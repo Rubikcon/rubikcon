@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: #0A0A0A;
+  color: #FFFFFF;
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* ── LIGHT MODE ──────────────────────────────────────── */
+body.light {
+  background-color: #FFFFFF;
+  color: #0A0A0A;
+}
+
+@layer utilities {
+  /* Gold */
+  .text-gold { color: #F5C518; }
+  .bg-gold { background-color: #F5C518; }
+
+  /* Buttons */
+  .btn-gold {
+    background-color: #F5C518;
+    color: #0A0A0A;
+    font-weight: 600;
+    padding: 0.6rem 1.6rem;
+    border-radius: 9999px;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+  .btn-gold:hover { background-color: #FFD740; transform: translateY(-1px); }
+
+  .btn-outline {
+    border: 1px solid #F5C518;
+    color: #F5C518;
+    font-weight: 500;
+    padding: 0.6rem 1.6rem;
+    border-radius: 9999px;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+  .btn-outline:hover { background-color: #F5C518; color: #0A0A0A; }
+
+  .btn-dark {
+    background-color: #1A1A1A;
+    color: #FFFFFF;
+    font-weight: 500;
+    padding: 0.6rem 1.6rem;
+    border-radius: 9999px;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+  .btn-dark:hover { background-color: #2A2A2A; }
+
+  /* Cards */
+  .card-dark {
+    background-color: #1A1A1A;
+    border: 1px solid #2A2A2A;
+    border-radius: 12px;
+  }
+  .card-cream {
+    background-color: #FFFFFF;
+    border: 1px solid #E8DFB8;
+    border-radius: 12px;
+  }
+
+  /* Image placeholder */
+  .img-placeholder {
+    background: linear-gradient(135deg, #1A1A1A 0%, #2A2A2A 100%);
+    border: 1.5px dashed #F5C518;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #F5C518;
+    font-size: 0.7rem;
+    font-family: 'JetBrains Mono', monospace;
+    text-align: center;
+    padding: 8px;
+  }
+  body.light .img-placeholder {
+    background: linear-gradient(135deg, #F0EAD0 0%, #E8DFB8 100%);
+    border-color: #C9A800;
+    color: #C9A800;
+  }
+
+  /* Section backgrounds */
+  .sec-dark   { background-color: #0A0A0A; }
+  .sec-mid    { background-color: #111111; }
+  .sec-cream  { background-color: #F5F0DC; }
+  .sec-white  { background-color: #FAFAF5; }
+
+  body.light .sec-dark  { background-color: #FFFFFF; }
+  body.light .sec-mid   { background-color: #F5F0DC; }
+  body.light .sec-cream { background-color: #F5F0DC; }
+  body.light .sec-white { background-color: #FFFFFF; }
+
+  /* Text colors */
+  .t-primary   { color: #FFFFFF; }
+  .t-secondary { color: #CCCCCC; }
+  .t-muted     { color: #888888; }
+  .t-border    { border-color: #2A2A2A; }
+
+  body.light .t-primary   { color: #0A0A0A; }
+  body.light .t-secondary { color: #333333; }
+  body.light .t-muted     { color: #666666; }
+  body.light .t-border    { border-color: #E0D9C0; }
+
+  /* Card adapts */
+  body.light .card-dark {
+    background-color: #FFFFFF;
+    border-color: #E0D9C0;
+  }
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #0A0A0A; }
+::-webkit-scrollbar-thumb { background: #2A2A2A; border-radius: 3px; }
+body.light ::-webkit-scrollbar-track { background: #F5F0DC; }
+body.light ::-webkit-scrollbar-thumb { background: #C9A800; border-radius: 3px; }

@@ -1,0 +1,215 @@
+// This is your Prisma schema file
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Auth & Users ────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  sessions     Session[]
+  progress     Progress[]
+  scores       Score[]
+  applications Application[]
+  gigs         Gig[]
+
+  @@index([email])
+  @@map("users")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+// ─── Session (anonymous + authenticated) ─────────────────────────────────────
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  scores Score[]
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ─── Academy ─────────────────────────────────────────────────────────────────
+
+model Course {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  slug        String   @unique
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  modules Module[]
+
+  @@map("courses")
+}
+
+model Module {
+  id       String @id @default(uuid())
+  title    String
+  position Int
+  courseId String
+
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  @@index([courseId])
+  @@map("modules")
+}
+
+model Lesson {
+  id          String   @id @default(uuid())
+  title       String
+  content     String
+  videoUrl    String?
+  duration    Int      // minutes
+  position    Int
+  moduleId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  module    Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress  Progress[]
+
+  @@index([moduleId])
+  @@map("lessons")
+}
+
+model Progress {
+  id        String   @id @default(uuid())
+  userId    String
+  lessonId  String
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+  @@index([lessonId])
+  @@map("progress")
+}
+
+// ─── Games ────────────────────────────────────────────────────────────────────
+
+model Score {
+  id        String   @id @default(uuid())
+  sessionId String
+  gameId    String
+  score     Int
+  createdAt DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId  String?
+
+  @@index([sessionId])
+  @@index([gameId])
+  @@index([userId])
+  @@map("scores")
+}
+
+// ─── BlockGigs ────────────────────────────────────────────────────────────────
+
+model Gig {
+  id          String      @id @default(uuid())
+  title       String
+  description String
+  budget      Float
+  budgetType  BudgetType  @default(FIXED)
+  currency    Currency    @default(USDC)
+  category    String
+  skills      String[]
+  difficulty  Difficulty  @default(MID)
+  deadline    String
+  remote      Boolean     @default(true)
+  featured    Boolean     @default(false)
+  status      GigStatus   @default(OPEN)
+  posterId    String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  poster       User          @relation(fields: [posterId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@index([posterId])
+  @@index([status])
+  @@index([category])
+  @@map("gigs")
+}
+
+model Application {
+  id        String            @id @default(uuid())
+  gigId     String
+  userId    String
+  proposal  String
+  rate      Float?
+  status    ApplicationStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  gig  Gig  @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gigId, userId])
+  @@index([gigId])
+  @@index([userId])
+  @@map("applications")
+}
+
+enum BudgetType {
+  FIXED
+  HOURLY
+}
+
+enum Currency {
+  ETH
+  USDC
+  MATIC
+}
+
+enum Difficulty {
+  ENTRY
+  MID
+  SENIOR
+}
+
+enum GigStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
