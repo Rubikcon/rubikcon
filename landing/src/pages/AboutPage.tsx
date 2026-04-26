@@ -204,19 +204,6 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── COMMUNITY TEAM ─────────────────────────────────────────── */}
-      {/* <section className="bg-[#111111] py-20 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div> */}
-              {/* REPLACE: community/event video thumbnail or collage */}
-              {/* <div className="grid grid-cols-2 gap-3">
-                <Img label="Community event photo 1 (Devcon at Your Doorstep)" aspect="aspect-square" />
-                <Img label="Community event photo 2 (Team/event)" aspect="aspect-square" />
-                <Img label="Community event photo 3" aspect="aspect-square" />
-                <Img label="Community event photo 4" aspect="aspect-square" />
-              </div>
-            </div> */}
             {/* ══════════════════════════════════════════════════════════════
           COMMUNITY TEAM
           Image mosaic: 1 tall on LEFT + 2 stacked on RIGHT
@@ -320,8 +307,9 @@ export default function AboutPage() {
       {/* ── BOTTOM CTA ─────────────────────────────────────────────── */}
       <section className="relative py-24 px-6 overflow-hidden bg-[#0A0A0A]">
         <div className="absolute inset-0">
-          {/* REPLACE: <img src="/cta-bg-2.jpg" className="w-full h-full object-cover opacity-15" /> */}
-          <div className="img-placeholder w-full h-full opacity-10" style={{ borderRadius: 0, border: 'none' }} />
+          
+          <img src="/images/down.jpg" className="w-full h-full object-cover opacity-15" />
+          {/* <div className="img-placeholder w-full h-full opacity-10" style={{ borderRadius: 0, border: 'none' }} /> */}
           <div className="absolute inset-0 bg-[#0A0A0A]/80" />
         </div>
         <div className="relative max-w-2xl mx-auto text-center">

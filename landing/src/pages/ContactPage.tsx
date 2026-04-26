@@ -101,10 +101,11 @@ export default function ContactPage() {
       {/* ── SCHEDULE CONSULTATION ─────────────────────────────────── */}
       <section className="relative py-28 px-6 overflow-hidden">
         <div className="absolute inset-0">
-          {/* REPLACE: <img src="/consultation-bg.jpg" className="w-full h-full object-cover opacity-20" /> */}
-          <div className="img-placeholder w-full h-full opacity-10" style={{ borderRadius: 0, border: 'none' }}>
+          {/* REPLACE:  */}
+          <img src="/images/down.jpg" className="w-full h-full object-cover opacity-20" />
+          {/* <div className="img-placeholder w-full h-full opacity-10" style={{ borderRadius: 0, border: 'none' }}>
             <span className="text-[10px]">[ Schedule consultation section background image ]</span>
-          </div>
+          </div> */}
           <div className="absolute inset-0 bg-[#0A0A0A]/80" />
         </div>
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}

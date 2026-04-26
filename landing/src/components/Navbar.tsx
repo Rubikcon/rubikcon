@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, ArrowRight, Sun, Moon } from 'lucide-react'
 import { useLocation } from 'wouter'
 import { useTheme } from '../context/ThemeContext'
+import { URLS } from '../config/urls'
 
 const NAV_LINKS = [
   { label: 'About Us', href: '/about' },
-  { label: 'Academy', href: 'http://localhost:3001', external: true},
+  { label: 'Academy', href: URLS.academy, external: true},
   { label: 'Products', href: '/products' },
   { label: 'Projects', href: '/projects' },
   { label: 'Contact Us', href: '/contact' },
@@ -37,7 +38,7 @@ export default function Navbar() {
       {/* ── Announcement Bar ─────────────────────────────── */}
       <div className={`py-2 px-6 text-center text-xs transition-colors ${isDark ? 'bg-[#111111] border-b border-[#2A2A2A] text-[#CCCCCC]' : 'bg-[#F5F0DC] border-b border-[#E0D9C0] text-[#555555]'}`}>
         We have a collection of Games available&nbsp;
-        <a href="http://localhost:3002"
+        <a href={URLS.games}
           className="text-[#F5C518] underline underline-offset-2 hover:text-[#C9A800] transition-colors font-medium">
           Visit our Game Shop
         </a>
