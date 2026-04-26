@@ -14,6 +14,10 @@ body {
   transition: background-color 0.3s, color 0.3s;
 }
 
+* {
+  max-width: 100%;
+}
+
 /* ── LIGHT MODE ──────────────────────────────────────── */
 body.light {
   background-color: #FFFFFF;
