@@ -310,4 +310,4 @@ Use Railway PostgreSQL, Supabase, or Neon.tech for managed PostgreSQL.
 
 ---
 
-Built with ❤️ for the Web3 frontier.
+Built with ❤️ for the Web3 frontier - by Natzsmart:[https://www.github.com/Natzsmart]
