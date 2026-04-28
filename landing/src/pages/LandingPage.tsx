@@ -433,7 +433,7 @@ export default function LandingPage() {
                     (top-right: 320×192, bottom-left: 315×192, bottom-right: 228×192)
           Central vertical gold dashed line between rows with pill labels
       ══════════════════════════════════════════════════════════════ */}
-      <section className={`py-20 px-6 transition-colors ${isDark ? 'bg-[#0A0A0A]' : 'bg-white'}`}>
+      <section className={`py-20 px-6 overflow-hidden transition-colors ${isDark ? 'bg-[#0A0A0A]' : 'bg-white'}`}>
         <div className="max-w-7xl mx-auto">
           <h2 className={`font-display text-3xl font-bold text-center mb-16 ${isDark ? 'text-white' : 'text-[#0A0A0A]'}`}>
             Projects &amp; Products

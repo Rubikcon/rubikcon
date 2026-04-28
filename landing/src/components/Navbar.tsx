@@ -59,7 +59,8 @@ export default function Navbar() {
           </a>
 
           {/* Desktop Links */}
-          <div className="hidden md:flex items-center gap-8">
+          {/* <div className="hidden md:flex items-center gap-8"> */}
+          <div className="hidden lg:flex items-center gap-8">
             {NAV_LINKS.map(link => (
               <a key={link.href} href={link.href}
                 className={`text-sm font-medium transition-colors ${
@@ -93,7 +94,9 @@ export default function Navbar() {
           </div>
 
           {/* Mobile: toggle + menu */}
-          <div className="md:hidden flex items-center gap-2">
+          {/* <div className="md:hidden flex items-center gap-2"> */}
+          <div className="lg:hidden flex items-center gap-2">
+
             <button onClick={toggle}
               className={`w-8 h-8 rounded-full flex items-center justify-center ${isDark ? 'bg-[#1A1A1A] text-[#F5C518]' : 'bg-[#F5F0DC] text-[#C9A800]'}`}>
               {isDark ? <Sun size={13} /> : <Moon size={13} />}
@@ -110,7 +113,7 @@ export default function Navbar() {
           {mobileOpen && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className={isDark ? 'bg-[#111111] border-t border-[#2A2A2A]' : 'bg-white border-t border-[#E0D9C0]'}>
+              className={isDark ? 'lg:hidden bg-[#111111] border-t border-[#2A2A2A]' : 'lg:hidden bg-white border-t border-[#E0D9C0]'}>
               <div className="px-6 py-5 flex flex-col gap-3">
                 {NAV_LINKS.map(link => (
                   <a key={link.href} href={link.href}
