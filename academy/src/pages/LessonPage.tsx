@@ -186,7 +186,18 @@ export default function LessonPage() {
         setError(null)
         await loadWeekPage()
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load week content.')
+        if (cancelled) return
+        if (err instanceof ApiError) {
+          if (err.status === 401) {
+            window.location.href = `/login?redirect=/course/${courseSlug}/${weekSlug}`
+            return
+          }
+          if (err.status === 403) {
+            window.location.href = `/course/${courseSlug}`
+            return
+          }
+        }
+        setError(err instanceof Error ? err.message : 'Failed to load week content.')
       } finally {
         if (!cancelled) setLoading(false)
       }

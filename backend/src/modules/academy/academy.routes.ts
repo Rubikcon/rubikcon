@@ -608,6 +608,19 @@ router.get('/weeks/:weekSlug', optionalAuth, async (req: Request, res: Response,
       return sendError(res, 'Week not found.', 404)
     }
 
+    // Require enrollment to access week content
+    if (!req.user) {
+      return sendError(res, 'Log in to access this lesson.', 401)
+    }
+
+    const enrollment = await prisma.courseEnrollment.findUnique({
+      where: { userId_courseId: { userId: req.user.userId, courseId: week.courseId } },
+    })
+
+    if (!enrollment) {
+      return sendError(res, 'Enrol in this course to access this lesson.', 403)
+    }
+
     const courseWeeks = await prisma.week.findMany({
       where: { courseId: week.courseId, published: true },
       orderBy: { number: 'asc' },
