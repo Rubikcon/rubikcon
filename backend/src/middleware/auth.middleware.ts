@@ -42,8 +42,17 @@ export const optionalAuth = (req: Request, _res: Response, next: NextFunction): 
 
 // Admin-only guard (must be used after requireAuth)
 export const requireAdmin = (req: Request, res: Response, next: NextFunction): void => {
-  if (req.user?.role !== 'ADMIN') {
+  if (req.user?.role !== 'ADMIN' && req.user?.role !== 'SUPER_ADMIN') {
     sendError(res, 'Forbidden. Admin access required.', 403)
+    return
+  }
+  next()
+}
+
+// Super admin-only guard (must be used after requireAuth)
+export const requireSuperAdmin = (req: Request, res: Response, next: NextFunction): void => {
+  if (req.user?.role !== 'SUPER_ADMIN') {
+    sendError(res, 'Forbidden. Super admin access required.', 403)
     return
   }
   next()

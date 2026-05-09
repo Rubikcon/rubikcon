@@ -28,6 +28,18 @@ model User {
   scores       Score[]
   applications Application[]
   gigs         Gig[]
+  savedTerms   SavedGlossaryTerm[]
+  readingItems ReadingProgress[]
+  quizAttempts QuizAttempt[]
+  quizRetakeAccess QuizRetakeUnlock[] @relation("QuizRetakeLearner")
+  quizRetakeUnlocksGranted QuizRetakeUnlock[] @relation("QuizRetakeAdmin")
+  assignmentSubmissions AssignmentSubmission[]
+  assignmentFeedbackGiven AssignmentFeedback[] @relation("AssignmentFeedbackReviewer")
+  weekProgress WeekProgress[]
+  coursesCreated  Course[]         @relation("CourseCreator")
+  courseApprovals CourseApproval[] @relation("CourseApprovalReviewer")
+  courseEnrollments CourseEnrollment[]
+  profile      UserProfile?
 
   @@index([email])
   @@map("users")
@@ -36,6 +48,30 @@ model User {
 enum Role {
   USER
   ADMIN
+  SUPER_ADMIN
+}
+
+// ─── User Profile (onboarding data) ──────────────────────────────────────────
+
+model UserProfile {
+  id                  String    @id @default(uuid())
+  userId              String    @unique
+  userRole            String?
+  gender              String?
+  country             String?
+  experienceLevel     String?
+  motivation          String?
+  learningInterests   String[]
+  telegramHandle      String?
+  twitterHandle       String?
+  onboardingCompleted Boolean   @default(false)
+  completedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
 }
 
 // ─── Session (anonymous + authenticated) ─────────────────────────────────────
@@ -56,27 +92,92 @@ model Session {
 // ─── Academy ─────────────────────────────────────────────────────────────────
 
 model Course {
-  id          String   @id @default(uuid())
-  title       String
-  description String
-  slug        String   @unique
-  published   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String       @id @default(uuid())
+  title             String
+  description       String
+  tagline           String?
+  level             String?
+  estimatedDuration String?
+  phaseLabel        String?
+  heroImage         String?
+  contentUnit       String       @default("Lesson")
+  slug              String       @unique
+  published         Boolean      @default(false)
+  publishedAt       DateTime?
+  status            CourseStatus @default(DRAFT)
+  createdById       String?
+  approvalNotes     String?
+  submittedAt       DateTime?
+  approvedAt        DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-  modules Module[]
+  modules            Module[]
+  weeks              Week[]
+  createdBy          User?               @relation("CourseCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  courseFacilitators CourseFacilitator[]
+  approvals          CourseApproval[]
+  enrollments        CourseEnrollment[]
 
+  @@index([createdById])
   @@map("courses")
 }
 
+model CourseEnrollment {
+  id         String   @id @default(uuid())
+  userId     String
+  courseId   String
+  enrolledAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@map("course_enrollments")
+}
+
+model CourseFacilitator {
+  id            String @id @default(uuid())
+  courseId      String
+  facilitatorId String
+  position      Int
+
+  course      Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  facilitator Facilitator @relation(fields: [facilitatorId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, facilitatorId])
+  @@index([courseId])
+  @@index([facilitatorId])
+  @@map("course_facilitators")
+}
+
+model CourseApproval {
+  id         String         @id @default(uuid())
+  courseId   String
+  reviewerId String
+  action     ApprovalAction
+  notes      String?
+  createdAt  DateTime       @default(now())
+
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  reviewer User   @relation("CourseApprovalReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([reviewerId])
+  @@map("course_approvals")
+}
+
 model Module {
-  id       String @id @default(uuid())
-  title    String
-  position Int
-  courseId String
+  id          String  @id @default(uuid())
+  title       String
+  description String?
+  position    Int
+  courseId    String
 
   course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons Lesson[]
+  weeks   Week[]
 
   @@index([courseId])
   @@map("modules")
@@ -115,6 +216,427 @@ model Progress {
   @@index([userId])
   @@index([lessonId])
   @@map("progress")
+}
+
+model Facilitator {
+  id           String            @id @default(uuid())
+  name         String
+  title        String
+  organization String
+  email        String
+  linkedinUrl  String
+  photoUrl     String?
+  bio          String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  weeks   WeekFacilitator[]
+  courses CourseFacilitator[]
+
+  @@unique([email])
+  @@map("facilitators")
+}
+
+model Week {
+  id                         String          @id @default(uuid())
+  courseId                   String
+  moduleId                   String?
+  number                     Int
+  title                      String
+  slug                       String          @unique
+  durationLabel              String
+  difficulty                 WeekDifficulty
+  hook                       String
+  whatToExpect               String
+  summary                    String
+  estimatedCompletionMinutes Int
+  videoTitle                 String?
+  videoUrl                   String?
+  lessonContent              String?
+  published                  Boolean         @default(false)
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+
+  course         Course                  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module         Module?                 @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  facilitators   WeekFacilitator[]
+  topics         WeekTopic[]
+  objectives     WeekObjective[]
+  slideDeck      SlideDeck?
+  glossaryTerms  GlossaryTerm[]
+  readingResources ReadingResource[]
+  quiz           Quiz?
+  assignments    Assignment[]
+  progress       WeekProgress[]
+  images         WeekImage[]
+  videos         WeekVideo[]
+
+  @@unique([courseId, number])
+  @@index([courseId])
+  @@index([moduleId])
+  @@map("weeks")
+}
+
+model WeekVideo {
+  id          String  @id @default(uuid())
+  weekId      String
+  title       String
+  url         String
+  description String?
+  position    Int
+
+  week Week @relation(fields: [weekId], references: [id], onDelete: Cascade)
+
+  @@unique([weekId, position])
+  @@index([weekId])
+  @@map("week_videos")
+}
+
+model WeekImage {
+  id       String  @id @default(uuid())
+  weekId   String
+  url      String
+  alt      String?
+  caption  String?
+  position Int
+
+  week Week @relation(fields: [weekId], references: [id], onDelete: Cascade)
+
+  @@index([weekId])
+  @@map("week_images")
+}
+
+model WeekFacilitator {
+  id            String      @id @default(uuid())
+  weekId         String
+  facilitatorId  String
+  position       Int
+
+  week        Week        @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  facilitator Facilitator @relation(fields: [facilitatorId], references: [id], onDelete: Cascade)
+
+  @@unique([weekId, facilitatorId])
+  @@index([weekId])
+  @@index([facilitatorId])
+  @@map("week_facilitators")
+}
+
+model WeekTopic {
+  id       String @id @default(uuid())
+  weekId    String
+  title    String
+  position Int
+
+  week Week @relation(fields: [weekId], references: [id], onDelete: Cascade)
+
+  @@unique([weekId, position])
+  @@index([weekId])
+  @@map("week_topics")
+}
+
+model WeekObjective {
+  id        String @id @default(uuid())
+  weekId     String
+  body      String
+  position  Int
+
+  week Week @relation(fields: [weekId], references: [id], onDelete: Cascade)
+
+  @@unique([weekId, position])
+  @@index([weekId])
+  @@map("week_objectives")
+}
+
+model SlideDeck {
+  id            String              @id @default(uuid())
+  weekId         String              @unique
+  title         String
+  url           String
+  slideCount    Int
+  lastUpdatedAt DateTime
+  viewerType    SlideDeckViewerType @default(EXTERNAL)
+
+  week     Week               @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  sections SlideDeckSection[]
+
+  @@map("slide_decks")
+}
+
+model SlideDeckSection {
+  id          String @id @default(uuid())
+  slideDeckId  String
+  label       String
+  position    Int
+
+  slideDeck SlideDeck @relation(fields: [slideDeckId], references: [id], onDelete: Cascade)
+
+  @@unique([slideDeckId, position])
+  @@index([slideDeckId])
+  @@map("slide_deck_sections")
+}
+
+model GlossaryTerm {
+  id         String @id @default(uuid())
+  weekId      String
+  term       String
+  definition String
+  example    String?
+  position   Int
+
+  week       Week                @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  savedBy    SavedGlossaryTerm[]
+
+  @@unique([weekId, term])
+  @@unique([weekId, position])
+  @@index([weekId])
+  @@map("glossary_terms")
+}
+
+model SavedGlossaryTerm {
+  id        String   @id @default(uuid())
+  userId    String
+  termId    String
+  createdAt DateTime @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  term GlossaryTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, termId])
+  @@index([userId])
+  @@index([termId])
+  @@map("saved_glossary_terms")
+}
+
+model ReadingResource {
+  id          String              @id @default(uuid())
+  weekId       String
+  title       String
+  source      String
+  url         String
+  description String
+  type        ReadingResourceType
+  position    Int
+
+  week     Week              @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  progress ReadingProgress[]
+
+  @@unique([weekId, position])
+  @@index([weekId])
+  @@map("reading_resources")
+}
+
+model ReadingProgress {
+  id         String   @id @default(uuid())
+  userId     String
+  resourceId String
+  readAt     DateTime @default(now())
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resource ReadingResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, resourceId])
+  @@index([userId])
+  @@index([resourceId])
+  @@map("reading_progress")
+}
+
+model Quiz {
+  id            String   @id @default(uuid())
+  weekId         String   @unique
+  title         String
+  passMark      Int      @default(70)
+  attemptLimit  Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  week      Week               @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  questions QuizQuestion[]
+  attempts  QuizAttempt[]
+  unlocks   QuizRetakeUnlock[]
+
+  @@map("quizzes")
+}
+
+model QuizQuestion {
+  id          String @id @default(uuid())
+  quizId       String
+  prompt      String
+  explanation String
+  position    Int
+
+  quiz    Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options QuizOption[]
+  answers QuizAnswer[]
+
+  @@unique([quizId, position])
+  @@index([quizId])
+  @@map("quiz_questions")
+}
+
+model QuizOption {
+  id         String  @id @default(uuid())
+  questionId  String
+  label      String
+  isCorrect  Boolean @default(false)
+  position   Int
+
+  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers   QuizAnswer[]
+
+  @@unique([questionId, position])
+  @@index([questionId])
+  @@map("quiz_options")
+}
+
+model QuizAttempt {
+  id          String            @id @default(uuid())
+  userId      String
+  quizId      String
+  score       Int
+  percentage  Float
+  status      QuizAttemptStatus @default(SUBMITTED)
+  submittedAt DateTime          @default(now())
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz    Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  answers QuizAnswer[]
+
+  @@unique([userId, quizId, submittedAt])
+  @@index([userId])
+  @@index([quizId])
+  @@map("quiz_attempts")
+}
+
+model QuizAnswer {
+  id               String @id @default(uuid())
+  attemptId         String
+  questionId        String
+  selectedOptionId  String
+
+  attempt        QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question       QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOption QuizOption   @relation(fields: [selectedOptionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@index([questionId])
+  @@index([selectedOptionId])
+  @@map("quiz_answers")
+}
+
+model QuizRetakeUnlock {
+  id           String   @id @default(uuid())
+  quizId        String
+  userId        String
+  unlockedById  String
+  unlockedAt    DateTime @default(now())
+
+  quiz       Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user       User @relation("QuizRetakeLearner", fields: [userId], references: [id], onDelete: Cascade)
+  unlockedBy User @relation("QuizRetakeAdmin", fields: [unlockedById], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, userId])
+  @@index([quizId])
+  @@index([userId])
+  @@index([unlockedById])
+  @@map("quiz_retake_unlocks")
+}
+
+model Assignment {
+  id                  String   @id @default(uuid())
+  weekId               String
+  title               String
+  instructions        String
+  deadline            DateTime
+  allowTextSubmission Boolean  @default(true)
+  allowFileUpload     Boolean  @default(false)
+  position            Int
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  week        Week                  @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  choices     AssignmentChoice[]
+  submissions AssignmentSubmission[]
+
+  @@unique([weekId, position])
+  @@index([weekId])
+  @@map("assignments")
+}
+
+model AssignmentChoice {
+  id           String @id @default(uuid())
+  assignmentId  String
+  title        String
+  description  String
+  position     Int
+
+  assignment  Assignment             @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  submissions AssignmentSubmission[]
+
+  @@unique([assignmentId, position])
+  @@index([assignmentId])
+  @@map("assignment_choices")
+}
+
+model AssignmentSubmission {
+  id                String                     @id @default(uuid())
+  userId            String
+  assignmentId      String
+  choiceId          String?
+  textResponse      String?
+  attachmentName    String?
+  attachmentUrl     String?
+  attachmentMimeType String?
+  attachmentSizeBytes Int?
+  status            AssignmentSubmissionStatus @default(SUBMITTED)
+  submittedAt       DateTime                   @default(now())
+  reviewedAt        DateTime?
+
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignment Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  choice     AssignmentChoice? @relation(fields: [choiceId], references: [id], onDelete: SetNull)
+  feedback   AssignmentFeedback[]
+
+  @@index([userId])
+  @@index([assignmentId])
+  @@index([choiceId])
+  @@map("assignment_submissions")
+}
+
+model AssignmentFeedback {
+  id           String   @id @default(uuid())
+  submissionId  String
+  reviewerId    String
+  feedback     String
+  rating       Int?
+  createdAt    DateTime @default(now())
+
+  submission AssignmentSubmission          @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  reviewer   User                          @relation("AssignmentFeedbackReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@index([reviewerId])
+  @@map("assignment_feedback")
+}
+
+model WeekProgress {
+  id                  String             @id @default(uuid())
+  userId              String
+  weekId              String
+  status              WeekProgressStatus @default(NOT_STARTED)
+  quizSubmitted       Boolean            @default(false)
+  assignmentSubmitted Boolean            @default(false)
+  completedAt         DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  week Week @relation(fields: [weekId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekId])
+  @@index([userId])
+  @@index([weekId])
+  @@map("week_progress")
 }
 
 // ─── Games ────────────────────────────────────────────────────────────────────
@@ -211,5 +733,53 @@ enum GigStatus {
 enum ApplicationStatus {
   PENDING
   ACCEPTED
+  REJECTED
+}
+
+enum WeekDifficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum SlideDeckViewerType {
+  MODAL
+  EXTERNAL
+}
+
+enum ReadingResourceType {
+  ARTICLE
+  COURSE
+  DOCUMENTATION
+  WHITEPAPER
+  VIDEO
+  INTERACTIVE
+}
+
+enum QuizAttemptStatus {
+  SUBMITTED
+}
+
+enum AssignmentSubmissionStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+}
+
+enum WeekProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETE
+}
+
+enum CourseStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum ApprovalAction {
+  APPROVED
   REJECTED
 }

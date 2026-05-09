@@ -24,13 +24,14 @@ const loginSchema = z.object({
 
 const SALT_ROUNDS = 12
 
-function sanitizeUser(user: { id: string; email: string; name: string | null; role: string; createdAt: Date }) {
+function sanitizeUser(user: { id: string; email: string; name: string | null; role: string; createdAt: Date }, onboardingCompleted = false) {
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     role: user.role,
     createdAt: user.createdAt,
+    onboardingCompleted,
   }
 }
 
@@ -56,9 +57,14 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
       data: { email, password: hashedPassword, name: name || null },
     })
 
+    // Create empty profile record so onboardingCompleted = false
+    await prisma.userProfile.create({
+      data: { userId: user.id },
+    })
+
     const token = signToken({ userId: user.id, email: user.email, role: user.role })
 
-    return sendSuccess(res, { user: sanitizeUser(user), token }, 'Account created successfully.', 201)
+    return sendSuccess(res, { user: sanitizeUser(user, false), token }, 'Account created successfully.', 201)
   } catch (err) {
     next(err)
   }
@@ -75,7 +81,10 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
 
     const { email, password } = parsed.data
 
-    const user = await prisma.user.findUnique({ where: { email } })
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { profile: true },
+    })
     if (!user) {
       return sendError(res, 'Invalid email or password.', 401)
     }
@@ -85,9 +94,10 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       return sendError(res, 'Invalid email or password.', 401)
     }
 
+    const onboardingCompleted = user.profile?.onboardingCompleted ?? false
     const token = signToken({ userId: user.id, email: user.email, role: user.role })
 
-    return sendSuccess(res, { user: sanitizeUser(user), token }, 'Logged in successfully.')
+    return sendSuccess(res, { user: sanitizeUser(user, onboardingCompleted), token }, 'Logged in successfully.')
   } catch (err) {
     next(err)
   }
@@ -97,9 +107,59 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
 
 router.get('/me', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } })
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      include: { profile: true },
+    })
     if (!user) return sendError(res, 'User not found.', 404)
-    return sendSuccess(res, sanitizeUser(user))
+    return sendSuccess(res, sanitizeUser(user, user.profile?.onboardingCompleted ?? false))
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── POST /auth/onboarding ────────────────────────────────────────────────────
+
+const onboardingSchema = z.object({
+  userRole: z.string().min(1).optional(),
+  gender: z.string().min(1).optional(),
+  country: z.string().min(1).optional(),
+  experienceLevel: z.string().min(1).optional(),
+  motivation: z.string().min(1).optional(),
+  learningInterests: z.array(z.string()).optional(),
+  telegramHandle: z.string().optional(),
+  twitterHandle: z.string().optional(),
+})
+
+router.post('/onboarding', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = onboardingSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+    }
+
+    const { userRole, gender, country, experienceLevel, motivation, learningInterests, telegramHandle, twitterHandle } = parsed.data
+
+    const profileData = {
+      userRole,
+      gender,
+      country,
+      experienceLevel,
+      motivation,
+      learningInterests: learningInterests ?? [],
+      telegramHandle: telegramHandle || null,
+      twitterHandle: twitterHandle || null,
+      onboardingCompleted: true,
+      completedAt: new Date(),
+    }
+
+    const profile = await prisma.userProfile.upsert({
+      where: { userId: req.user!.userId },
+      create: { userId: req.user!.userId, ...profileData },
+      update: profileData,
+    })
+
+    return sendSuccess(res, { onboardingCompleted: profile.onboardingCompleted }, 'Onboarding complete.')
   } catch (err) {
     next(err)
   }

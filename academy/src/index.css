@@ -6,9 +6,9 @@
 html { scroll-behavior: smooth; }
 
 body {
-  background-color: #080A0F;
+  background-color: #0A0A0A;
   color: #F9FAFB;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'DM Sans', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 

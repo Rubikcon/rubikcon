@@ -3,3 +3,10 @@ node_modules/
 .env.example
 .env.production
 dist/
+
+# Claude IDE
+.claude/
+
+# Local planning / scratch files
+checklist.md
+plan.md

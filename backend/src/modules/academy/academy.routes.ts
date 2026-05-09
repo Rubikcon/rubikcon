@@ -2,11 +2,1390 @@ import { Router, Request, Response, NextFunction } from 'express'
 import { z } from 'zod'
 import prisma from '../../config/database'
 import { sendSuccess, sendError } from '../../utils/response'
-import { requireAuth, optionalAuth } from '../../middleware/auth.middleware'
+import { optionalAuth, requireAdmin, requireAuth, requireSuperAdmin } from '../../middleware/auth.middleware'
+import { AssignmentSubmissionStatus, CourseStatus, Prisma, QuizAttemptStatus, WeekProgressStatus } from '@prisma/client'
 
 const router = Router()
 
-// ─── GET /academy/course — list all published courses ────────────────────────
+const legacyProgressSchema = z.object({
+  lessonId: z.string().uuid('Invalid lesson ID'),
+  completed: z.boolean().default(true),
+})
+
+const saveTermSchema = z.object({
+  termId: z.string().uuid('Invalid term ID'),
+})
+
+const quizSubmissionSchema = z.object({
+  answers: z.array(z.object({
+    questionId: z.string().uuid('Invalid question ID'),
+    selectedOptionId: z.string().uuid('Invalid option ID'),
+  })).min(1, 'At least one answer is required'),
+})
+
+const assignmentSubmissionSchema = z.object({
+  choiceId: z.string().uuid('Invalid choice ID').optional(),
+  textResponse: z.string().trim().min(1).max(10000).optional(),
+  attachmentName: z.string().trim().min(1).max(255).optional(),
+  attachmentUrl: z.string().url('Invalid attachment URL').optional(),
+  attachmentMimeType: z.string().trim().min(1).max(120).optional(),
+  attachmentSizeBytes: z.number().int().positive().max(10_000_000).optional(),
+}).superRefine((value, ctx) => {
+  if (!value.textResponse && !value.attachmentUrl) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['textResponse'],
+      message: 'Provide a text response or attachment URL.',
+    })
+  }
+})
+
+const feedbackSchema = z.object({
+  feedback: z.string().trim().min(2).max(5000),
+  rating: z.number().int().min(1).max(5).optional(),
+})
+
+const unlockRetakeSchema = z.object({
+  userId: z.string().uuid('Invalid user ID'),
+})
+
+const adminWeekFilterSchema = z.object({
+  weekSlug: z.string().optional(),
+})
+
+function maskEmail(email: string) {
+  const [local, domain] = email.split('@')
+  if (!local || !domain) return email
+  if (local.length <= 2) return `${local[0] || '*'}***@${domain}`
+  return `${local.slice(0, 2)}***@${domain}`
+}
+
+function deriveWeekProgressStatus(quizSubmitted: boolean, assignmentSubmitted: boolean): WeekProgressStatus {
+  if (quizSubmitted && assignmentSubmitted) return WeekProgressStatus.COMPLETE
+  if (quizSubmitted || assignmentSubmitted) return WeekProgressStatus.IN_PROGRESS
+  return WeekProgressStatus.NOT_STARTED
+}
+
+async function syncWeekProgress(userId: string, weekId: string) {
+  const [quizAttempt, assignmentSubmission] = await Promise.all([
+    prisma.quizAttempt.findFirst({
+      where: { userId, quiz: { weekId } },
+      select: { id: true },
+    }),
+    prisma.assignmentSubmission.findFirst({
+      where: { userId, assignment: { weekId } },
+      select: { id: true },
+    }),
+  ])
+
+  const quizSubmitted = Boolean(quizAttempt)
+  const assignmentSubmitted = Boolean(assignmentSubmission)
+  const status = deriveWeekProgressStatus(quizSubmitted, assignmentSubmitted)
+
+  return prisma.weekProgress.upsert({
+    where: { userId_weekId: { userId, weekId } },
+    create: {
+      userId,
+      weekId,
+      quizSubmitted,
+      assignmentSubmitted,
+      status,
+      completedAt: status === WeekProgressStatus.COMPLETE ? new Date() : null,
+    },
+    update: {
+      quizSubmitted,
+      assignmentSubmitted,
+      status,
+      completedAt: status === WeekProgressStatus.COMPLETE ? new Date() : null,
+    },
+  })
+}
+
+function serializeWeekSummary(
+  week: {
+    id: string
+    number: number
+    slug: string
+    title: string
+    durationLabel: string
+    estimatedCompletionMinutes: number
+    moduleId?: string | null
+    module?: { id: string; title: string; description: string | null } | null
+  },
+  progress?: {
+    status: WeekProgressStatus
+    quizSubmitted: boolean
+    assignmentSubmitted: boolean
+    completedAt: Date | null
+  } | null
+) {
+  return {
+    id: week.id,
+    number: week.number,
+    slug: week.slug,
+    title: week.title,
+    durationLabel: week.durationLabel,
+    estimatedCompletionMinutes: week.estimatedCompletionMinutes,
+    moduleId: week.moduleId ?? null,
+    module: week.module ? { id: week.module.id, title: week.module.title, description: week.module.description } : null,
+    progress: progress
+      ? {
+          status: progress.status,
+          quizSubmitted: progress.quizSubmitted,
+          assignmentSubmitted: progress.assignmentSubmitted,
+          completedAt: progress.completedAt,
+        }
+      : {
+          status: WeekProgressStatus.NOT_STARTED,
+          quizSubmitted: false,
+          assignmentSubmitted: false,
+          completedAt: null,
+        },
+  }
+}
+
+function serializeQuizForDelivery(
+  quiz: {
+    id: string
+    title: string
+    passMark: number
+    attemptLimit: number
+    questions: Array<{
+      id: string
+      prompt: string
+      explanation: string
+      position: number
+      options: Array<{
+        id: string
+        label: string
+        position: number
+        isCorrect: boolean
+      }>
+    }>
+  },
+  latestAttempt?: {
+    id: string
+    score: number
+    percentage: number
+    submittedAt: Date
+    status: QuizAttemptStatus
+    answers: Array<{
+      questionId: string
+      selectedOptionId: string
+    }>
+  } | null,
+  unlockGranted?: boolean
+) {
+  const selectedOptionByQuestion = new Map(
+    (latestAttempt?.answers ?? []).map(answer => [answer.questionId, answer.selectedOptionId])
+  )
+
+  return {
+    id: quiz.id,
+    title: quiz.title,
+    passMark: quiz.passMark,
+    attemptLimit: quiz.attemptLimit,
+    unlockGranted: Boolean(unlockGranted),
+    submitted: Boolean(latestAttempt),
+    latestAttempt: latestAttempt
+      ? {
+          id: latestAttempt.id,
+          score: latestAttempt.score,
+          percentage: latestAttempt.percentage,
+          submittedAt: latestAttempt.submittedAt,
+          status: latestAttempt.status,
+        }
+      : null,
+    questions: quiz.questions.map(question => ({
+      id: question.id,
+      prompt: question.prompt,
+      explanation: latestAttempt ? question.explanation : null,
+      position: question.position,
+      options: question.options.map(option => ({
+        id: option.id,
+        label: option.label,
+        position: option.position,
+        isCorrect: latestAttempt ? option.isCorrect : undefined,
+        isSelected: latestAttempt ? selectedOptionByQuestion.get(question.id) === option.id : false,
+      })),
+    })),
+  }
+}
+
+function serializeAssignmentsForDelivery(
+  assignments: Array<{
+    id: string
+    title: string
+    instructions: string
+    deadline: Date
+    allowTextSubmission: boolean
+    allowFileUpload: boolean
+    position: number
+    choices: Array<{
+      id: string
+      title: string
+      description: string
+      position: number
+    }>
+  }>,
+  submissions: Array<{
+    id: string
+    assignmentId: string
+    choiceId: string | null
+    textResponse: string | null
+    attachmentName: string | null
+    attachmentUrl: string | null
+    attachmentMimeType: string | null
+    attachmentSizeBytes: number | null
+    status: AssignmentSubmissionStatus
+    submittedAt: Date
+    reviewedAt: Date | null
+    feedback: Array<{
+      id: string
+      feedback: string
+      rating: number | null
+      createdAt: Date
+      reviewer: {
+        id: string
+        name: string | null
+        email: string
+      }
+    }>
+  }>
+) {
+  const latestSubmissionByAssignment = new Map<string, typeof submissions[number]>()
+  for (const submission of submissions) {
+    const existing = latestSubmissionByAssignment.get(submission.assignmentId)
+    if (!existing || submission.submittedAt > existing.submittedAt) {
+      latestSubmissionByAssignment.set(submission.assignmentId, submission)
+    }
+  }
+
+  return assignments.map(assignment => {
+    const latestSubmission = latestSubmissionByAssignment.get(assignment.id)
+    return {
+      id: assignment.id,
+      title: assignment.title,
+      instructions: assignment.instructions,
+      deadline: assignment.deadline,
+      allowTextSubmission: assignment.allowTextSubmission,
+      allowFileUpload: assignment.allowFileUpload,
+      position: assignment.position,
+      status: latestSubmission?.status ?? 'NOT_STARTED',
+      choices: assignment.choices,
+      latestSubmission: latestSubmission
+        ? {
+            id: latestSubmission.id,
+            choiceId: latestSubmission.choiceId,
+            textResponse: latestSubmission.textResponse,
+            attachmentName: latestSubmission.attachmentName,
+            attachmentUrl: latestSubmission.attachmentUrl,
+            attachmentMimeType: latestSubmission.attachmentMimeType,
+            attachmentSizeBytes: latestSubmission.attachmentSizeBytes,
+            status: latestSubmission.status,
+            submittedAt: latestSubmission.submittedAt,
+            reviewedAt: latestSubmission.reviewedAt,
+            feedback: latestSubmission.feedback.map(item => ({
+              id: item.id,
+              feedback: item.feedback,
+              rating: item.rating,
+              createdAt: item.createdAt,
+              reviewerName: item.reviewer.name ?? item.reviewer.email,
+            })),
+          }
+        : null,
+    }
+  })
+}
+
+async function getCourseProgressMap(userId: string, weekIds: string[]) {
+  const items = await prisma.weekProgress.findMany({
+    where: { userId, weekId: { in: weekIds } },
+  })
+
+  return new Map(items.map(item => [item.weekId, item]))
+}
+
+async function getUserWeekState(userId: string, weekId: string, quizId?: string | null) {
+  const [savedTerms, readItems, weekProgress, latestAttempt, quizUnlock, submissions] = await Promise.all([
+    prisma.savedGlossaryTerm.findMany({
+      where: { userId, term: { weekId } },
+      select: { termId: true },
+    }),
+    prisma.readingProgress.findMany({
+      where: { userId, resource: { weekId } },
+      select: { resourceId: true },
+    }),
+    prisma.weekProgress.findUnique({
+      where: { userId_weekId: { userId, weekId } },
+    }),
+    quizId
+      ? prisma.quizAttempt.findFirst({
+          where: { userId, quizId },
+          orderBy: { submittedAt: 'desc' },
+          include: {
+            answers: {
+              select: {
+                questionId: true,
+                selectedOptionId: true,
+              },
+            },
+          },
+        })
+      : Promise.resolve(null),
+    quizId
+      ? prisma.quizRetakeUnlock.findUnique({
+          where: { quizId_userId: { quizId, userId } },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    prisma.assignmentSubmission.findMany({
+      where: { userId, assignment: { weekId } },
+      include: {
+        feedback: {
+          include: {
+            reviewer: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+      orderBy: { submittedAt: 'desc' },
+    }),
+  ])
+
+  return {
+    savedTermIds: savedTerms.map(item => item.termId),
+    readResourceIds: readItems.map(item => item.resourceId),
+    weekProgress,
+    latestAttempt,
+    unlockGranted: Boolean(quizUnlock),
+    submissions,
+  }
+}
+
+// New LMS endpoints
+
+// Public course catalog (with optional enrollment status if logged in)
+router.get('/courses', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const courses = await prisma.course.findMany({
+      where: { published: true },
+      include: {
+        weeks: {
+          where: { published: true },
+          select: { id: true },
+        },
+        courseFacilitators: {
+          include: {
+            facilitator: {
+              select: { id: true, name: true, title: true, organization: true, photoUrl: true },
+            },
+          },
+          orderBy: { position: 'asc' },
+        },
+        enrollments: req.user
+          ? { where: { userId: req.user.userId }, select: { id: true } }
+          : false,
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    const result = courses.map(c => ({
+      id: c.id,
+      slug: c.slug,
+      title: c.title,
+      tagline: c.tagline,
+      level: c.level,
+      estimatedDuration: c.estimatedDuration,
+      phaseLabel: c.phaseLabel,
+      heroImage: c.heroImage,
+      contentUnit: c.contentUnit,
+      weekCount: c.weeks.length,
+      facilitators: c.courseFacilitators.map(cf => cf.facilitator),
+      enrolled: req.user ? (c.enrollments as { id: string }[]).length > 0 : false,
+    }))
+    return sendSuccess(res, result)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Enroll in a course
+router.post('/courses/:slug/enroll', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const course = await prisma.course.findUnique({
+      where: { slug: req.params.slug, published: true },
+      select: { id: true, slug: true, title: true },
+    })
+    if (!course) return sendError(res, 'Course not found.', 404)
+
+    await prisma.courseEnrollment.upsert({
+      where: { userId_courseId: { userId: req.user!.userId, courseId: course.id } },
+      create: { userId: req.user!.userId, courseId: course.id },
+      update: {},
+    })
+    return sendSuccess(res, { enrolled: true, courseSlug: course.slug })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/courses/:slug', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const course = await prisma.course.findUnique({
+      where: { slug: req.params.slug },
+      include: {
+        modules: {
+          orderBy: { position: 'asc' },
+          select: { id: true, title: true, description: true, position: true },
+        },
+        weeks: {
+          where: { published: true },
+          orderBy: { number: 'asc' },
+          select: {
+            id: true,
+            number: true,
+            slug: true,
+            title: true,
+            durationLabel: true,
+            estimatedCompletionMinutes: true,
+            moduleId: true,
+            module: { select: { id: true, title: true, description: true } },
+          },
+        },
+        courseFacilitators: {
+          include: {
+            facilitator: {
+              select: { id: true, name: true, title: true, organization: true, photoUrl: true },
+            },
+          },
+          orderBy: { position: 'asc' },
+        },
+        enrollments: req.user
+          ? { where: { userId: req.user.userId }, select: { id: true } }
+          : false,
+      },
+    })
+
+    if (!course || !course.published) {
+      return sendError(res, 'Course not found.', 404)
+    }
+
+    const enrolled = req.user ? (course.enrollments as { id: string }[]).length > 0 : false
+    const weekIds = course.weeks.map(week => week.id)
+    const progressMap = (req.user && enrolled) ? await getCourseProgressMap(req.user.userId, weekIds) : new Map()
+
+    const completedCount = course.weeks.filter(week => progressMap.get(week.id)?.status === WeekProgressStatus.COMPLETE).length
+    const progressPercent = course.weeks.length
+      ? Math.round((completedCount / course.weeks.length) * 100)
+      : 0
+
+    return sendSuccess(res, {
+      id: course.id,
+      slug: course.slug,
+      title: course.title,
+      tagline: course.tagline,
+      description: course.description,
+      level: course.level,
+      estimatedDuration: course.estimatedDuration,
+      phaseLabel: course.phaseLabel,
+      heroImage: course.heroImage,
+      contentUnit: course.contentUnit,
+      enrolled,
+      facilitators: course.courseFacilitators.map(cf => cf.facilitator),
+      progressPercent,
+      completedCount,
+      totalWeeks: course.weeks.length,
+      modules: course.modules,
+      weeks: course.weeks.map(week => serializeWeekSummary(week, progressMap.get(week.id))),
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/courses/:slug/weeks', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const course = await prisma.course.findUnique({
+      where: { slug: req.params.slug },
+      include: {
+        weeks: {
+          where: { published: true },
+          orderBy: { number: 'asc' },
+          select: {
+            id: true,
+            number: true,
+            slug: true,
+            title: true,
+            durationLabel: true,
+            estimatedCompletionMinutes: true,
+          },
+        },
+      },
+    })
+
+    if (!course || !course.published) {
+      return sendError(res, 'Course not found.', 404)
+    }
+
+    const progressMap = req.user ? await getCourseProgressMap(req.user.userId, course.weeks.map(week => week.id)) : new Map()
+    return sendSuccess(
+      res,
+      course.weeks.map(week => serializeWeekSummary(week, progressMap.get(week.id)))
+    )
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/weeks/:weekSlug', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const week = await prisma.week.findUnique({
+      where: { slug: req.params.weekSlug },
+      include: {
+        course: true,
+        module: true,
+        facilitators: {
+          include: {
+            facilitator: true,
+          },
+          orderBy: { position: 'asc' },
+        },
+        topics: {
+          orderBy: { position: 'asc' },
+        },
+        objectives: {
+          orderBy: { position: 'asc' },
+        },
+        slideDeck: {
+          include: {
+            sections: {
+              orderBy: { position: 'asc' },
+            },
+          },
+        },
+        glossaryTerms: {
+          orderBy: { position: 'asc' },
+        },
+        readingResources: {
+          orderBy: { position: 'asc' },
+        },
+        quiz: {
+          include: {
+            questions: {
+              orderBy: { position: 'asc' },
+              include: {
+                options: {
+                  orderBy: { position: 'asc' },
+                },
+              },
+            },
+          },
+        },
+        assignments: {
+          orderBy: { position: 'asc' },
+          include: {
+            choices: {
+              orderBy: { position: 'asc' },
+            },
+          },
+        },
+        images: {
+          orderBy: { position: 'asc' },
+        },
+        videos: {
+          orderBy: { position: 'asc' },
+        },
+      },
+    })
+
+    if (!week || !week.published || !week.course.published) {
+      return sendError(res, 'Week not found.', 404)
+    }
+
+    const courseWeeks = await prisma.week.findMany({
+      where: { courseId: week.courseId, published: true },
+      orderBy: { number: 'asc' },
+      select: { id: true, slug: true, title: true, number: true },
+    })
+
+    const currentIndex = courseWeeks.findIndex(item => item.id === week.id)
+    const prev = currentIndex > 0 ? courseWeeks[currentIndex - 1] : null
+    const nextWeek = currentIndex < courseWeeks.length - 1 ? courseWeeks[currentIndex + 1] : null
+
+    const userState = req.user
+      ? await getUserWeekState(req.user.userId, week.id, week.quiz?.id)
+      : null
+
+    return sendSuccess(res, {
+      id: week.id,
+      slug: week.slug,
+      number: week.number,
+      title: week.title,
+      durationLabel: week.durationLabel,
+      difficulty: week.difficulty,
+      hook: week.hook,
+      whatToExpect: week.whatToExpect,
+      summary: week.summary,
+      estimatedCompletionMinutes: week.estimatedCompletionMinutes,
+      videos: [
+        // Legacy single video migrated into the list
+        ...(week.videoUrl
+          ? [{ id: 'legacy', title: week.videoTitle ?? week.title, url: week.videoUrl, description: null, position: 0 }]
+          : []),
+        // New multi-video records
+        ...week.videos.map(v => ({ id: v.id, title: v.title, url: v.url, description: v.description, position: v.position })),
+      ],
+      module: week.module ? { id: week.module.id, title: week.module.title, description: week.module.description } : null,
+      course: {
+        id: week.course.id,
+        slug: week.course.slug,
+        title: week.course.title,
+        tagline: week.course.tagline,
+        phaseLabel: week.course.phaseLabel,
+        contentUnit: week.course.contentUnit,
+      },
+      navigation: {
+        previous: prev,
+        next: nextWeek,
+      },
+      heroSlides: [
+        {
+          id: 'overview',
+          title: 'Week Overview',
+          subtitle: `Week ${week.number}`,
+          headline: week.title,
+          body: week.hook,
+          facilitatorNames: week.facilitators.map(item => item.facilitator.name),
+        },
+        {
+          id: 'learn',
+          title: 'What You Will Learn',
+          items: week.objectives.map(item => item.body),
+        },
+        {
+          id: 'expect',
+          title: 'What to Expect',
+          items: week.topics.map(item => item.title),
+          difficulty: week.difficulty,
+          estimatedCompletionMinutes: week.estimatedCompletionMinutes,
+        },
+      ],
+      lessonDetails: {
+        title: week.title,
+        facilitators: week.facilitators.map(item => ({
+          id: item.facilitator.id,
+          name: item.facilitator.name,
+          title: item.facilitator.title,
+          organization: item.facilitator.organization,
+          emailMasked: maskEmail(item.facilitator.email),
+          emailMailto: `mailto:${item.facilitator.email}`,
+          linkedinUrl: item.facilitator.linkedinUrl,
+          photoUrl: item.facilitator.photoUrl,
+          bio: item.facilitator.bio,
+        })),
+        topics: week.topics.map(item => item.title),
+        objectives: week.objectives.map(item => item.body),
+        whatToExpect: week.whatToExpect,
+        summary: week.summary,
+        lessonContent: week.lessonContent ?? null,
+        images: week.images.map(img => ({
+          id: img.id,
+          url: img.url,
+          alt: img.alt,
+          caption: img.caption,
+          position: img.position,
+        })),
+      },
+      resources: {
+        slideDeck: week.slideDeck
+          ? {
+              id: week.slideDeck.id,
+              title: week.slideDeck.title,
+              url: week.slideDeck.url,
+              slideCount: week.slideDeck.slideCount,
+              lastUpdatedAt: week.slideDeck.lastUpdatedAt,
+              viewerType: week.slideDeck.viewerType,
+              sections: week.slideDeck.sections.map(section => section.label),
+            }
+          : null,
+        glossary: week.glossaryTerms.map(term => ({
+          id: term.id,
+          term: term.term,
+          definition: term.definition,
+          example: term.example,
+          position: term.position,
+          saved: userState ? userState.savedTermIds.includes(term.id) : false,
+        })),
+        readings: week.readingResources.map(resource => ({
+          id: resource.id,
+          title: resource.title,
+          source: resource.source,
+          url: resource.url,
+          description: resource.description,
+          type: resource.type,
+          position: resource.position,
+          read: userState ? userState.readResourceIds.includes(resource.id) : false,
+        })),
+      },
+      assignment: {
+        quiz: week.quiz ? serializeQuizForDelivery(week.quiz, userState?.latestAttempt, userState?.unlockGranted) : null,
+        tasks: serializeAssignmentsForDelivery(week.assignments, userState?.submissions ?? []),
+      },
+      progress: userState?.weekProgress
+        ? {
+            status: userState.weekProgress.status,
+            quizSubmitted: userState.weekProgress.quizSubmitted,
+            assignmentSubmitted: userState.weekProgress.assignmentSubmitted,
+            completedAt: userState.weekProgress.completedAt,
+          }
+        : {
+            status: WeekProgressStatus.NOT_STARTED,
+            quizSubmitted: false,
+            assignmentSubmitted: false,
+            completedAt: null,
+          },
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/weeks/:weekSlug/resources', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const week = await prisma.week.findUnique({
+      where: { slug: req.params.weekSlug },
+      include: {
+        slideDeck: { include: { sections: { orderBy: { position: 'asc' } } } },
+        glossaryTerms: { orderBy: { position: 'asc' } },
+        readingResources: { orderBy: { position: 'asc' } },
+      },
+    })
+    if (!week || !week.published) return sendError(res, 'Week not found.', 404)
+
+    const [savedTerms, readItems] = req.user
+      ? await Promise.all([
+          prisma.savedGlossaryTerm.findMany({
+            where: { userId: req.user.userId, term: { weekId: week.id } },
+            select: { termId: true },
+          }),
+          prisma.readingProgress.findMany({
+            where: { userId: req.user.userId, resource: { weekId: week.id } },
+            select: { resourceId: true },
+          }),
+        ])
+      : [[], []]
+
+    const savedTermIds = new Set(savedTerms.map(item => item.termId))
+    const readResourceIds = new Set(readItems.map(item => item.resourceId))
+
+    return sendSuccess(res, {
+      slideDeck: week.slideDeck
+        ? {
+            id: week.slideDeck.id,
+            title: week.slideDeck.title,
+            url: week.slideDeck.url,
+            slideCount: week.slideDeck.slideCount,
+            lastUpdatedAt: week.slideDeck.lastUpdatedAt,
+            viewerType: week.slideDeck.viewerType,
+            sections: week.slideDeck.sections.map(item => item.label),
+          }
+        : null,
+      glossary: week.glossaryTerms.map(term => ({
+        id: term.id,
+        term: term.term,
+        definition: term.definition,
+        example: term.example,
+        saved: savedTermIds.has(term.id),
+      })),
+      readings: week.readingResources.map(resource => ({
+        id: resource.id,
+        title: resource.title,
+        source: resource.source,
+        url: resource.url,
+        description: resource.description,
+        type: resource.type,
+        read: readResourceIds.has(resource.id),
+      })),
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/weeks/:weekSlug/assignment', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const week = await prisma.week.findUnique({
+      where: { slug: req.params.weekSlug },
+      include: {
+        quiz: {
+          include: {
+            questions: {
+              orderBy: { position: 'asc' },
+              include: {
+                options: {
+                  orderBy: { position: 'asc' },
+                },
+              },
+            },
+          },
+        },
+        assignments: {
+          orderBy: { position: 'asc' },
+          include: {
+            choices: {
+              orderBy: { position: 'asc' },
+            },
+          },
+        },
+      },
+    })
+    if (!week || !week.published) return sendError(res, 'Week not found.', 404)
+
+    const userState = req.user
+      ? await getUserWeekState(req.user.userId, week.id, week.quiz?.id)
+      : null
+
+    return sendSuccess(res, {
+      quiz: week.quiz ? serializeQuizForDelivery(week.quiz, userState?.latestAttempt, userState?.unlockGranted) : null,
+      tasks: serializeAssignmentsForDelivery(week.assignments, userState?.submissions ?? []),
+      progress: userState?.weekProgress
+        ? {
+            status: userState.weekProgress.status,
+            quizSubmitted: userState.weekProgress.quizSubmitted,
+            assignmentSubmitted: userState.weekProgress.assignmentSubmitted,
+          }
+        : {
+            status: WeekProgressStatus.NOT_STARTED,
+            quizSubmitted: false,
+            assignmentSubmitted: false,
+          },
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/dashboard', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const courses = await prisma.course.findMany({
+      where: {
+        published: true,
+        weeks: { some: { published: true } },
+        enrollments: { some: { userId: req.user!.userId } },
+      },
+      include: {
+        weeks: {
+          where: { published: true },
+          orderBy: { number: 'asc' },
+          select: {
+            id: true,
+            number: true,
+            slug: true,
+            title: true,
+            durationLabel: true,
+            estimatedCompletionMinutes: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    const weekIds = courses.flatMap(course => course.weeks.map(week => week.id))
+    const progressMap = await getCourseProgressMap(req.user!.userId, weekIds)
+
+    const quizAttempts = await prisma.quizAttempt.findMany({
+      where: { userId: req.user!.userId, quiz: { weekId: { in: weekIds } } },
+      include: {
+        quiz: { select: { weekId: true } },
+      },
+      orderBy: { submittedAt: 'desc' },
+    })
+
+    const latestAttemptByWeek = new Map<string, typeof quizAttempts[number]>()
+    for (const attempt of quizAttempts) {
+      if (!latestAttemptByWeek.has(attempt.quiz.weekId)) {
+        latestAttemptByWeek.set(attempt.quiz.weekId, attempt)
+      }
+    }
+
+    const assignmentCounts = await prisma.assignmentSubmission.groupBy({
+      by: ['userId'],
+      where: { userId: req.user!.userId },
+      _count: { _all: true },
+    })
+
+    const assignmentCount = assignmentCounts[0]?._count._all ?? 0
+
+    return sendSuccess(res, {
+      courses: courses.map(course => {
+        const completedCount = course.weeks.filter(week => progressMap.get(week.id)?.status === WeekProgressStatus.COMPLETE).length
+        return {
+          id: course.id,
+          slug: course.slug,
+          title: course.title,
+          phaseLabel: course.phaseLabel,
+          contentUnit: course.contentUnit,
+          progressPercent: course.weeks.length ? Math.round((completedCount / course.weeks.length) * 100) : 0,
+          weeks: course.weeks.map(week => ({
+            ...serializeWeekSummary(week, progressMap.get(week.id)),
+            latestQuizAttempt: latestAttemptByWeek.get(week.id)
+              ? {
+                  score: latestAttemptByWeek.get(week.id)!.score,
+                  percentage: latestAttemptByWeek.get(week.id)!.percentage,
+                  submittedAt: latestAttemptByWeek.get(week.id)!.submittedAt,
+                }
+              : null,
+          })),
+        }
+      }),
+      assignmentSubmissionCount: assignmentCount,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/glossary/save', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = saveTermSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+    }
+
+    const term = await prisma.glossaryTerm.findUnique({ where: { id: parsed.data.termId } })
+    if (!term) return sendError(res, 'Glossary term not found.', 404)
+
+    const item = await prisma.savedGlossaryTerm.upsert({
+      where: { userId_termId: { userId: req.user!.userId, termId: term.id } },
+      update: {},
+      create: {
+        userId: req.user!.userId,
+        termId: term.id,
+      },
+    })
+
+    return sendSuccess(res, item, 'Glossary term saved.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.delete('/glossary/save/:termId', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await prisma.savedGlossaryTerm.deleteMany({
+      where: { userId: req.user!.userId, termId: req.params.termId },
+    })
+    return sendSuccess(res, { termId: req.params.termId }, 'Glossary term removed.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/resources/:resourceId/mark-read', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const resource = await prisma.readingResource.findUnique({
+      where: { id: req.params.resourceId },
+      select: { id: true },
+    })
+    if (!resource) return sendError(res, 'Reading resource not found.', 404)
+
+    const existing = await prisma.readingProgress.findUnique({
+      where: { userId_resourceId: { userId: req.user!.userId, resourceId: resource.id } },
+    })
+
+    if (existing) {
+      await prisma.readingProgress.delete({
+        where: { userId_resourceId: { userId: req.user!.userId, resourceId: resource.id } },
+      })
+      return sendSuccess(res, { resourceId: resource.id, read: false }, 'Reading resource marked unread.')
+    }
+
+    await prisma.readingProgress.create({
+      data: {
+        userId: req.user!.userId,
+        resourceId: resource.id,
+      },
+    })
+
+    return sendSuccess(res, { resourceId: resource.id, read: true }, 'Reading resource marked read.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/quizzes/:quizId/submit', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = quizSubmissionSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+    }
+
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: req.params.quizId },
+      include: {
+        questions: {
+          orderBy: { position: 'asc' },
+          include: {
+            options: { orderBy: { position: 'asc' } },
+          },
+        },
+      },
+    })
+
+    if (!quiz) return sendError(res, 'Quiz not found.', 404)
+
+    const [attemptCount, unlock] = await Promise.all([
+      prisma.quizAttempt.count({ where: { userId: req.user!.userId, quizId: quiz.id } }),
+      prisma.quizRetakeUnlock.findUnique({
+        where: { quizId_userId: { quizId: quiz.id, userId: req.user!.userId } },
+      }),
+    ])
+
+    const effectiveLimit = quiz.attemptLimit + (unlock ? 1 : 0)
+    if (attemptCount >= effectiveLimit) {
+      return sendError(res, 'Quiz is locked. A facilitator must unlock a retake for another attempt.', 409)
+    }
+
+    const answersByQuestion = new Map(parsed.data.answers.map(answer => [answer.questionId, answer.selectedOptionId]))
+    if (answersByQuestion.size !== quiz.questions.length) {
+      return sendError(res, 'Every quiz question must be answered exactly once.', 400)
+    }
+
+    let score = 0
+    for (const question of quiz.questions) {
+      const selectedOptionId = answersByQuestion.get(question.id)
+      const selectedOption = question.options.find(option => option.id === selectedOptionId)
+      if (!selectedOption) {
+        return sendError(res, `Invalid option selected for question ${question.id}.`, 400)
+      }
+      if (selectedOption.isCorrect) score += 1
+    }
+
+    const percentage = Number(((score / quiz.questions.length) * 100).toFixed(1))
+
+    const attempt = await prisma.quizAttempt.create({
+      data: {
+        userId: req.user!.userId,
+        quizId: quiz.id,
+        score,
+        percentage,
+        status: QuizAttemptStatus.SUBMITTED,
+        answers: {
+          create: parsed.data.answers.map(answer => ({
+            questionId: answer.questionId,
+            selectedOptionId: answer.selectedOptionId,
+          })),
+        },
+      },
+      include: {
+        answers: {
+          select: {
+            questionId: true,
+            selectedOptionId: true,
+          },
+        },
+      },
+    })
+
+    await syncWeekProgress(req.user!.userId, quiz.weekId)
+
+    return sendSuccess(res, {
+      id: attempt.id,
+      score: attempt.score,
+      percentage: attempt.percentage,
+      passed: percentage >= quiz.passMark,
+      submittedAt: attempt.submittedAt,
+      questions: quiz.questions.map(question => ({
+        id: question.id,
+        prompt: question.prompt,
+        explanation: question.explanation,
+        options: question.options.map(option => ({
+          id: option.id,
+          label: option.label,
+          isCorrect: option.isCorrect,
+          isSelected: answersByQuestion.get(question.id) === option.id,
+        })),
+      })),
+    }, 'Quiz submitted successfully.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/quizzes/:quizId/attempt', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const attempt = await prisma.quizAttempt.findFirst({
+      where: { userId: req.user!.userId, quizId: req.params.quizId },
+      orderBy: { submittedAt: 'desc' },
+      include: {
+        quiz: {
+          include: {
+            questions: {
+              orderBy: { position: 'asc' },
+              include: { options: { orderBy: { position: 'asc' } } },
+            },
+          },
+        },
+        answers: true,
+      },
+    })
+
+    if (!attempt) return sendError(res, 'No quiz attempt found.', 404)
+
+    const selected = new Map(attempt.answers.map(answer => [answer.questionId, answer.selectedOptionId]))
+    return sendSuccess(res, {
+      id: attempt.id,
+      score: attempt.score,
+      percentage: attempt.percentage,
+      submittedAt: attempt.submittedAt,
+      quiz: {
+        id: attempt.quiz.id,
+        title: attempt.quiz.title,
+        passMark: attempt.quiz.passMark,
+      },
+      questions: attempt.quiz.questions.map(question => ({
+        id: question.id,
+        prompt: question.prompt,
+        explanation: question.explanation,
+        options: question.options.map(option => ({
+          id: option.id,
+          label: option.label,
+          isCorrect: option.isCorrect,
+          isSelected: selected.get(question.id) === option.id,
+        })),
+      })),
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/assignments/:assignmentId/submissions', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = assignmentSubmissionSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+    }
+
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: req.params.assignmentId },
+      include: {
+        choices: true,
+      },
+    })
+    if (!assignment) return sendError(res, 'Assignment not found.', 404)
+
+    if (parsed.data.choiceId && !assignment.choices.some(choice => choice.id === parsed.data.choiceId)) {
+      return sendError(res, 'Selected assignment choice is invalid.', 400)
+    }
+
+    const submission = await prisma.assignmentSubmission.create({
+      data: {
+        userId: req.user!.userId,
+        assignmentId: assignment.id,
+        choiceId: parsed.data.choiceId ?? null,
+        textResponse: parsed.data.textResponse ?? null,
+        attachmentName: parsed.data.attachmentName ?? null,
+        attachmentUrl: parsed.data.attachmentUrl ?? null,
+        attachmentMimeType: parsed.data.attachmentMimeType ?? null,
+        attachmentSizeBytes: parsed.data.attachmentSizeBytes ?? null,
+        status: AssignmentSubmissionStatus.SUBMITTED,
+      },
+    })
+
+    await syncWeekProgress(req.user!.userId, assignment.weekId)
+
+    return sendSuccess(res, submission, 'Assignment submitted successfully.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/progress', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const progress = await prisma.weekProgress.findMany({
+      where: { userId: req.user!.userId },
+      include: {
+        week: {
+          select: {
+            id: true,
+            number: true,
+            slug: true,
+            title: true,
+            course: {
+              select: {
+                id: true,
+                slug: true,
+                title: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    })
+    return sendSuccess(res, progress)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/admin/learners/progress', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = adminWeekFilterSchema.safeParse(req.query)
+    if (!parsed.success) {
+      return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+    }
+
+    const where: Prisma.WeekProgressWhereInput = parsed.data.weekSlug
+      ? { week: { slug: parsed.data.weekSlug } }
+      : {}
+
+    const progress = await prisma.weekProgress.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        week: {
+          select: {
+            id: true,
+            slug: true,
+            number: true,
+            title: true,
+          },
+        },
+      },
+      orderBy: [{ week: { number: 'asc' } }, { updatedAt: 'desc' }],
+    })
+
+    return sendSuccess(res, progress)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/admin/assignments/submissions', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const submissions = await prisma.assignmentSubmission.findMany({
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        assignment: {
+          include: {
+            week: {
+              select: {
+                id: true,
+                slug: true,
+                number: true,
+                title: true,
+              },
+            },
+          },
+        },
+        choice: true,
+        feedback: {
+          include: {
+            reviewer: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+      orderBy: { submittedAt: 'desc' },
+    })
+
+    return sendSuccess(res, submissions)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/admin/assignments/submissions/:submissionId/feedback', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = feedbackSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+    }
+
+    const submission = await prisma.assignmentSubmission.findUnique({
+      where: { id: req.params.submissionId },
+    })
+    if (!submission) return sendError(res, 'Submission not found.', 404)
+
+    const feedback = await prisma.assignmentFeedback.create({
+      data: {
+        submissionId: submission.id,
+        reviewerId: req.user!.userId,
+        feedback: parsed.data.feedback,
+        rating: parsed.data.rating ?? null,
+      },
+    })
+
+    await prisma.assignmentSubmission.update({
+      where: { id: submission.id },
+      data: {
+        status: AssignmentSubmissionStatus.REVIEWED,
+        reviewedAt: new Date(),
+      },
+    })
+
+    return sendSuccess(res, feedback, 'Feedback saved.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/admin/quizzes/:quizId/unlock-retake', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = unlockRetakeSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+    }
+
+    const quiz = await prisma.quiz.findUnique({ where: { id: req.params.quizId } })
+    if (!quiz) return sendError(res, 'Quiz not found.', 404)
+
+    const unlock = await prisma.quizRetakeUnlock.upsert({
+      where: { quizId_userId: { quizId: quiz.id, userId: parsed.data.userId } },
+      update: {
+        unlockedAt: new Date(),
+        unlockedById: req.user!.userId,
+      },
+      create: {
+        quizId: quiz.id,
+        userId: parsed.data.userId,
+        unlockedById: req.user!.userId,
+      },
+    })
+
+    return sendSuccess(res, unlock, 'Quiz retake unlocked.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Legacy endpoints retained for compatibility
 
 router.get('/course', async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -31,8 +1410,6 @@ router.get('/course', async (_req: Request, res: Response, next: NextFunction) =
   }
 })
 
-// ─── GET /academy/course/:slug — single course ───────────────────────────────
-
 router.get('/course/:slug', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const course = await prisma.course.findUnique({
@@ -55,8 +1432,6 @@ router.get('/course/:slug', optionalAuth, async (req: Request, res: Response, ne
   }
 })
 
-// ─── GET /academy/lesson/:id — single lesson ─────────────────────────────────
-
 router.get('/lesson/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const lesson = await prisma.lesson.findUnique({
@@ -70,24 +1445,15 @@ router.get('/lesson/:id', async (req: Request, res: Response, next: NextFunction
   }
 })
 
-// ─── POST /academy/progress — mark a lesson complete ─────────────────────────
-
-const progressSchema = z.object({
-  lessonId: z.string().uuid('Invalid lesson ID'),
-  completed: z.boolean().default(true),
-})
-
 router.post('/progress', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const parsed = progressSchema.safeParse(req.body)
+    const parsed = legacyProgressSchema.safeParse(req.body)
     if (!parsed.success) {
       return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
     }
 
     const { lessonId, completed } = parsed.data
     const userId = req.user!.userId
-
-    // Verify lesson exists
     const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } })
     if (!lesson) return sendError(res, 'Lesson not found.', 404)
 
@@ -103,15 +1469,1035 @@ router.post('/progress', requireAuth, async (req: Request, res: Response, next: 
   }
 })
 
-// ─── GET /academy/progress — get all progress for current user ───────────────
-
-router.get('/progress', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/legacy-progress', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const progress = await prisma.progress.findMany({
       where: { userId: req.user!.userId },
       include: { lesson: { select: { id: true, title: true, moduleId: true } } },
     })
     return sendSuccess(res, progress)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── Course Management (Admin) ────────────────────────────────────────────────
+
+const createCourseSchema = z.object({
+  title: z.string().trim().min(3).max(200),
+  description: z.string().trim().min(10).max(5000),
+  tagline: z.string().trim().max(300).optional(),
+  level: z.string().trim().max(100).optional(),
+  estimatedDuration: z.string().trim().max(100).optional(),
+  phaseLabel: z.string().trim().max(100).optional(),
+  heroImage: z.string().url().optional(),
+  contentUnit: z.enum(['Lesson', 'Week', 'Module', 'Session', 'Chapter', 'Unit']).default('Lesson').optional(),
+  slug: z.string().trim().regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens').min(3).max(100),
+})
+
+const updateCourseSchema = createCourseSchema.partial()
+
+const createWeekSchema = z.object({
+  number: z.number().int().min(1),
+  title: z.string().trim().min(3).max(200),
+  slug: z.string().trim().regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens').min(3).max(100),
+  durationLabel: z.string().trim().min(1).max(100),
+  difficulty: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']),
+  hook: z.string().trim().min(1).max(500),
+  whatToExpect: z.string().trim().min(1).max(2000),
+  summary: z.string().trim().min(1).max(5000),
+  estimatedCompletionMinutes: z.number().int().min(1).max(600),
+  videoTitle: z.string().trim().max(200).optional(),
+  videoUrl: z.string().url().optional(),
+  lessonContent: z.string().trim().max(50000).optional(),
+  topics: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
+  objectives: z.array(z.string().trim().min(1).max(500)).max(20).default([]),
+})
+
+const updateWeekSchema = createWeekSchema.partial()
+
+const createQuizSchema = z.object({
+  title: z.string().trim().min(3).max(200),
+  passMark: z.number().int().min(1).max(100).default(70),
+  attemptLimit: z.number().int().min(1).max(10).default(1),
+  questions: z.array(z.object({
+    prompt: z.string().trim().min(5).max(2000),
+    explanation: z.string().trim().max(2000).default(''),
+    position: z.number().int().min(1),
+    options: z.array(z.object({
+      label: z.string().trim().min(1).max(500),
+      isCorrect: z.boolean().default(false),
+      position: z.number().int().min(1),
+    })).min(2).max(8),
+  })).min(1).max(30),
+})
+
+const createAssignmentSchema = z.object({
+  title: z.string().trim().min(3).max(200),
+  instructions: z.string().trim().min(10).max(10000),
+  deadline: z.string().datetime({ offset: true }),
+  allowTextSubmission: z.boolean().default(true),
+  allowFileUpload: z.boolean().default(false),
+  position: z.number().int().min(1).optional(),
+  choices: z.array(z.object({
+    title: z.string().trim().min(1).max(200),
+    description: z.string().trim().max(1000).default(''),
+    position: z.number().int().min(1),
+  })).max(10).default([]),
+})
+
+const createFacilitatorSchema = z.object({
+  name: z.string().trim().min(2).max(200),
+  title: z.string().trim().min(2).max(200),
+  organization: z.string().trim().min(2).max(200),
+  email: z.string().email(),
+  linkedinUrl: z.string().url(),
+  photoUrl: z.string().url().optional(),
+  bio: z.string().trim().max(2000).optional(),
+})
+
+// Helper to check course ownership
+async function getCourseOrFail(courseId: string, userId: string, role: string, res: Response) {
+  const course = await prisma.course.findUnique({ where: { id: courseId } })
+  if (!course) {
+    sendError(res, 'Course not found.', 404)
+    return null
+  }
+  if (role !== 'SUPER_ADMIN' && role !== 'ADMIN' && course.createdById !== userId) {
+    sendError(res, 'Forbidden. You do not own this course.', 403)
+    return null
+  }
+  return course
+}
+
+// List all available facilitators
+router.get('/admin/facilitators', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const facilitators = await prisma.facilitator.findMany({
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, title: true, organization: true, email: true, linkedinUrl: true, photoUrl: true, bio: true },
+    })
+    return sendSuccess(res, facilitators)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Create a new facilitator
+router.post('/admin/facilitators', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = createFacilitatorSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const existing = await prisma.facilitator.findUnique({ where: { email: parsed.data.email } })
+    if (existing) return sendError(res, 'A facilitator with this email already exists.', 409)
+
+    const facilitator = await prisma.facilitator.create({ data: parsed.data })
+    return sendSuccess(res, facilitator, 'Facilitator created.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Create a new course (draft)
+router.post('/admin/courses', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = createCourseSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const existing = await prisma.course.findUnique({ where: { slug: parsed.data.slug } })
+    if (existing) return sendError(res, 'A course with this slug already exists.', 409)
+
+    const course = await prisma.course.create({
+      data: { ...parsed.data, createdById: req.user!.userId, status: 'DRAFT' },
+    })
+    return sendSuccess(res, course, 'Course created.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// List admin's own courses
+router.get('/admin/courses', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    // SUPER_ADMIN can see all courses
+    const where = req.user!.role === 'SUPER_ADMIN' ? {} : { createdById: userId }
+
+    const courses = await prisma.course.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: { select: { weeks: true } },
+        courseFacilitators: {
+          include: { facilitator: { select: { id: true, name: true, title: true, photoUrl: true } } },
+          orderBy: { position: 'asc' },
+        },
+        createdBy: { select: { id: true, name: true, email: true } },
+      },
+    })
+
+    const result = courses.map(c => ({
+      id: c.id,
+      title: c.title,
+      slug: c.slug,
+      tagline: c.tagline,
+      status: c.status,
+      published: c.published,
+      contentUnit: c.contentUnit,
+      weekCount: c._count.weeks,
+      facilitators: c.courseFacilitators.map(cf => cf.facilitator),
+      createdBy: c.createdBy,
+      approvalNotes: c.approvalNotes,
+      submittedAt: c.submittedAt,
+      approvedAt: c.approvedAt,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    }))
+
+    return sendSuccess(res, result)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Get full course detail (for builder)
+router.get('/admin/courses/:courseId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await prisma.course.findUnique({
+      where: { id: req.params.courseId },
+      include: {
+        courseFacilitators: {
+          include: { facilitator: true },
+          orderBy: { position: 'asc' },
+        },
+        modules: {
+          orderBy: { position: 'asc' },
+        },
+        weeks: {
+          orderBy: { number: 'asc' },
+          include: {
+            topics: { orderBy: { position: 'asc' } },
+            objectives: { orderBy: { position: 'asc' } },
+            quiz: { include: { questions: { orderBy: { position: 'asc' }, include: { options: { orderBy: { position: 'asc' } } } } } },
+            assignments: { orderBy: { position: 'asc' }, include: { choices: { orderBy: { position: 'asc' } } } },
+            images: { orderBy: { position: 'asc' } },
+            videos: { orderBy: { position: 'asc' } },
+          },
+        },
+        approvals: {
+          orderBy: { createdAt: 'desc' },
+          include: { reviewer: { select: { id: true, name: true, email: true } } },
+        },
+        createdBy: { select: { id: true, name: true, email: true } },
+      },
+    })
+
+    if (!course) return sendError(res, 'Course not found.', 404)
+    if (req.user!.role !== 'SUPER_ADMIN' && course.createdById !== userId) {
+      return sendError(res, 'Forbidden.', 403)
+    }
+
+    return sendSuccess(res, course)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Update course basic info
+router.patch('/admin/courses/:courseId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const isPrivileged = req.user!.role === 'SUPER_ADMIN' || req.user!.role === 'ADMIN'
+    if (!isPrivileged && (course.status === 'PENDING_REVIEW' || course.status === 'APPROVED')) {
+      return sendError(res, 'Cannot edit a course that is pending review or approved.', 400)
+    }
+
+    const parsed = updateCourseSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    if (parsed.data.slug && parsed.data.slug !== course.slug) {
+      const existing = await prisma.course.findUnique({ where: { slug: parsed.data.slug } })
+      if (existing) return sendError(res, 'A course with this slug already exists.', 409)
+    }
+
+    const updated = await prisma.course.update({ where: { id: course.id }, data: parsed.data })
+    return sendSuccess(res, updated, 'Course updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Delete a draft course
+router.delete('/admin/courses/:courseId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    if (course.status !== 'DRAFT' && course.status !== 'REJECTED') {
+      return sendError(res, 'Only DRAFT or REJECTED courses can be deleted.', 400)
+    }
+
+    await prisma.course.delete({ where: { id: course.id } })
+    return sendSuccess(res, { id: course.id }, 'Course deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Submit course for super-admin review
+router.post('/admin/courses/:courseId/submit', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    if (course.status !== 'DRAFT' && course.status !== 'REJECTED') {
+      return sendError(res, 'Only DRAFT or REJECTED courses can be submitted for review.', 400)
+    }
+
+    // Prerequisites check
+    const weekCount = await prisma.week.count({ where: { courseId: course.id } })
+    const facilitatorCount = await prisma.courseFacilitator.count({ where: { courseId: course.id } })
+    const errors: string[] = []
+    if (weekCount < 1) errors.push('Add at least one week before submitting.')
+    if (facilitatorCount < 1) errors.push('Assign at least one facilitator before submitting.')
+    if (!course.description || course.description.length < 10) errors.push('Add a course description.')
+    if (errors.length > 0) return sendError(res, 'Prerequisites not met.', 400, errors)
+
+    const updated = await prisma.course.update({
+      where: { id: course.id },
+      data: { status: 'PENDING_REVIEW', submittedAt: new Date() },
+    })
+    return sendSuccess(res, updated, 'Course submitted for review.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Add a week to a course
+router.post('/admin/courses/:courseId/weeks', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const parsed = createWeekSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const slugExists = await prisma.week.findUnique({ where: { slug: parsed.data.slug } })
+    if (slugExists) return sendError(res, 'A week with this slug already exists.', 409)
+
+    const numberExists = await prisma.week.findUnique({ where: { courseId_number: { courseId: course.id, number: parsed.data.number } } })
+    if (numberExists) return sendError(res, `Week ${parsed.data.number} already exists in this course.`, 409)
+
+    const { topics, objectives, ...weekData } = parsed.data
+
+    const week = await prisma.week.create({
+      data: {
+        ...weekData,
+        courseId: course.id,
+        topics: {
+          create: topics.map((title, i) => ({ title, position: i + 1 })),
+        },
+        objectives: {
+          create: objectives.map((body, i) => ({ body, position: i + 1 })),
+        },
+      },
+      include: {
+        topics: { orderBy: { position: 'asc' } },
+        objectives: { orderBy: { position: 'asc' } },
+      },
+    })
+
+    return sendSuccess(res, week, 'Week added.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Update a week
+router.patch('/admin/courses/:courseId/weeks/:weekId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const parsed = updateWeekSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const { topics, objectives, ...weekData } = parsed.data
+
+    // Replace topics and objectives if provided
+    await prisma.$transaction(async (tx) => {
+      if (topics !== undefined) {
+        await tx.weekTopic.deleteMany({ where: { weekId: week.id } })
+        await tx.weekTopic.createMany({ data: topics.map((title, i) => ({ weekId: week.id, title, position: i + 1 })) })
+      }
+      if (objectives !== undefined) {
+        await tx.weekObjective.deleteMany({ where: { weekId: week.id } })
+        await tx.weekObjective.createMany({ data: objectives.map((body, i) => ({ weekId: week.id, body, position: i + 1 })) })
+      }
+      if (Object.keys(weekData).length > 0) {
+        await tx.week.update({ where: { id: week.id }, data: weekData })
+      }
+    })
+
+    const updated = await prisma.week.findUnique({
+      where: { id: week.id },
+      include: { topics: { orderBy: { position: 'asc' } }, objectives: { orderBy: { position: 'asc' } } },
+    })
+    return sendSuccess(res, updated, 'Week updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Delete a week
+router.delete('/admin/courses/:courseId/weeks/:weekId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    await prisma.week.delete({ where: { id: week.id } })
+    return sendSuccess(res, { id: week.id }, 'Week deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Save lesson content for a week
+router.patch('/admin/courses/:courseId/weeks/:weekId/content', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const { lessonContent } = z.object({ lessonContent: z.string().trim().max(50000) }).parse(req.body)
+    const updated = await prisma.week.update({ where: { id: week.id }, data: { lessonContent } })
+    return sendSuccess(res, { lessonContent: updated.lessonContent }, 'Lesson content saved.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Add image to a week
+router.post('/admin/courses/:courseId/weeks/:weekId/images', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const parsed = z.object({
+      url: z.string().url('Invalid image URL'),
+      alt: z.string().trim().max(500).optional(),
+      caption: z.string().trim().max(500).optional(),
+    }).safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const count = await prisma.weekImage.count({ where: { weekId: week.id } })
+    const image = await prisma.weekImage.create({
+      data: { weekId: week.id, ...parsed.data, position: count + 1 },
+    })
+    return sendSuccess(res, image, 'Image added.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Remove image from a week
+router.delete('/admin/courses/:courseId/weeks/:weekId/images/:imageId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const image = await prisma.weekImage.findFirst({
+      where: { id: req.params.imageId, week: { id: req.params.weekId, courseId: course.id } },
+    })
+    if (!image) return sendError(res, 'Image not found.', 404)
+
+    await prisma.weekImage.delete({ where: { id: image.id } })
+    return sendSuccess(res, { id: image.id }, 'Image removed.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── Week Videos ─────────────────────────────────────────────────────────────
+
+// Add a video to a week
+router.post('/admin/courses/:courseId/weeks/:weekId/videos', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const parsed = z.object({
+      title: z.string().trim().min(1).max(200),
+      url: z.string().url('Invalid video URL'),
+      description: z.string().trim().max(1000).optional(),
+    }).safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const count = await prisma.weekVideo.count({ where: { weekId: week.id } })
+    const video = await prisma.weekVideo.create({
+      data: { weekId: week.id, ...parsed.data, position: count + 1 },
+    })
+    return sendSuccess(res, video, 'Video added.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Update a video
+router.patch('/admin/courses/:courseId/weeks/:weekId/videos/:videoId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const video = await prisma.weekVideo.findFirst({
+      where: { id: req.params.videoId, week: { id: req.params.weekId, courseId: course.id } },
+    })
+    if (!video) return sendError(res, 'Video not found.', 404)
+
+    const parsed = z.object({
+      title: z.string().trim().min(1).max(200).optional(),
+      url: z.string().url('Invalid video URL').optional(),
+      description: z.string().trim().max(1000).optional(),
+    }).safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const updated = await prisma.weekVideo.update({ where: { id: video.id }, data: parsed.data })
+    return sendSuccess(res, updated, 'Video updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Delete a video
+router.delete('/admin/courses/:courseId/weeks/:weekId/videos/:videoId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const video = await prisma.weekVideo.findFirst({
+      where: { id: req.params.videoId, week: { id: req.params.weekId, courseId: course.id } },
+    })
+    if (!video) return sendError(res, 'Video not found.', 404)
+
+    await prisma.weekVideo.delete({ where: { id: video.id } })
+    return sendSuccess(res, { id: video.id }, 'Video deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── Modules ──────────────────────────────────────────────────────────────────
+
+// Create a module for a course
+router.post('/admin/courses/:courseId/modules', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const parsed = z.object({
+      title: z.string().trim().min(1).max(200),
+      description: z.string().trim().max(1000).optional(),
+    }).safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const count = await prisma.module.count({ where: { courseId: course.id } })
+    const mod = await prisma.module.create({
+      data: { courseId: course.id, ...parsed.data, position: count + 1 },
+    })
+    return sendSuccess(res, mod, 'Module created.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Update a module
+router.patch('/admin/courses/:courseId/modules/:moduleId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const mod = await prisma.module.findFirst({ where: { id: req.params.moduleId, courseId: course.id } })
+    if (!mod) return sendError(res, 'Module not found.', 404)
+
+    const parsed = z.object({
+      title: z.string().trim().min(1).max(200).optional(),
+      description: z.string().trim().max(1000).optional(),
+    }).safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const updated = await prisma.module.update({ where: { id: mod.id }, data: parsed.data })
+    return sendSuccess(res, updated, 'Module updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Delete a module
+router.delete('/admin/courses/:courseId/modules/:moduleId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const mod = await prisma.module.findFirst({ where: { id: req.params.moduleId, courseId: course.id } })
+    if (!mod) return sendError(res, 'Module not found.', 404)
+
+    // Unassign all weeks from this module before deleting
+    await prisma.week.updateMany({ where: { moduleId: mod.id }, data: { moduleId: null } })
+    await prisma.module.delete({ where: { id: mod.id } })
+    return sendSuccess(res, { id: mod.id }, 'Module deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Assign a week to a module
+router.patch('/admin/courses/:courseId/weeks/:weekId/module', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const { moduleId } = z.object({ moduleId: z.string().nullable() }).parse(req.body)
+
+    if (moduleId) {
+      const mod = await prisma.module.findFirst({ where: { id: moduleId, courseId: course.id } })
+      if (!mod) return sendError(res, 'Module not found.', 404)
+    }
+
+    const updated = await prisma.week.update({ where: { id: week.id }, data: { moduleId } })
+    return sendSuccess(res, { moduleId: updated.moduleId }, 'Week module assignment updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Create or replace quiz for a week
+router.post('/admin/courses/:courseId/weeks/:weekId/quiz', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const parsed = createQuizSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    // Delete existing quiz if any
+    await prisma.quiz.deleteMany({ where: { weekId: week.id } })
+
+    const quiz = await prisma.quiz.create({
+      data: {
+        weekId: week.id,
+        title: parsed.data.title,
+        passMark: parsed.data.passMark,
+        attemptLimit: parsed.data.attemptLimit,
+        questions: {
+          create: parsed.data.questions.map(q => ({
+            prompt: q.prompt,
+            explanation: q.explanation,
+            position: q.position,
+            options: {
+              create: q.options.map(o => ({
+                label: o.label,
+                isCorrect: o.isCorrect,
+                position: o.position,
+              })),
+            },
+          })),
+        },
+      },
+      include: { questions: { include: { options: true }, orderBy: { position: 'asc' } } },
+    })
+
+    return sendSuccess(res, quiz, 'Quiz saved.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Create assignment for a week
+router.post('/admin/courses/:courseId/weeks/:weekId/assignments', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const parsed = createAssignmentSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const existingCount = await prisma.assignment.count({ where: { weekId: week.id } })
+    const { choices, ...assignmentData } = parsed.data
+
+    const assignment = await prisma.assignment.create({
+      data: {
+        ...assignmentData,
+        deadline: new Date(assignmentData.deadline),
+        weekId: week.id,
+        position: assignmentData.position ?? existingCount + 1,
+        choices: {
+          create: choices.map(c => ({ title: c.title, description: c.description, position: c.position })),
+        },
+      },
+      include: { choices: { orderBy: { position: 'asc' } } },
+    })
+
+    return sendSuccess(res, assignment, 'Assignment created.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Add facilitator to course
+router.post('/admin/courses/:courseId/facilitators', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const { facilitatorId } = z.object({ facilitatorId: z.string().uuid() }).parse(req.body)
+
+    const facilitator = await prisma.facilitator.findUnique({ where: { id: facilitatorId } })
+    if (!facilitator) return sendError(res, 'Facilitator not found.', 404)
+
+    const existing = await prisma.courseFacilitator.findUnique({
+      where: { courseId_facilitatorId: { courseId: course.id, facilitatorId } },
+    })
+    if (existing) return sendError(res, 'Facilitator already assigned to this course.', 409)
+
+    const count = await prisma.courseFacilitator.count({ where: { courseId: course.id } })
+    const cf = await prisma.courseFacilitator.create({
+      data: { courseId: course.id, facilitatorId, position: count + 1 },
+      include: { facilitator: true },
+    })
+
+    return sendSuccess(res, cf.facilitator, 'Facilitator added.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Remove facilitator from course
+router.delete('/admin/courses/:courseId/facilitators/:facilitatorId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const cf = await prisma.courseFacilitator.findUnique({
+      where: { courseId_facilitatorId: { courseId: course.id, facilitatorId: req.params.facilitatorId } },
+    })
+    if (!cf) return sendError(res, 'Facilitator not assigned to this course.', 404)
+
+    await prisma.courseFacilitator.delete({ where: { id: cf.id } })
+    return sendSuccess(res, { facilitatorId: req.params.facilitatorId }, 'Facilitator removed.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── Super Admin ──────────────────────────────────────────────────────────────
+
+// List all courses (filterable by status)
+router.get('/superadmin/courses', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const status = req.query.status as CourseStatus | undefined
+    const courses = await prisma.course.findMany({
+      where: status ? { status } : {},
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        _count: { select: { weeks: true } },
+        courseFacilitators: {
+          include: { facilitator: { select: { id: true, name: true, title: true, photoUrl: true } } },
+          orderBy: { position: 'asc' },
+        },
+        createdBy: { select: { id: true, name: true, email: true } },
+        approvals: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: { reviewer: { select: { id: true, name: true } } },
+        },
+      },
+    })
+    return sendSuccess(res, courses)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Get a single course detail (super admin view)
+router.get('/superadmin/courses/:courseId', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const course = await prisma.course.findUnique({
+      where: { id: req.params.courseId },
+      include: {
+        courseFacilitators: { include: { facilitator: true }, orderBy: { position: 'asc' } },
+        weeks: {
+          orderBy: { number: 'asc' },
+          include: {
+            topics: { orderBy: { position: 'asc' } },
+            objectives: { orderBy: { position: 'asc' } },
+            quiz: { include: { questions: { orderBy: { position: 'asc' }, include: { options: { orderBy: { position: 'asc' } } } } } },
+            assignments: { orderBy: { position: 'asc' }, include: { choices: { orderBy: { position: 'asc' } } } },
+            images: { orderBy: { position: 'asc' } },
+          },
+        },
+        approvals: {
+          orderBy: { createdAt: 'desc' },
+          include: { reviewer: { select: { id: true, name: true, email: true } } },
+        },
+        createdBy: { select: { id: true, name: true, email: true } },
+      },
+    })
+    if (!course) return sendError(res, 'Course not found.', 404)
+    return sendSuccess(res, course)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Approve a course
+router.post('/superadmin/courses/:courseId/approve', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const course = await prisma.course.findUnique({ where: { id: req.params.courseId } })
+    if (!course) return sendError(res, 'Course not found.', 404)
+    if (course.status !== 'PENDING_REVIEW') return sendError(res, 'Only courses pending review can be approved.', 400)
+
+    const { notes } = z.object({ notes: z.string().trim().max(2000).optional() }).parse(req.body)
+
+    await prisma.$transaction([
+      prisma.course.update({
+        where: { id: course.id },
+        data: { status: 'APPROVED', published: true, publishedAt: new Date(), approvedAt: new Date(), approvalNotes: null },
+      }),
+      prisma.courseApproval.create({
+        data: { courseId: course.id, reviewerId: req.user!.userId, action: 'APPROVED', notes: notes ?? null },
+      }),
+    ])
+
+    return sendSuccess(res, { id: course.id, status: 'APPROVED' }, 'Course approved and published.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Reject a course
+router.post('/superadmin/courses/:courseId/reject', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const course = await prisma.course.findUnique({ where: { id: req.params.courseId } })
+    if (!course) return sendError(res, 'Course not found.', 404)
+    if (course.status !== 'PENDING_REVIEW') return sendError(res, 'Only courses pending review can be rejected.', 400)
+
+    const { notes } = z.object({ notes: z.string().trim().min(1, 'Rejection reason is required').max(2000) }).parse(req.body)
+
+    await prisma.$transaction([
+      prisma.course.update({
+        where: { id: course.id },
+        data: { status: 'REJECTED', published: false, approvalNotes: notes },
+      }),
+      prisma.courseApproval.create({
+        data: { courseId: course.id, reviewerId: req.user!.userId, action: 'REJECTED', notes },
+      }),
+    ])
+
+    return sendSuccess(res, { id: course.id, status: 'REJECTED' }, 'Course rejected.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ── Super Admin: Platform overview ────────────────────────────────────────────
+router.get('/superadmin/overview', requireAuth, requireSuperAdmin, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [
+      totalUsers,
+      adminCount,
+      totalEnrollments,
+      totalCourses,
+      coursesByStatus,
+      totalSubmissions,
+      pendingSubmissions,
+      totalWeeks,
+      recentUsers,
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.count({ where: { role: { in: ['ADMIN', 'SUPER_ADMIN'] } } }),
+      prisma.courseEnrollment.count(),
+      prisma.course.count(),
+      prisma.course.groupBy({ by: ['status'], _count: { _all: true } }),
+      prisma.assignmentSubmission.count(),
+      prisma.assignmentSubmission.count({ where: { status: 'SUBMITTED' } }),
+      prisma.week.count(),
+      prisma.user.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 8,
+        select: { id: true, name: true, email: true, role: true, createdAt: true },
+      }),
+    ])
+
+    const statusMap: Record<string, number> = {}
+    for (const s of coursesByStatus) statusMap[s.status] = s._count._all
+
+    return sendSuccess(res, {
+      totalUsers,
+      adminCount,
+      learnerCount: totalUsers - adminCount,
+      totalEnrollments,
+      totalCourses,
+      coursesByStatus: statusMap,
+      totalSubmissions,
+      pendingSubmissions,
+      totalWeeks,
+      recentUsers,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ── Super Admin: List users ───────────────────────────────────────────────────
+router.get('/superadmin/users', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { role, search, page = '1', limit = '30' } = req.query as Record<string, string>
+    const skip = (parseInt(page) - 1) * parseInt(limit)
+    const where: Prisma.UserWhereInput = {}
+    if (role) where.role = role as any
+    if (search) where.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } },
+    ]
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: parseInt(limit),
+        select: {
+          id: true, name: true, email: true, role: true, createdAt: true,
+          _count: { select: { courseEnrollments: true } },
+          profile: { select: { country: true, onboardingCompleted: true } },
+        },
+      }),
+      prisma.user.count({ where }),
+    ])
+
+    return sendSuccess(res, { users, total, page: parseInt(page), limit: parseInt(limit) })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ── Super Admin: Create admin user ────────────────────────────────────────────
+router.post('/superadmin/users', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { name, email, password } = z.object({
+      name: z.string().trim().min(2).max(100),
+      email: z.string().email().toLowerCase(),
+      password: z.string().min(8).max(72),
+    }).parse(req.body)
+
+    const existing = await prisma.user.findUnique({ where: { email } })
+    if (existing) return sendError(res, 'A user with this email already exists.', 409)
+
+    const bcrypt = await import('bcryptjs')
+    const hashed = await bcrypt.hash(password, 12)
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        name,
+        password: hashed,
+        role: 'ADMIN',
+        profile: { create: { onboardingCompleted: true } },
+      },
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
+    })
+
+    return sendSuccess(res, user, 'Admin account created.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ── Super Admin: Change user role ─────────────────────────────────────────────
+router.patch('/superadmin/users/:userId/role', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { role } = z.object({
+      role: z.enum(['USER', 'ADMIN', 'SUPER_ADMIN']),
+    }).parse(req.body)
+
+    const user = await prisma.user.findUnique({ where: { id: req.params.userId } })
+    if (!user) return sendError(res, 'User not found.', 404)
+    if (user.id === req.user!.userId && role !== 'SUPER_ADMIN') {
+      return sendError(res, 'You cannot change your own role.', 400)
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.params.userId },
+      data: { role },
+      select: { id: true, name: true, email: true, role: true },
+    })
+
+    return sendSuccess(res, updated, 'User role updated.')
   } catch (err) {
     next(err)
   }

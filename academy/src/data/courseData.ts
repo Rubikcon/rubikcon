@@ -434,6 +434,13 @@ export const COURSE_AI: Course = {
   ],
 }
 
+// ─── Curriculum topics (what the academy covers broadly) ─────────────────────
+export const CURRICULUM_TOPICS = [
+  { num: '01', title: 'Blockchain fundamentals', body: 'Wallets, keys, consensus, EVM — get comfortable with how a chain actually works under the hood.' },
+  { num: '02', title: 'Solidity & smart contracts', body: 'Write, test, and deploy production contracts. Patterns, pitfalls, and gas-aware engineering.' },
+  { num: '03', title: 'Tokenomics that hold up', body: "Design token economies that don't collapse under their own incentives — supply, sinks, and stress tests." },
+]
+
 // ─── All courses array ────────────────────────────────────────────────────────
 export const ALL_COURSES: Course[] = [
   COURSE_BLOCKCHAIN,
