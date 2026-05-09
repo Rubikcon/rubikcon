@@ -6,7 +6,7 @@ const defaultAllowedOrigins = [
   'http://localhost:3001',
   'http://localhost:3002',
   'http://localhost:3003',
-  'https://rubikcon-academy.vercel.app',
+  'https://academy.rubikconnexus.com',
   'https://rubikcon.vercel.app',
   'https://rubikcon-games.vercel.app',
   'https://rubikcon-blockgigs.vercel.app',
