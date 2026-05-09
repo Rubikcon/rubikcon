@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react'
 import { useLocation } from 'wouter'
+import { Check, X } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
 import { login, signup } from '../lib/api'
 
@@ -16,6 +17,26 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  // Validation helpers
+  const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
+  const isPasswordValid = (p: string) => p.length >= 8
+  const isNameValid = (n: string) => n.length >= 2
+
+  const passwordStrength = useMemo(() => {
+    if (!password) return 0
+    let strength = 0
+    if (password.length >= 8) strength++
+    if (password.length >= 12) strength++
+    if (/[A-Z]/.test(password)) strength++
+    if (/[0-9]/.test(password)) strength++
+    if (/[^A-Za-z0-9]/.test(password)) strength++
+    return strength
+  }, [password])
+
+  const canSubmit = mode === 'login'
+    ? email && isValidEmail(email) && password
+    : name && isNameValid(name) && email && isValidEmail(email) && isPasswordValid(password)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -75,39 +96,104 @@ export default function LoginPage() {
               ))}
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
               {mode === 'signup' && (
                 <div>
-                  <label className="block text-sm text-white/65 mb-2">Full name</label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-white">Full name</label>
+                    {name && (
+                      isNameValid(name) ? (
+                        <Check size={16} className="text-emerald-400" />
+                      ) : (
+                        <X size={16} className="text-red-400" />
+                      )
+                    )}
+                  </div>
                   <input
                     value={name}
                     onChange={event => setName(event.target.value)}
-                    className="w-full rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-white placeholder:text-white/20 focus:outline-none focus:border-[#F5C518]/40"
+                    className={`w-full rounded-2xl border bg-black/20 px-4 py-3 text-white placeholder:text-white/20 focus:outline-none transition-colors ${
+                      !name ? 'border-white/12 focus:border-[#F5C518]/40'
+                      : isNameValid(name) ? 'border-emerald-400/40 focus:border-emerald-400/60'
+                      : 'border-red-400/40 focus:border-red-400/60'
+                    }`}
                     placeholder="Your full name"
                   />
+                  {name && !isNameValid(name) && (
+                    <p className="text-xs text-red-400 mt-1">Name must be at least 2 characters</p>
+                  )}
                 </div>
               )}
 
               <div>
-                <label className="block text-sm text-white/65 mb-2">Email</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-white">Email</label>
+                  {email && (
+                    isValidEmail(email) ? (
+                      <Check size={16} className="text-emerald-400" />
+                    ) : (
+                      <X size={16} className="text-red-400" />
+                    )
+                  )}
+                </div>
                 <input
                   type="email"
                   value={email}
                   onChange={event => setEmail(event.target.value)}
-                  className="w-full rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-white placeholder:text-white/20 focus:outline-none focus:border-[#F5C518]/40"
+                  className={`w-full rounded-2xl border bg-black/20 px-4 py-3 text-white placeholder:text-white/20 focus:outline-none transition-colors ${
+                    !email ? 'border-white/12 focus:border-[#F5C518]/40'
+                    : isValidEmail(email) ? 'border-emerald-400/40 focus:border-emerald-400/60'
+                    : 'border-red-400/40 focus:border-red-400/60'
+                  }`}
                   placeholder="you@example.com"
                 />
+                {email && !isValidEmail(email) && (
+                  <p className="text-xs text-red-400 mt-1">Please enter a valid email address</p>
+                )}
               </div>
 
               <div>
-                <label className="block text-sm text-white/65 mb-2">Password</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-white">Password</label>
+                  {mode === 'signup' && password && (
+                    isPasswordValid(password) ? (
+                      <Check size={16} className="text-emerald-400" />
+                    ) : (
+                      <X size={16} className="text-red-400" />
+                    )
+                  )}
+                </div>
                 <input
                   type="password"
                   value={password}
                   onChange={event => setPassword(event.target.value)}
-                  className="w-full rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-white placeholder:text-white/20 focus:outline-none focus:border-[#F5C518]/40"
+                  className={`w-full rounded-2xl border bg-black/20 px-4 py-3 text-white placeholder:text-white/20 focus:outline-none transition-colors ${
+                    !password ? 'border-white/12 focus:border-[#F5C518]/40'
+                    : (mode === 'login' || isPasswordValid(password)) ? 'border-emerald-400/40 focus:border-emerald-400/60'
+                    : 'border-red-400/40 focus:border-red-400/60'
+                  }`}
                   placeholder="••••••••"
                 />
+                {mode === 'signup' && password && (
+                  <div className="mt-2 space-y-2">
+                    <div className="flex gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <div
+                          key={i}
+                          className={`h-1.5 flex-1 rounded-full ${
+                            i < passwordStrength ? 'bg-[#F5C518]' : 'bg-white/10'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    {!isPasswordValid(password) && (
+                      <p className="text-xs text-red-400">Password must be at least 8 characters</p>
+                    )}
+                    {isPasswordValid(password) && (
+                      <p className="text-xs text-emerald-400">Password meets requirements</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {error && (
@@ -116,10 +202,25 @@ export default function LoginPage() {
                 </div>
               )}
 
+              {mode === 'signup' && !canSubmit && (
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
+                  <p className="font-medium mb-1">Complete all requirements to continue:</p>
+                  <ul className="space-y-0.5 ml-1">
+                    {!isNameValid(name) && <li>• Name: at least 2 characters</li>}
+                    {!isValidEmail(email) && <li>• Email: valid email address</li>}
+                    {!isPasswordValid(password) && <li>• Password: at least 8 characters</li>}
+                  </ul>
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={submitting}
-                className="w-full rounded-full bg-[#F5C518] px-6 py-3 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors disabled:opacity-60"
+                disabled={submitting || !canSubmit}
+                className={`w-full rounded-full px-6 py-3 text-sm font-semibold transition-colors ${
+                  canSubmit
+                    ? 'bg-[#F5C518] text-[#0A0A0A] hover:bg-[#E8B800]'
+                    : 'bg-white/10 text-white/50 cursor-not-allowed'
+                }`}
               >
                 {submitting ? 'Please wait...' : mode === 'login' ? 'Log in' : 'Create account'}
               </button>
