@@ -44,7 +44,8 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
       return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
     }
 
-    const { email, password, name } = parsed.data
+    const { password, name } = parsed.data
+    const email = parsed.data.email.toLowerCase()
 
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) {
@@ -53,13 +54,17 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS)
 
-    const user = await prisma.user.create({
-      data: { email, password: hashedPassword, name: name || null },
-    })
+    const user = await prisma.$transaction(async tx => {
+      const createdUser = await tx.user.create({
+        data: { email, password: hashedPassword, name: name || null },
+      })
 
-    // Create empty profile record so onboardingCompleted = false
-    await prisma.userProfile.create({
-      data: { userId: user.id },
+      // Create empty profile record so onboardingCompleted = false.
+      await tx.userProfile.create({
+        data: { userId: createdUser.id },
+      })
+
+      return createdUser
     })
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role })
