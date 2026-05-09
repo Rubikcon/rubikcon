@@ -21,7 +21,22 @@ const STATUS_COLORS: Record<CourseStatus, string> = {
   REJECTED:       'border-red-400/40 text-red-300',
 }
 
-type Tab = 'courses' | 'progress' | 'submissions'
+type Tab = 'courses' | 'progress' | 'submissions' | 'enrollments'
+
+type CourseEnrollment = {
+  id: string
+  enrolledAt: string
+  user: {
+    id: string
+    email: string
+    name: string | null
+    createdAt: string
+    profile: {
+      country: string | null
+      experienceLevel: string | null
+    } | null
+  }
+}
 
 function StatCard({ icon: Icon, label, value, sub }: {
   icon: typeof BookOpen
@@ -48,6 +63,9 @@ export default function AdminAcademyPage() {
   const [progress, setProgress] = useState<AdminLearnerProgress>([])
   const [submissions, setSubmissions] = useState<AdminSubmission>([])
   const [courses, setCourses] = useState<AdminCourse[]>([])
+  const [enrollments, setEnrollments] = useState<Record<string, CourseEnrollment[]>>({})
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
+  const [loadingEnrollments, setLoadingEnrollments] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({})
@@ -144,6 +162,24 @@ export default function AdminAcademyPage() {
     }
   }
 
+  async function loadEnrollments(courseId: string) {
+    if (enrollments[courseId]) {
+      setSelectedCourseId(courseId)
+      return
+    }
+    setLoadingEnrollments(true)
+    setError(null)
+    try {
+      const data = await apiRequest<CourseEnrollment[]>(`/academy/admin/courses/${courseId}/enrollments`)
+      setEnrollments(prev => ({ ...prev, [courseId]: data }))
+      setSelectedCourseId(courseId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load enrollments.')
+    } finally {
+      setLoadingEnrollments(false)
+    }
+  }
+
   async function createCourse(e: FormEvent) {
     e.preventDefault()
     setCreating(true)
@@ -177,6 +213,7 @@ export default function AdminAcademyPage() {
 
   const TABS: Array<{ id: Tab; label: string; icon: typeof BookOpen; count: number }> = [
     { id: 'courses',     label: 'My Courses',      icon: BookOpen,       count: courses.length },
+    { id: 'enrollments', label: 'Enrollments',     icon: Users,          count: selectedCourseId && enrollments[selectedCourseId] ? enrollments[selectedCourseId].length : 0 },
     { id: 'submissions', label: 'Submissions',      icon: ClipboardList,  count: submissions.length },
     { id: 'progress',    label: 'Learner Progress', icon: Users,          count: progress.length },
   ]
@@ -413,6 +450,82 @@ export default function AdminAcademyPage() {
             </div>
           )}
 
+          {/* ── Enrollments tab ──────────────────────────────────────────────── */}
+          {activeTab === 'enrollments' && (
+            <div>
+              <div className="mb-6">
+                <p className="text-sm text-white/50 mb-3">Select a course to view enrollments:</p>
+                <div className="flex flex-wrap gap-2">
+                  {courses.map(course => (
+                    <button
+                      key={course.id}
+                      onClick={() => loadEnrollments(course.id)}
+                      className={`rounded-full px-4 py-2 text-sm transition-colors border ${
+                        selectedCourseId === course.id
+                          ? 'border-[#F5C518] bg-[#F5C518]/10 text-[#F5C518]'
+                          : 'border-white/15 text-white/60 hover:border-white/30'
+                      }`}
+                    >
+                      {course.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {selectedCourseId ? (
+                <div>
+                  {loadingEnrollments ? (
+                    <div className="flex items-center justify-center py-16">
+                      <Loader2 className="animate-spin text-[#F5C518]" size={24} />
+                    </div>
+                  ) : enrollments[selectedCourseId]?.length === 0 ? (
+                    <div className="rounded-[24px] border border-white/8 bg-white/[0.02] p-12 text-center">
+                      <Users size={28} className="text-white/20 mx-auto mb-3" />
+                      <p className="text-white/40">No enrollments yet.</p>
+                    </div>
+                  ) : (
+                    <div className="rounded-[24px] border border-white/10 bg-white/[0.03] overflow-hidden">
+                      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-3 border-b border-white/8 text-[10px] font-mono uppercase tracking-widest text-white/25">
+                        <span>Learner</span>
+                        <span>Experience</span>
+                        <span>Enrolled</span>
+                        <span>Joined</span>
+                      </div>
+                      {enrollments[selectedCourseId]?.map(enrollment => {
+                        const initials = (enrollment.user.name || enrollment.user.email).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                        return (
+                          <div key={enrollment.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center px-5 py-3.5 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.02] transition-colors">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-[#F5C518]/12 border border-[#F5C518]/20 flex items-center justify-center text-[#F5C518] text-xs font-extrabold shrink-0">
+                                {initials}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-white truncate">{enrollment.user.name || '—'}</p>
+                                <p className="text-xs text-white/35 truncate">{enrollment.user.email}</p>
+                              </div>
+                            </div>
+                            <span className="text-xs text-white/40">{enrollment.user.profile?.experienceLevel || '—'}</span>
+                            <span className="text-xs text-white/30 shrink-0">
+                              {new Date(enrollment.enrolledAt).toLocaleDateString()}
+                            </span>
+                            <span className="text-xs text-white/25 shrink-0">
+                              {new Date(enrollment.user.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-[24px] border border-white/8 bg-white/[0.02] p-12 text-center">
+                  <Users size={28} className="text-white/20 mx-auto mb-3" />
+                  <p className="text-white/40">Select a course to view its enrollments.</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Submissions tab ──────────────────────────────────────────────── */}
           {activeTab === 'submissions' && (
             <div className="space-y-5">
@@ -432,7 +545,7 @@ export default function AdminAcademyPage() {
                   <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-mono text-white/30">Week {submission.assignment.week.number}</span>
+                        <span className="text-xs font-mono text-white/30">{submission.assignment.week.course.contentUnit} {submission.assignment.week.number}</span>
                         <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-mono ${
                           submission.status === 'SUBMITTED'
                             ? 'border-amber-400/30 text-amber-300 bg-amber-400/8'
@@ -512,7 +625,7 @@ export default function AdminAcademyPage() {
                         <div className="flex items-start justify-between gap-4 mb-4">
                           <div>
                             <p className="text-xs font-mono uppercase tracking-[0.16em] text-white/30 mb-1">
-                              Week {items[0].week.number}
+                              {items[0].week.course.contentUnit} {items[0].week.number}
                             </p>
                             <h3 className="text-lg font-semibold text-white">{items[0].week.title}</h3>
                           </div>

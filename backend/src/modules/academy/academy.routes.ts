@@ -2516,4 +2516,78 @@ router.patch('/superadmin/users/:userId/role', requireAuth, requireSuperAdmin, a
   }
 })
 
+// ─── DELETE /superadmin/users/:userId ──────────────────────────────────────────
+
+router.delete('/superadmin/users/:userId', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.params.userId } })
+    if (!user) return sendError(res, 'User not found.', 404)
+    if (user.id === req.user!.userId) {
+      return sendError(res, 'You cannot delete yourself.', 400)
+    }
+
+    await prisma.user.delete({ where: { id: req.params.userId } })
+    return sendSuccess(res, { id: req.params.userId }, 'User deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── DELETE /superadmin/courses/:courseId ──────────────────────────────────────
+
+router.delete('/superadmin/courses/:courseId', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const course = await prisma.course.findUnique({ where: { id: req.params.courseId } })
+    if (!course) return sendError(res, 'Course not found.', 404)
+
+    await prisma.course.delete({ where: { id: req.params.courseId } })
+    return sendSuccess(res, { id: req.params.courseId }, 'Course deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── GET /admin/courses/:courseId/enrollments ──────────────────────────────────
+
+router.get('/admin/courses/:courseId/enrollments', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const course = await prisma.course.findUnique({
+      where: { id: req.params.courseId },
+      select: { createdById: true },
+    })
+
+    if (!course) return sendError(res, 'Course not found.', 404)
+
+    // Only the creator or a superadmin can view enrollments
+    if (course.createdById !== req.user!.userId && req.user!.role !== 'SUPER_ADMIN') {
+      return sendError(res, 'Unauthorized.', 403)
+    }
+
+    const enrollments = await prisma.courseEnrollment.findMany({
+      where: { courseId: req.params.courseId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            createdAt: true,
+            profile: {
+              select: {
+                country: true,
+                experienceLevel: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { enrolledAt: 'desc' },
+    })
+
+    return sendSuccess(res, enrollments)
+  } catch (err) {
+    next(err)
+  }
+})
+
 export default router

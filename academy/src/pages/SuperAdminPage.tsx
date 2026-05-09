@@ -9,6 +9,7 @@ import {
   Plus,
   Search,
   ShieldCheck,
+  Trash2,
   Users,
   XCircle,
 } from 'lucide-react'
@@ -48,6 +49,7 @@ type SuperAdminCourse = {
   slug: string
   tagline: string | null
   status: CourseStatus
+  contentUnit: string
   submittedAt: string | null
   createdAt: string
   _count: { weeks: number }
@@ -129,6 +131,10 @@ export default function SuperAdminPage() {
   const [showCreateAdmin, setShowCreateAdmin] = useState(false)
   const [createForm, setCreateForm] = useState({ name: '', email: '', password: '' })
   const [creating, setCreating] = useState(false)
+
+  // Delete actions
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'user' | 'course'; id: string; name: string } | null>(null)
 
   const [error, setError] = useState<string | null>(null)
 
@@ -244,6 +250,36 @@ export default function SuperAdminPage() {
       setError(err instanceof Error ? err.message : 'Failed to change role.')
     } finally {
       setChangingRoleId(null)
+    }
+  }
+
+  async function deleteUser(userId: string) {
+    setDeletingId(userId)
+    setError(null)
+    try {
+      await apiRequest(`/academy/superadmin/users/${userId}`, { method: 'DELETE' })
+      setDeleteConfirm(null)
+      await loadUsers()
+      await loadOverview()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete user.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  async function deleteCourse(courseId: string) {
+    setDeletingId(courseId)
+    setError(null)
+    try {
+      await apiRequest(`/academy/superadmin/courses/${courseId}`, { method: 'DELETE' })
+      setDeleteConfirm(null)
+      await loadCourses(statusFilter)
+      await loadOverview()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete course.')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -449,7 +485,7 @@ export default function SuperAdminPage() {
                             <h3 className="text-xl font-bold text-white mb-1">{course.title}</h3>
                             <p className="text-sm text-white/40 mb-3">/{course.slug}</p>
                             <div className="flex flex-wrap gap-4 text-sm text-white/50">
-                              <span>{course._count.weeks} week{course._count.weeks !== 1 ? 's' : ''}</span>
+                              <span>{course._count.weeks} {course.contentUnit.toLowerCase()}{course._count.weeks !== 1 ? 's' : ''}</span>
                               <span>{course.courseFacilitators.length} facilitator{course.courseFacilitators.length !== 1 ? 's' : ''}</span>
                               {course.createdBy && <span>by {course.createdBy.name || course.createdBy.email}</span>}
                             </div>
@@ -492,6 +528,12 @@ export default function SuperAdminPage() {
                                 </button>
                               </>
                             )}
+                            <button
+                              onClick={() => setDeleteConfirm({ type: 'course', id: course.id, name: course.title })}
+                              className="inline-flex items-center gap-1.5 rounded-full border border-red-400/30 bg-red-400/5 px-4 py-2 text-sm text-red-300/60 hover:bg-red-400/10 hover:text-red-300 transition-colors"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -607,11 +649,12 @@ export default function SuperAdminPage() {
                 </div>
               ) : (
                 <div className="rounded-[24px] border border-white/10 bg-white/[0.03] overflow-hidden">
-                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-3 border-b border-white/8 text-[10px] font-mono uppercase tracking-widest text-white/25">
+                  <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3 border-b border-white/8 text-[10px] font-mono uppercase tracking-widest text-white/25">
                     <span>User</span>
                     <span>Enrolled</span>
                     <span>Joined</span>
                     <span>Role</span>
+                    <span></span>
                   </div>
                   {users.length === 0 ? (
                     <div className="px-5 py-10 text-center text-sm text-white/30">No users found.</div>
@@ -621,7 +664,7 @@ export default function SuperAdminPage() {
                       const initials = (u.name || u.email).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
                       const isSelf = u.id === currentAuth?.user.id
                       return (
-                        <div key={u.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center px-5 py-3.5 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.02] transition-colors">
+                        <div key={u.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 items-center px-5 py-3.5 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.02] transition-colors">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-8 h-8 rounded-full bg-[#F5C518]/12 border border-[#F5C518]/20 flex items-center justify-center text-[#F5C518] text-xs font-extrabold shrink-0">
                               {initials}
@@ -668,6 +711,15 @@ export default function SuperAdminPage() {
                               </div>
                             )}
                           </div>
+                          {!isSelf && (
+                            <button
+                              onClick={() => setDeleteConfirm({ type: 'user', id: u.id, name: u.name || u.email })}
+                              className="shrink-0 text-red-400/50 hover:text-red-400 transition-colors p-1"
+                              title="Delete user"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       )
                     })
@@ -723,6 +775,36 @@ export default function SuperAdminPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[24px] border border-red-500/20 bg-[#111] p-6">
+            <h2 className="font-display text-xl font-extrabold text-white mb-1">
+              Delete {deleteConfirm.type === 'user' ? 'user' : 'course'}?
+            </h2>
+            <p className="text-sm text-white/50 mb-6">
+              Are you sure you want to delete <span className="font-semibold">{deleteConfirm.name}</span>? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => deleteConfirm.type === 'user' ? deleteUser(deleteConfirm.id) : deleteCourse(deleteConfirm.id)}
+                disabled={deletingId === deleteConfirm.id}
+                className="flex-1 rounded-full bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {deletingId === deleteConfirm.id ? 'Deleting…' : 'Delete'}
+              </button>
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                disabled={deletingId === deleteConfirm.id}
+                className="rounded-full border border-white/10 px-5 py-3 text-sm text-white/60 hover:border-white/20 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

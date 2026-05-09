@@ -7,6 +7,7 @@ const prisma = new PrismaClient()
 async function seedUsers() {
   const adminPassword = await bcrypt.hash('admin123456', 12)
   const demoPassword = await bcrypt.hash('demo12345', 12)
+  const superadminPassword = await bcrypt.hash('superadmin123456', 12)
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@rubikcon.com' },
@@ -20,6 +21,21 @@ async function seedUsers() {
       password: adminPassword,
       name: 'Rubikcon Admin',
       role: 'ADMIN',
+    },
+  })
+
+  const superadmin = await prisma.user.upsert({
+    where: { email: 'superadmin@rubikcon.com' },
+    update: {
+      password: superadminPassword,
+      name: 'Rubikcon Superadmin',
+      role: 'SUPER_ADMIN',
+    },
+    create: {
+      email: 'superadmin@rubikcon.com',
+      password: superadminPassword,
+      name: 'Rubikcon Superadmin',
+      role: 'SUPER_ADMIN',
     },
   })
 
@@ -38,7 +54,7 @@ async function seedUsers() {
     },
   })
 
-  return { admin, demo }
+  return { admin, superadmin, demo }
 }
 
 async function seedLegacyCourse() {
@@ -325,7 +341,8 @@ async function seedSampleGig(adminId: string) {
 async function main() {
   console.log('🌱 Seeding database...')
 
-  const { admin, demo } = await seedUsers()
+  const { admin, superadmin, demo } = await seedUsers()
+  console.log('✅ Superadmin user:', superadmin.email)
   console.log('✅ Admin user:', admin.email)
   console.log('✅ Demo user:', demo.email)
 
@@ -340,8 +357,9 @@ async function main() {
 
   console.log('\n🎉 Seed complete!')
   console.log('\nTest credentials:')
-  console.log('  Admin: admin@rubikcon.com / admin123456')
-  console.log('  Demo:  demo@rubikcon.com  / demo12345')
+  console.log('  Superadmin: superadmin@rubikcon.com / superadmin123456')
+  console.log('  Admin:      admin@rubikcon.com      / admin123456')
+  console.log('  Demo:       demo@rubikcon.com       / demo12345')
 }
 
 main()
