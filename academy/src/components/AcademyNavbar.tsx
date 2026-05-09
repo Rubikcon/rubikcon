@@ -89,7 +89,10 @@ export default function AcademyNavbar({
                 </a>
               )}
               <button
-                onClick={() => clearStoredAuth()}
+                onClick={() => {
+                  clearStoredAuth()
+                  window.location.href = '/login'
+                }}
                 className="text-sm px-4 py-1.5 rounded-full bg-[#F5C518] text-[#0A0A0A] font-semibold hover:bg-[#E8B800] transition-colors"
               >
                 Log out
