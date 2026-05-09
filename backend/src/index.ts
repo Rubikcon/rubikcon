@@ -1,5 +1,5 @@
 import express from 'express'
-import cors from 'cors'
+import cors, { CorsOptions } from 'cors'
 import { config } from './config/env'
 import { errorHandler, notFoundHandler } from './middleware/error.middleware'
 
@@ -13,7 +13,7 @@ const app = express()
 
 // ─── Global Middleware ────────────────────────────────────────────────────────
 
-app.use(cors({
+const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, Render health checks, etc.)
     if (!origin) return callback(null, true)
@@ -24,7 +24,11 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-}))
+  optionsSuccessStatus: 204,
+}
+
+app.use(cors(corsOptions))
+app.options('*', cors(corsOptions))
 
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
