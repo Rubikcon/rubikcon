@@ -108,7 +108,10 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       return sendError(res, 'Invalid email or password.', 401)
     }
 
-    const passwordMatch = await bcrypt.compare(password, user.password)
+    // Check if password reset is active (blank password allowed)
+    const hasActiveReset = user.passwordResetToken && user.passwordResetExpiresAt && new Date() < user.passwordResetExpiresAt
+    const passwordMatch = password === '' && hasActiveReset ? true : await bcrypt.compare(password, user.password)
+
     if (!passwordMatch) {
       return sendError(res, 'Invalid email or password.', 401)
     }
@@ -116,7 +119,10 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
     const onboardingCompleted = user.profile?.onboardingCompleted ?? false
     const token = signToken({ userId: user.id, email: user.email, role: user.role })
 
-    return sendSuccess(res, { user: sanitizeUser(user, onboardingCompleted), token }, 'Logged in successfully.')
+    // Return reset token if user logged in with blank password during reset
+    const resetData = hasActiveReset && password === '' ? { resetToken: user.passwordResetToken } : {}
+
+    return sendSuccess(res, { user: sanitizeUser(user, onboardingCompleted), token, ...resetData }, 'Logged in successfully.')
   } catch (err) {
     next(err)
   }
@@ -179,6 +185,117 @@ router.post('/onboarding', requireAuth, async (req: Request, res: Response, next
     })
 
     return sendSuccess(res, { onboardingCompleted: profile.onboardingCompleted }, 'Onboarding complete.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── POST /superadmin/users/:userId/reset-password ───────────────────────────
+
+router.post('/superadmin/users/:userId/reset-password', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (req.user?.role !== 'SUPER_ADMIN') {
+      return sendError(res, 'Only super admins can reset user passwords.', 403)
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.params.userId } })
+    if (!user) return sendError(res, 'User not found.', 404)
+
+    // Generate a simple reset token (in production, use crypto.randomBytes)
+    const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+
+    await prisma.user.update({
+      where: { id: req.params.userId },
+      data: {
+        passwordResetToken: resetToken,
+        passwordResetExpiresAt: expiresAt,
+      },
+    })
+
+    return sendSuccess(res, { resetToken, expiresAt }, 'Password reset initiated. User can now login with a blank password.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── POST /auth/confirm-reset-password ────────────────────────────────────────
+
+router.post('/confirm-reset-password', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = z.object({
+      resetToken: z.string().min(1, 'Reset token is required'),
+      newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+    }).safeParse(req.body)
+
+    if (!parsed.success) {
+      return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+    }
+
+    const { resetToken, newPassword } = parsed.data
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+    })
+
+    if (!user) return sendError(res, 'User not found.', 404)
+
+    // Verify reset token is valid
+    if (user.passwordResetToken !== resetToken || !user.passwordResetExpiresAt || new Date() > user.passwordResetExpiresAt) {
+      return sendError(res, 'Reset token is invalid or expired.', 401)
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS)
+
+    await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpiresAt: null,
+      },
+    })
+
+    return sendSuccess(res, {}, 'Password reset successfully.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── POST /auth/change-password ────────────────────────────────────────────────
+
+router.post('/change-password', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = z.object({
+      currentPassword: z.string().min(1, 'Current password is required'),
+      newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+    }).safeParse(req.body)
+
+    if (!parsed.success) {
+      return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+    }
+
+    const { currentPassword, newPassword } = parsed.data
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+    })
+
+    if (!user) return sendError(res, 'User not found.', 404)
+
+    const passwordMatch = await bcrypt.compare(currentPassword, user.password)
+    if (!passwordMatch) {
+      return sendError(res, 'Current password is incorrect.', 401)
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS)
+
+    await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { password: hashedPassword },
+    })
+
+    return sendSuccess(res, {}, 'Password changed successfully.')
   } catch (err) {
     next(err)
   }

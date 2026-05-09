@@ -5,8 +5,10 @@ import {
   ChevronDown,
   Clock,
   Eye,
+  Key,
   Loader2,
   Plus,
+  RotateCcw,
   Search,
   ShieldCheck,
   Trash2,
@@ -135,6 +137,15 @@ export default function SuperAdminPage() {
   // Delete actions
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'user' | 'course'; id: string; name: string } | null>(null)
+
+  // Password change
+  const [showPasswordChange, setShowPasswordChange] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [changingPassword, setChangingPassword] = useState(false)
+
+  // Password reset
+  const [resetPasswordData, setResetPasswordData] = useState<{ userId: string; userName: string; resetToken: string; expiresAt: string } | null>(null)
+  const [resettingPassword, setResettingPassword] = useState(false)
 
   const [error, setError] = useState<string | null>(null)
 
@@ -283,6 +294,51 @@ export default function SuperAdminPage() {
     }
   }
 
+  async function changePassword(e: FormEvent) {
+    e.preventDefault()
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
+    if (passwordForm.newPassword.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
+    setChangingPassword(true)
+    setError(null)
+    try {
+      await apiRequest('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        }),
+      })
+      setShowPasswordChange(false)
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to change password.')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
+  async function resetUserPassword(userId: string, userName: string) {
+    setResettingPassword(true)
+    setError(null)
+    try {
+      const result = await apiRequest<{ resetToken: string; expiresAt: string }>(`/auth/superadmin/users/${userId}/reset-password`, {
+        method: 'POST',
+      })
+      setResetPasswordData({ userId, userName, resetToken: result.resetToken, expiresAt: result.expiresAt })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reset password.')
+    } finally {
+      setResettingPassword(false)
+    }
+  }
+
   const actionCourse = courses.find(c => c.id === actionCourseId)
 
   const TABS: Array<{ id: Tab; label: string; icon: typeof ShieldCheck }> = [
@@ -299,17 +355,26 @@ export default function SuperAdminPage() {
         <div className="max-w-7xl mx-auto">
 
           {/* Header */}
-          <div className="mb-8">
-            <div className="inline-flex items-center gap-2 rounded-full border border-purple-400/25 bg-purple-400/10 px-4 py-2 text-sm text-purple-300 mb-4">
-              <ShieldCheck size={15} />
-              Super Admin Console
+          <div className="mb-8 flex items-start justify-between gap-6">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-purple-400/25 bg-purple-400/10 px-4 py-2 text-sm text-purple-300 mb-4">
+                <ShieldCheck size={15} />
+                Super Admin Console
+              </div>
+              <h1 className="font-display text-4xl md:text-5xl font-extrabold text-white mb-2">
+                Platform Management
+              </h1>
+              <p className="text-white/45 max-w-2xl">
+                Manage administrators, approve courses, and monitor platform-wide metrics.
+              </p>
             </div>
-            <h1 className="font-display text-4xl md:text-5xl font-extrabold text-white mb-2">
-              Platform Management
-            </h1>
-            <p className="text-white/45 max-w-2xl">
-              Manage administrators, approve courses, and monitor platform-wide metrics.
-            </p>
+            <button
+              onClick={() => setShowPasswordChange(true)}
+              className="shrink-0 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white/60 hover:border-white/30 hover:text-white transition-colors"
+            >
+              <Key size={14} />
+              Change password
+            </button>
           </div>
 
           {error && (
@@ -712,13 +777,23 @@ export default function SuperAdminPage() {
                             )}
                           </div>
                           {!isSelf && (
-                            <button
-                              onClick={() => setDeleteConfirm({ type: 'user', id: u.id, name: u.name || u.email })}
-                              className="shrink-0 text-red-400/50 hover:text-red-400 transition-colors p-1"
-                              title="Delete user"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => resetUserPassword(u.id, u.name || u.email)}
+                                disabled={resettingPassword}
+                                className="shrink-0 text-blue-400/50 hover:text-blue-400 transition-colors p-1 disabled:opacity-50"
+                                title="Reset password"
+                              >
+                                <RotateCcw size={14} />
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirm({ type: 'user', id: u.id, name: u.name || u.email })}
+                                className="shrink-0 text-red-400/50 hover:text-red-400 transition-colors p-1"
+                                title="Delete user"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           )}
                         </div>
                       )
@@ -803,6 +878,139 @@ export default function SuperAdminPage() {
                 className="rounded-full border border-white/10 px-5 py-3 text-sm text-white/60 hover:border-white/20 disabled:opacity-50"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password change modal */}
+      {showPasswordChange && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#111] p-6">
+            <h2 className="font-display text-xl font-extrabold text-white mb-1">Change password</h2>
+            <p className="text-sm text-white/50 mb-5">Update your account password</p>
+            <form onSubmit={changePassword} className="space-y-4">
+              <div>
+                <label className="block text-xs text-white/40 mb-1">Current password *</label>
+                <input
+                  type="password"
+                  required
+                  value={passwordForm.currentPassword}
+                  onChange={e => setPasswordForm(p => ({ ...p, currentPassword: e.target.value }))}
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-white/40 mb-1">New password *</label>
+                <input
+                  type="password"
+                  required
+                  value={passwordForm.newPassword}
+                  onChange={e => setPasswordForm(p => ({ ...p, newPassword: e.target.value }))}
+                  placeholder="Min. 8 characters"
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-white/40 mb-1">Confirm new password *</label>
+                <input
+                  type="password"
+                  required
+                  value={passwordForm.confirmPassword}
+                  onChange={e => setPasswordForm(p => ({ ...p, confirmPassword: e.target.value }))}
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={changingPassword}
+                  className="flex-1 rounded-full bg-[#F5C518] px-5 py-3 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors disabled:opacity-50"
+                >
+                  {changingPassword ? 'Changing…' : 'Change password'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordChange(false)
+                    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+                  }}
+                  disabled={changingPassword}
+                  className="rounded-full border border-white/10 px-5 py-3 text-sm text-white/60 hover:border-white/20 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Password reset result modal */}
+      {resetPasswordData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[24px] border border-blue-500/20 bg-[#111] p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0 mt-0.5">
+                <RotateCcw size={16} className="text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <h2 className="font-display text-xl font-extrabold text-white">Password reset initiated</h2>
+                <p className="text-sm text-white/50 mt-1">for <span className="font-semibold">{resetPasswordData.userName}</span></p>
+              </div>
+            </div>
+
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-5 space-y-3">
+              <div>
+                <p className="text-xs text-blue-300/70 uppercase tracking-widest font-mono mb-1">Reset Token</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-sm font-mono text-blue-300 bg-black/50 rounded-lg px-3 py-2 break-all">
+                    {resetPasswordData.resetToken}
+                  </code>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(resetPasswordData.resetToken)
+                      // Could add a toast notification here
+                    }}
+                    className="shrink-0 p-2 text-blue-300/60 hover:text-blue-300 transition-colors"
+                    title="Copy to clipboard"
+                  >
+                    📋
+                  </button>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-blue-300/70 uppercase tracking-widest font-mono mb-1">Valid Until</p>
+                <p className="text-sm text-blue-200">{new Date(resetPasswordData.expiresAt).toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="bg-white/5 rounded-xl p-4 mb-5 space-y-2 text-sm">
+              <p className="text-white/80 font-semibold">Instructions to share with user:</p>
+              <ol className="text-white/60 space-y-1.5 text-xs leading-relaxed ml-4 list-decimal">
+                <li>Go to the login page</li>
+                <li>Enter your email address</li>
+                <li>Leave the password field empty and click "Login with reset"</li>
+                <li>You'll be prompted to set a new password</li>
+                <li>This reset link is valid for 10 minutes</li>
+              </ol>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`Password reset token: ${resetPasswordData.resetToken}\n\nValid until: ${new Date(resetPasswordData.expiresAt).toLocaleString()}\n\nInstructions:\n1. Go to login\n2. Enter email\n3. Leave password empty\n4. Click "Login with reset"\n5. Set new password`)
+                }}
+                className="flex-1 rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+              >
+                Copy instructions
+              </button>
+              <button
+                onClick={() => setResetPasswordData(null)}
+                className="rounded-full border border-white/10 px-5 py-3 text-sm text-white/60 hover:border-white/20"
+              >
+                Done
               </button>
             </div>
           </div>

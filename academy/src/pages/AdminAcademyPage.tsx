@@ -3,6 +3,7 @@ import {
   BookOpen,
   CheckCircle2,
   ClipboardList,
+  Key,
   Loader2,
   MessageSquare,
   Plus,
@@ -76,6 +77,10 @@ export default function AdminAcademyPage() {
   const [createForm, setCreateForm] = useState({
     title: '', slug: '', description: '', tagline: '', level: '', estimatedDuration: '', phaseLabel: '', contentUnit: 'Lesson',
   })
+
+  const [showPasswordChange, setShowPasswordChange] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [changingPassword, setChangingPassword] = useState(false)
 
   const COURSE_LEVELS = ['Beginner', 'Intermediate', 'Advanced'] as const
   const COURSE_DURATIONS = ['2 weeks', '4 weeks', '6 weeks', '8 weeks', '10 weeks', '12 weeks', 'Self-paced'] as const
@@ -180,6 +185,36 @@ export default function AdminAcademyPage() {
     }
   }
 
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
+    if (passwordForm.newPassword.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
+    setChangingPassword(true)
+    setError(null)
+    try {
+      await apiRequest('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        }),
+      })
+      setShowPasswordChange(false)
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to change password.')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
   async function createCourse(e: FormEvent) {
     e.preventDefault()
     setCreating(true)
@@ -226,17 +261,26 @@ export default function AdminAcademyPage() {
         <div className="max-w-7xl mx-auto">
 
           {/* Header */}
-          <div className="mb-8">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#F5C518]/25 bg-[#F5C518]/10 px-4 py-2 text-sm text-[#F5C518] mb-4">
-              <ShieldCheck size={15} />
-              {auth?.user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Facilitator'} dashboard
+          <div className="mb-8 flex items-start justify-between gap-6">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#F5C518]/25 bg-[#F5C518]/10 px-4 py-2 text-sm text-[#F5C518] mb-4">
+                <ShieldCheck size={15} />
+                {auth?.user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Facilitator'} dashboard
+              </div>
+              <h1 className="font-display text-4xl md:text-5xl font-extrabold text-white mb-2">
+                Welcome back{auth?.user.name ? `, ${auth.user.name.split(' ')[0]}` : ''}.
+              </h1>
+              <p className="text-white/45">
+                Build courses, review submissions, and track your learners' progress.
+              </p>
             </div>
-            <h1 className="font-display text-4xl md:text-5xl font-extrabold text-white mb-2">
-              Welcome back{auth?.user.name ? `, ${auth.user.name.split(' ')[0]}` : ''}.
-            </h1>
-            <p className="text-white/45">
-              Build courses, review submissions, and track your learners' progress.
-            </p>
+            <button
+              onClick={() => setShowPasswordChange(true)}
+              className="shrink-0 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white/60 hover:border-white/30 hover:text-white transition-colors"
+            >
+              <Key size={14} />
+              Change password
+            </button>
           </div>
 
           {/* Stats row */}
@@ -683,6 +727,69 @@ export default function AdminAcademyPage() {
 
         </div>
       </main>
+
+      {/* Password change modal */}
+      {showPasswordChange && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#111] p-6">
+            <h2 className="font-display text-xl font-extrabold text-white mb-1">Change password</h2>
+            <p className="text-sm text-white/50 mb-5">Update your account password</p>
+            <form onSubmit={changePassword} className="space-y-4">
+              <div>
+                <label className="block text-xs text-white/40 mb-1">Current password *</label>
+                <input
+                  type="password"
+                  required
+                  value={passwordForm.currentPassword}
+                  onChange={e => setPasswordForm(p => ({ ...p, currentPassword: e.target.value }))}
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-white/40 mb-1">New password *</label>
+                <input
+                  type="password"
+                  required
+                  value={passwordForm.newPassword}
+                  onChange={e => setPasswordForm(p => ({ ...p, newPassword: e.target.value }))}
+                  placeholder="Min. 8 characters"
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-white/40 mb-1">Confirm new password *</label>
+                <input
+                  type="password"
+                  required
+                  value={passwordForm.confirmPassword}
+                  onChange={e => setPasswordForm(p => ({ ...p, confirmPassword: e.target.value }))}
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={changingPassword}
+                  className="flex-1 rounded-full bg-[#F5C518] px-5 py-3 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors disabled:opacity-50"
+                >
+                  {changingPassword ? 'Changing…' : 'Change password'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordChange(false)
+                    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+                  }}
+                  disabled={changingPassword}
+                  className="rounded-full border border-white/10 px-5 py-3 text-sm text-white/60 hover:border-white/20 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
