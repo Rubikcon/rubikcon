@@ -54,17 +54,14 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS)
 
-    const user = await prisma.$transaction(async tx => {
-      const createdUser = await tx.user.create({
-        data: { email, password: hashedPassword, name: name || null },
-      })
-
-      // Create empty profile record so onboardingCompleted = false.
-      await tx.userProfile.create({
-        data: { userId: createdUser.id },
-      })
-
-      return createdUser
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        name: name || null,
+        // Create empty profile record so onboardingCompleted = false.
+        profile: { create: {} },
+      },
     })
 
     const token = signToken({ userId: user.id, email: user.email, role: user.role })
