@@ -1,6 +1,7 @@
 import express from 'express'
 import cors, { CorsOptions } from 'cors'
 import { config } from './config/env'
+import prisma from './config/database'
 import { errorHandler, notFoundHandler } from './middleware/error.middleware'
 
 // Routes
@@ -51,6 +52,32 @@ app.get('/health', (_req, res) => {
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   })
+})
+
+app.get('/health/db', async (_req, res, next) => {
+  try {
+    const [schema] = await prisma.$queryRaw<Array<{
+      usersExists: boolean
+      userProfilesExists: boolean
+    }>>`
+      SELECT
+        to_regclass('public.users') IS NOT NULL AS "usersExists",
+        to_regclass('public.user_profiles') IS NOT NULL AS "userProfilesExists"
+    `
+    const userCount = schema.usersExists ? await prisma.user.count() : null
+
+    res.json({
+      status: schema.usersExists && schema.userProfilesExists ? 'ok' : 'schema_mismatch',
+      database: {
+        usersExists: schema.usersExists,
+        userProfilesExists: schema.userProfilesExists,
+        userCount,
+      },
+      timestamp: new Date().toISOString(),
+    })
+  } catch (err) {
+    next(err)
+  }
 })
 
 // ─── API Routes ───────────────────────────────────────────────────────────────

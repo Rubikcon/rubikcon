@@ -7,7 +7,14 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ): void {
-  console.error('[Error]', err.message)
+  console.error('[Error]', {
+    name: err.name,
+    message: err.message,
+    stack: err.stack,
+    ...(err instanceof Prisma.PrismaClientKnownRequestError
+      ? { code: err.code, meta: err.meta }
+      : {}),
+  })
 
   // Prisma unique constraint
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
