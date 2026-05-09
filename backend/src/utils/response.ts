@@ -63,9 +63,20 @@ export interface JWTPayload {
 }
 
 export const signToken = (payload: JWTPayload): string => {
-  return jwt.sign(payload, config.jwtSecret, {
-    expiresIn: config.jwtExpiresIn,
-  } as jwt.SignOptions)
+  try {
+    return jwt.sign(payload, config.jwtSecret, {
+      expiresIn: config.jwtExpiresIn,
+    } as jwt.SignOptions)
+  } catch (err) {
+    console.error('[JWT sign failed]', {
+      jwtExpiresIn: config.jwtExpiresIn,
+      message: err instanceof Error ? err.message : String(err),
+    })
+
+    return jwt.sign(payload, config.jwtSecret, {
+      expiresIn: '7d',
+    } as jwt.SignOptions)
+  }
 }
 
 export const verifyToken = (token: string): JWTPayload => {

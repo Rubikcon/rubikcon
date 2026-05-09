@@ -47,9 +47,26 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
     const { password, name } = parsed.data
     const email = parsed.data.email.toLowerCase()
 
-    const existing = await prisma.user.findUnique({ where: { email } })
+    const existing = await prisma.user.findUnique({
+      where: { email },
+      include: { profile: true },
+    })
     if (existing) {
-      return sendError(res, 'An account with this email already exists.', 409)
+      const passwordMatch = await bcrypt.compare(password, existing.password)
+      if (!passwordMatch) {
+        return sendError(res, 'An account with this email already exists. Please log in instead.', 409)
+      }
+
+      const profile = existing.profile ?? await prisma.userProfile.create({
+        data: { userId: existing.id },
+      })
+      const token = signToken({ userId: existing.id, email: existing.email, role: existing.role })
+
+      return sendSuccess(
+        res,
+        { user: sanitizeUser(existing, profile.onboardingCompleted), token },
+        'Account already exists. Logged in successfully.'
+      )
     }
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS)
