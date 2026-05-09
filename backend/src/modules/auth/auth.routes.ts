@@ -30,7 +30,7 @@ function sanitizeUser(user: { id: string; email: string; name: string | null; ro
     email: user.email,
     name: user.name,
     role: user.role,
-    createdAt: user.createdAt,
+    createdAt: user.createdAt.toISOString(),
     onboardingCompleted,
   }
 }

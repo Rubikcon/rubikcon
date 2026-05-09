@@ -61,7 +61,7 @@ model UserProfile {
   country             String?
   experienceLevel     String?
   motivation          String?
-  learningInterests   String[]
+  learningInterests   String[]  @default([])
   telegramHandle      String?
   twitterHandle       String?
   onboardingCompleted Boolean   @default(false)
