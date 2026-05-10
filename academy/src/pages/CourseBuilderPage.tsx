@@ -41,7 +41,7 @@ export default function CourseBuilderPage() {
   // Edit course info
   const [editInfo, setEditInfo] = useState(false)
   const [infoForm, setInfoForm] = useState({
-    title: '', description: '', tagline: '', level: '', estimatedDuration: '', phaseLabel: '', slug: '', contentUnit: 'Lesson',
+    title: '', description: '', tagline: '', level: '', estimatedDuration: '', phaseLabel: '', slug: '', contentUnit: 'Lesson', introVideoUrl: '', isPaid: false,
   })
 
   // Facilitators
@@ -90,6 +90,8 @@ export default function CourseBuilderPage() {
       phaseLabel: data.phaseLabel ?? '',
       slug: data.slug,
       contentUnit: data.contentUnit,
+      introVideoUrl: data.introVideoUrl ?? '',
+      isPaid: data.isPaid ?? false,
     })
   }
 
@@ -117,6 +119,8 @@ export default function CourseBuilderPage() {
             phaseLabel: courseData.phaseLabel ?? '',
             slug: courseData.slug,
             contentUnit: courseData.contentUnit,
+            introVideoUrl: courseData.introVideoUrl ?? '',
+            isPaid: courseData.isPaid ?? false,
           })
         }
       } catch (err) {
@@ -590,6 +594,17 @@ export default function CourseBuilderPage() {
                       {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-xs text-white/40 mb-1">Intro Video URL</label>
+                    <input value={infoForm.introVideoUrl} onChange={e => setInfoForm(p => ({ ...p, introVideoUrl: e.target.value }))} type="url" placeholder="YouTube, Vimeo, or Loom URL"
+                      className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40" />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 text-white/60 cursor-pointer">
+                      <input type="checkbox" checked={infoForm.isPaid} onChange={e => setInfoForm(p => ({ ...p, isPaid: e.target.checked }))} className="accent-[#F5C518]" />
+                      <span className="text-xs">This is a paid course</span>
+                    </label>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs text-white/40 mb-1">Description</label>
@@ -615,6 +630,8 @@ export default function CourseBuilderPage() {
                   ['Duration', course.estimatedDuration],
                   ['Phase', course.phaseLabel],
                   ['Content unit', course.contentUnit],
+                  ['Type', course.isPaid ? 'Paid' : 'Free'],
+                  ['Intro Video', course.introVideoUrl],
                 ].map(([label, val]) => val && (
                   <div key={label as string}>
                     <dt className="text-white/35 text-xs mb-0.5">{label}</dt>

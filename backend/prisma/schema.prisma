@@ -102,10 +102,12 @@ model Course {
   estimatedDuration String?
   phaseLabel        String?
   heroImage         String?
+  introVideoUrl     String?
   contentUnit       String       @default("Lesson")
   slug              String       @unique
   published         Boolean      @default(false)
   publishedAt       DateTime?
+  isPaid            Boolean      @default(false)
   status            CourseStatus @default(DRAFT)
   createdById       String?
   approvalNotes     String?

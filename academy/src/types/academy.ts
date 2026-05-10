@@ -23,6 +23,7 @@ export type AdminCourse = {
   tagline: string | null
   status: CourseStatus
   published: boolean
+  isPaid: boolean
   contentUnit: string
   weekCount: number
   facilitators: FacilitatorSummary[]
@@ -52,9 +53,11 @@ export type AdminCourseDetail = {
   estimatedDuration: string | null
   phaseLabel: string | null
   heroImage: string | null
+  introVideoUrl: string | null
   contentUnit: string
   status: CourseStatus
   published: boolean
+  isPaid: boolean
   approvalNotes: string | null
   submittedAt: string | null
   approvedAt: string | null

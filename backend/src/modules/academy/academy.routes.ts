@@ -1603,7 +1603,9 @@ const createCourseSchema = z.object({
   estimatedDuration: z.string().trim().max(100).optional(),
   phaseLabel: z.string().trim().max(100).optional(),
   heroImage: z.string().url().optional(),
+  introVideoUrl: z.string().url().optional(),
   contentUnit: z.enum(['Lesson', 'Week', 'Module', 'Session', 'Chapter', 'Unit']).default('Lesson').optional(),
+  isPaid: z.boolean().default(false).optional(),
   slug: z.string().trim().regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens').min(3).max(100),
 })
 
