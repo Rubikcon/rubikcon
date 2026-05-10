@@ -2223,6 +2223,7 @@ router.patch('/admin/courses/:courseId/modules/:moduleId', requireAuth, requireA
     const parsed = z.object({
       title: z.string().trim().min(1).max(200).optional(),
       description: z.string().trim().max(1000).optional(),
+      introVideoUrl: z.string().url().optional().nullable(),
     }).safeParse(req.body)
     if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
 
@@ -2248,6 +2249,120 @@ router.delete('/admin/courses/:courseId/modules/:moduleId', requireAuth, require
     await prisma.week.updateMany({ where: { moduleId: mod.id }, data: { moduleId: null } })
     await prisma.module.delete({ where: { id: mod.id } })
     return sendSuccess(res, { id: mod.id }, 'Module deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Create a lesson in a module
+router.post('/admin/courses/:courseId/modules/:moduleId/lessons', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const mod = await prisma.module.findFirst({ where: { id: req.params.moduleId, courseId: course.id } })
+    if (!mod) return sendError(res, 'Module not found.', 404)
+
+    const parsed = z.object({
+      title: z.string().trim().min(1).max(200),
+      content: z.string().trim().min(1).max(50000),
+      duration: z.number().int().min(1).max(600),
+    }).safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const lessonCount = await prisma.lesson.count({ where: { moduleId: mod.id } })
+    const lesson = await prisma.lesson.create({
+      data: {
+        ...parsed.data,
+        moduleId: mod.id,
+        position: lessonCount + 1,
+      },
+    })
+
+    return sendSuccess(res, lesson, 'Lesson created.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Delete a lesson
+router.delete('/lesson/:lessonId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const lesson = await prisma.lesson.findUnique({ where: { id: req.params.lessonId } })
+    if (!lesson) return sendError(res, 'Lesson not found.', 404)
+
+    // Verify user has permission (owns the course)
+    const course = await prisma.course.findFirst({
+      where: {
+        modules: { some: { lessons: { some: { id: lesson.id } } } },
+      },
+    })
+    if (!course) return sendError(res, 'Lesson not found.', 404)
+    if (req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN' && course.createdById !== req.user!.userId) {
+      return sendError(res, 'Forbidden.', 403)
+    }
+
+    // Delete all videos associated with the lesson
+    await prisma.lessonVideo.deleteMany({ where: { lessonId: lesson.id } })
+
+    // Delete all facilitators assigned to the lesson
+    await prisma.lessonFacilitator.deleteMany({ where: { lessonId: lesson.id } })
+
+    // Delete the lesson
+    await prisma.lesson.delete({ where: { id: lesson.id } })
+
+    return sendSuccess(res, { id: lesson.id }, 'Lesson deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Add facilitator to lesson
+router.post('/lessons/:lessonId/facilitators', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const lesson = await prisma.lesson.findUnique({ where: { id: req.params.lessonId } })
+    if (!lesson) return sendError(res, 'Lesson not found.', 404)
+
+    const { facilitatorId } = z.object({ facilitatorId: z.string().uuid() }).parse(req.body)
+
+    const facilitator = await prisma.facilitator.findUnique({ where: { id: facilitatorId } })
+    if (!facilitator) return sendError(res, 'Facilitator not found.', 404)
+
+    // Check if already assigned
+    const existing = await prisma.lessonFacilitator.findUnique({
+      where: { lessonId_facilitatorId: { lessonId: lesson.id, facilitatorId } },
+    })
+    if (existing) return sendError(res, 'Facilitator already assigned to this lesson.', 409)
+
+    const lf = await prisma.lessonFacilitator.create({
+      data: { lessonId: lesson.id, facilitatorId },
+      include: { facilitator: true },
+    })
+
+    return sendSuccess(res, lf.facilitator, 'Facilitator added to lesson.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Remove facilitator from lesson
+router.delete('/lessons/:lessonId/facilitators/:facilitatorId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const lesson = await prisma.lesson.findUnique({ where: { id: req.params.lessonId } })
+    if (!lesson) return sendError(res, 'Lesson not found.', 404)
+
+    const lf = await prisma.lessonFacilitator.findUnique({
+      where: { lessonId_facilitatorId: { lessonId: lesson.id, facilitatorId: req.params.facilitatorId } },
+    })
+    if (!lf) return sendError(res, 'Facilitator not assigned to this lesson.', 404)
+
+    await prisma.lessonFacilitator.delete({
+      where: { lessonId_facilitatorId: { lessonId: lesson.id, facilitatorId: req.params.facilitatorId } },
+    })
+
+    return sendSuccess(res, { id: lf.facilitatorId }, 'Facilitator removed from lesson.')
   } catch (err) {
     next(err)
   }

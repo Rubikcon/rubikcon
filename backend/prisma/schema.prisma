@@ -173,11 +173,12 @@ model CourseApproval {
 }
 
 model Module {
-  id          String  @id @default(uuid())
-  title       String
-  description String?
-  position    Int
-  courseId    String
+  id            String  @id @default(uuid())
+  title         String
+  description   String?
+  introVideoUrl String?
+  position      Int
+  courseId      String
 
   course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons Lesson[]
@@ -197,9 +198,10 @@ model Lesson {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  module    Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  progress  Progress[]
-  videos    LessonVideo[]
+  module      Module            @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress    Progress[]
+  videos      LessonVideo[]
+  facilitators LessonFacilitator[]
 
   @@index([moduleId])
   @@map("lessons")
@@ -218,6 +220,20 @@ model LessonVideo {
   @@unique([lessonId, position])
   @@index([lessonId])
   @@map("lesson_videos")
+}
+
+model LessonFacilitator {
+  id            String  @id @default(uuid())
+  lessonId      String
+  facilitatorId String
+
+  lesson      Lesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  facilitator Facilitator @relation(fields: [facilitatorId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, facilitatorId])
+  @@index([lessonId])
+  @@index([facilitatorId])
+  @@map("lesson_facilitators")
 }
 
 model Progress {
@@ -249,8 +265,9 @@ model Facilitator {
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
-  weeks   WeekFacilitator[]
-  courses CourseFacilitator[]
+  weeks    WeekFacilitator[]
+  courses  CourseFacilitator[]
+  lessons  LessonFacilitator[]
 
   @@unique([email])
   @@map("facilitators")
