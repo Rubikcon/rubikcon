@@ -8,11 +8,11 @@ A production-ready monorepo containing 4 independent frontend applications and a
 
 ```
 rubikcon/
-├── landing/          → rubikcon.com          (port 3000)
-├── academy/          → academy.rubikcon.com  (port 3001)
-├── games/            → games.rubikcon.com    (port 3002)
-├── blockgigs/        → blockgigs.rubikcon.com (port 3003)
-└── backend/          → api.rubikcon.com      (port 4000)
+├── landing/          → rubikcon.com                    (port 3000)
+├── academy/          → www.rubikconacademy.xyz        (port 3001)
+├── games/            → games.rubikcon.com              (port 3002)
+├── blockgigs/        → blockgigs.rubikcon.com          (port 3003)
+└── backend/          → api.rubikcon.com                (port 4000)
 ```
 
 ---
@@ -267,7 +267,7 @@ Update `APPS` URLs in each frontend from `localhost` to production domains.
 # Set these environment variables in your deployment:
 DATABASE_URL=postgresql://...
 JWT_SECRET=your-production-secret-min-32-chars
-ALLOWED_ORIGINS=https://rubikcon.com,https://academy.rubikcon.com,...
+ALLOWED_ORIGINS=https://rubikcon.com,https://www.rubikconacademy.xyz,...
 PORT=4000
 NODE_ENV=production
 ```
