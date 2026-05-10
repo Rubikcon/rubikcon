@@ -427,7 +427,7 @@ router.get('/courses', optionalAuth, async (req: Request, res: Response, next: N
       facilitators: c.courseFacilitators.map(cf => cf.facilitator),
       enrolled: req.user ? (c.enrollments as { id: string }[]).length > 0 : false,
     }))
-    return sendSuccess(res, { data: result, pagination: { page, limit, total, pages: Math.ceil(total / limit) } })
+    return sendPaginated(res, result, total, page, limit)
   } catch (err) {
     next(err)
   }
