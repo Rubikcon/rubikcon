@@ -116,7 +116,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       return sendError(res, 'Invalid email or password.', 401)
     }
 
-    // Check active sessions (limit to 2 concurrent devices)
+    // Check active sessions (limit to 5 concurrent devices)
     const activeSessions = await prisma.session.findMany({
       where: {
         userId: user.id,
@@ -124,7 +124,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       },
     })
 
-    if (activeSessions.length >= 2) {
+    if (activeSessions.length >= 5) {
       return sendError(res, 'Too many devices logged in. Please log out on another device to continue.', 401)
     }
 
