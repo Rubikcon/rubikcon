@@ -107,7 +107,7 @@ export default function LandingPage() {
           {/* CTAs */}
           <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={3}
             className="flex items-center justify-center gap-4 mb-20 flex-wrap">
-            <a href="#courses"
+            <a href="/courses"
               className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-bold px-8 py-3.5 rounded-full hover:bg-[#E8B800] transition-colors text-[15px]">
               Browse courses →
             </a>
