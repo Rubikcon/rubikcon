@@ -21,6 +21,7 @@ import {
 import { apiRequest, ApiError } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
 import VideoEmbed, { getEmbedUrl } from '../components/VideoEmbed'
+import SlideViewer from '../components/SlideViewer'
 import type { CourseSummary, CourseWeekSummary, ReadingType, WeekDetail } from '../types/academy'
 
 type LessonTab = 'overview' | 'resources' | 'quiz' | 'assignment'
@@ -127,6 +128,7 @@ export default function LessonPage() {
   const [assignmentSavingId, setAssignmentSavingId] = useState<string | null>(null)
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, { choiceId?: string; textResponse: string }>>({})
   const [activeVideoIdx, setActiveVideoIdx] = useState(0)
+  const [slideViewerOpen, setSlideViewerOpen] = useState(false)
 
   const auth = getStoredAuth()
 
@@ -647,31 +649,53 @@ export default function LessonPage() {
               <div className="space-y-6">
                 {/* Slide deck */}
                 {week.resources.slideDeck && (
-                  <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div>
-                        <p className="text-[11px] font-mono uppercase tracking-widest text-white/30 mb-2">Slide deck</p>
-                        <h4 className="font-semibold text-white mb-1">{week.resources.slideDeck.title}</h4>
-                        <div className="flex flex-wrap gap-3 text-xs text-white/35 mb-3">
-                          <span>{week.resources.slideDeck.slideCount} slides</span>
-                          <span>Updated {new Date(week.resources.slideDeck.lastUpdatedAt).toLocaleDateString()}</span>
+                  <>
+                    <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                          <p className="text-[11px] font-mono uppercase tracking-widest text-white/30 mb-2">Slide deck</p>
+                          <h4 className="font-semibold text-white mb-1">{week.resources.slideDeck.title}</h4>
+                          <div className="flex flex-wrap gap-3 text-xs text-white/35 mb-3">
+                            <span>{week.resources.slideDeck.slideCount} slides</span>
+                            <span>Updated {new Date(week.resources.slideDeck.lastUpdatedAt).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {week.resources.slideDeck.sections.map(section => (
+                              <span key={section} className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-white/50">{section}</span>
+                            ))}
+                          </div>
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {week.resources.slideDeck.sections.map(section => (
-                            <span key={section} className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-white/50">{section}</span>
-                          ))}
+                        <div className="flex gap-2 flex-wrap flex-shrink-0">
+                          {week.resources.slideDeck.viewerType === 'MODAL' && (
+                            <button
+                              onClick={() => setSlideViewerOpen(true)}
+                              className="inline-flex items-center gap-2 rounded-xl bg-[#F5C518] px-4 py-2.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#FFD020] transition-colors"
+                            >
+                              View Slides
+                            </button>
+                          )}
+                          <a
+                            href={week.resources.slideDeck.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition-colors"
+                          >
+                            Open <ExternalLink size={13} />
+                          </a>
                         </div>
                       </div>
-                      <a
-                        href={week.resources.slideDeck.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-2 rounded-xl bg-[#F5C518] px-4 py-2.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#FFD020] transition-colors shrink-0"
-                      >
-                        Open <ExternalLink size={13} />
-                      </a>
                     </div>
-                  </div>
+                    {slideViewerOpen && (
+                      <SlideViewer
+                        url={week.resources.slideDeck.url}
+                        title={week.resources.slideDeck.title}
+                        slideCount={week.resources.slideDeck.slideCount}
+                        sections={week.resources.slideDeck.sections}
+                        viewerType={week.resources.slideDeck.viewerType}
+                        onClose={() => setSlideViewerOpen(false)}
+                      />
+                    )}
+                  </>
                 )}
 
                 {/* Readings */}

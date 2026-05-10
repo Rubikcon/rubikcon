@@ -5,7 +5,7 @@ import AcademyNavbar from '../components/AcademyNavbar'
 import LessonVideoManager from '../components/LessonVideoManager'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
-import type { AdminLesson, LessonVideo } from '../types/academy'
+import type { AdminLesson } from '../types/academy'
 
 export default function LessonEditorPage() {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>()

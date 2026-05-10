@@ -589,7 +589,7 @@ export default function AdminAcademyPage() {
                   <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-mono text-white/30">{submission.assignment.week.course.contentUnit} {submission.assignment.week.number}</span>
+                        <span className="text-xs font-mono text-white/30">Week {submission.assignment.week.number}</span>
                         <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-mono ${
                           submission.status === 'SUBMITTED'
                             ? 'border-amber-400/30 text-amber-300 bg-amber-400/8'
@@ -669,7 +669,7 @@ export default function AdminAcademyPage() {
                         <div className="flex items-start justify-between gap-4 mb-4">
                           <div>
                             <p className="text-xs font-mono uppercase tracking-[0.16em] text-white/30 mb-1">
-                              {items[0].week.course.contentUnit} {items[0].week.number}
+                              Week {items[0].week.number}
                             </p>
                             <h3 className="text-lg font-semibold text-white">{items[0].week.title}</h3>
                           </div>
