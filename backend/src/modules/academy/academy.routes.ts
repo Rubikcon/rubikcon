@@ -1449,10 +1449,109 @@ router.get('/lesson/:id', async (req: Request, res: Response, next: NextFunction
   try {
     const lesson = await prisma.lesson.findUnique({
       where: { id: req.params.id },
-      include: { module: { include: { course: true } } },
+      include: {
+        module: { include: { course: true } },
+        videos: { orderBy: { position: 'asc' } },
+      },
     })
     if (!lesson) return sendError(res, 'Lesson not found.', 404)
     return sendSuccess(res, lesson)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.patch('/lesson/:id', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = z.object({
+      title: z.string().trim().min(1).max(200).optional(),
+      content: z.string().trim().max(50000).optional(),
+      duration: z.number().int().positive().optional(),
+    }).safeParse(req.body)
+
+    if (!parsed.success) {
+      return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+    }
+
+    const updated = await prisma.lesson.update({
+      where: { id: req.params.id },
+      data: Object.fromEntries(Object.entries(parsed.data).filter(([, v]) => v !== undefined)),
+      include: {
+        module: { include: { course: true } },
+        videos: { orderBy: { position: 'asc' } },
+      },
+    })
+
+    return sendSuccess(res, updated, 'Lesson updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/lessons/:lessonId/videos', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = z.object({
+      title: z.string().trim().min(1).max(200),
+      url: z.string().url('Invalid video URL'),
+      description: z.string().trim().max(1000).optional(),
+    }).safeParse(req.body)
+
+    if (!parsed.success) {
+      return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+    }
+
+    const lesson = await prisma.lesson.findUnique({
+      where: { id: req.params.lessonId },
+      include: { videos: true },
+    })
+    if (!lesson) return sendError(res, 'Lesson not found.', 404)
+
+    const nextPosition = (lesson.videos.length || 0) + 1
+
+    const video = await prisma.lessonVideo.create({
+      data: {
+        lessonId: req.params.lessonId,
+        position: nextPosition,
+        title: parsed.data.title,
+        url: parsed.data.url,
+        description: parsed.data.description || null,
+      },
+    })
+
+    return sendSuccess(res, video, 'Video added to lesson.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.put('/lesson-videos/:videoId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = z.object({
+      title: z.string().trim().min(1).max(200).optional(),
+      url: z.string().url('Invalid video URL').optional(),
+      description: z.string().trim().max(1000).optional(),
+      position: z.number().int().positive().optional(),
+    }).safeParse(req.body)
+
+    if (!parsed.success) {
+      return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+    }
+
+    const video = await prisma.lessonVideo.update({
+      where: { id: req.params.videoId },
+      data: Object.fromEntries(Object.entries(parsed.data).filter(([, v]) => v !== undefined)),
+    })
+
+    return sendSuccess(res, video, 'Video updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.delete('/lesson-videos/:videoId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await prisma.lessonVideo.delete({ where: { id: req.params.videoId } })
+    return sendSuccess(res, {}, 'Video deleted.')
   } catch (err) {
     next(err)
   }

@@ -122,6 +122,17 @@ export type AdminAssignment = {
   choices: Array<{ id: string; title: string; description: string; position: number }>
 }
 
+export type AdminLesson = {
+  id: string
+  title: string
+  content: string
+  duration: number
+  position: number
+  moduleId: string
+  videos: Array<{ id: string; title: string; url: string; description: string | null; position: number }>
+  module: { id: string; title: string; description: string | null; course: { id: string; title: string; slug: string } }
+}
+
 export type ReadingType =
   | 'ARTICLE'
   | 'COURSE'

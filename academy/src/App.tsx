@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import AdminAcademyPage from './pages/AdminAcademyPage'
 import CourseBuilderPage from './pages/CourseBuilderPage'
+import LessonEditorPage from './pages/LessonEditorPage'
 import SuperAdminPage from './pages/SuperAdminPage'
 import SuperAdminCourseDetailPage from './pages/SuperAdminCourseDetailPage'
 import CoursesPage from './pages/CoursesPage'
@@ -21,6 +22,7 @@ export default function App() {
       <Route path="/admin" component={AdminAcademyPage} />
       <Route path="/admin/academy" component={AdminAcademyPage} />
       <Route path="/admin/courses/:courseId" component={CourseBuilderPage} />
+      <Route path="/admin/courses/:courseId/lessons/:lessonId" component={LessonEditorPage} />
       <Route path="/admin/superadmin" component={SuperAdminPage} />
       <Route path="/admin/superadmin/courses/:courseId" component={SuperAdminCourseDetailPage} />
       <Route path="/courses" component={CoursesPage} />
