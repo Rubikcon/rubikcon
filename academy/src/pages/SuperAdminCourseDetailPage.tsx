@@ -189,7 +189,6 @@ export default function SuperAdminCourseDetailPage() {
               {[
                 ['Level', course.level],
                 ['Duration', course.estimatedDuration],
-                ['Phase label', course.phaseLabel],
                 ['Tagline', course.tagline],
               ].map(([label, val]) => val && (
                 <div key={label as string}>

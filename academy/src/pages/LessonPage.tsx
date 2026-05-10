@@ -337,7 +337,7 @@ export default function LessonPage() {
             <X size={13} /> Close player
           </a>
           <p className="text-[11px] font-mono uppercase tracking-[0.16em] text-[#F5C518]/60 mb-1">
-            {course.phaseLabel ?? 'Programme'}
+            Programme
           </p>
           <h2 className="text-sm font-bold text-white leading-snug mb-3 line-clamp-2">{course.title}</h2>
           {/* Overall progress */}

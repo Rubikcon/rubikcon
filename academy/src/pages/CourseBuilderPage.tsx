@@ -19,13 +19,6 @@ const STATUS_COLORS: Record<string, string> = {
 const DIFFICULTIES = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'] as const
 const LEVELS = ['Beginner', 'Intermediate', 'Advanced'] as const
 const DURATIONS = ['2 weeks', '4 weeks', '6 weeks', '8 weeks', '10 weeks', '12 weeks', 'Self-paced'] as const
-const PHASE_LABELS = [
-  'Phase 1 - Theory',
-  'Phase 2 - Foundations',
-  'Phase 3 - Application',
-  'Phase 4 - Advanced',
-  'Phase 5 - Capstone',
-] as const
 const CONTENT_UNITS = ['Lesson', 'Week', 'Module', 'Session', 'Chapter', 'Unit'] as const
 
 export default function CourseBuilderPage() {
@@ -41,7 +34,7 @@ export default function CourseBuilderPage() {
   // Edit course info
   const [editInfo, setEditInfo] = useState(false)
   const [infoForm, setInfoForm] = useState({
-    title: '', description: '', tagline: '', level: '', estimatedDuration: '', phaseLabel: '', slug: '', contentUnit: 'Lesson', introVideoUrl: '', isPaid: false,
+    title: '', description: '', tagline: '', level: '', estimatedDuration: '', slug: '', contentUnit: 'Lesson', introVideoUrl: '', isPaid: false,
   })
 
   // Facilitators
@@ -87,7 +80,6 @@ export default function CourseBuilderPage() {
       tagline: data.tagline ?? '',
       level: data.level ?? '',
       estimatedDuration: data.estimatedDuration ?? '',
-      phaseLabel: data.phaseLabel ?? '',
       slug: data.slug,
       contentUnit: data.contentUnit,
       introVideoUrl: data.introVideoUrl ?? '',
@@ -116,7 +108,6 @@ export default function CourseBuilderPage() {
             tagline: courseData.tagline ?? '',
             level: courseData.level ?? '',
             estimatedDuration: courseData.estimatedDuration ?? '',
-            phaseLabel: courseData.phaseLabel ?? '',
             slug: courseData.slug,
             contentUnit: courseData.contentUnit,
             introVideoUrl: courseData.introVideoUrl ?? '',
@@ -580,14 +571,6 @@ export default function CourseBuilderPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-white/40 mb-1">Phase label</label>
-                    <select value={infoForm.phaseLabel} onChange={e => setInfoForm(p => ({ ...p, phaseLabel: e.target.value }))}
-                      className="w-full rounded-xl border border-white/12 bg-[#111] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40 [color-scheme:dark]">
-                      <option value="">-- Select phase --</option>
-                      {PHASE_LABELS.map(pl => <option key={pl} value={pl}>{pl}</option>)}
-                    </select>
-                  </div>
-                  <div>
                     <label className="block text-xs text-white/40 mb-1">Content unit</label>
                     <select value={infoForm.contentUnit} onChange={e => setInfoForm(p => ({ ...p, contentUnit: e.target.value }))}
                       className="w-full rounded-xl border border-white/12 bg-[#111] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40 [color-scheme:dark]">
@@ -628,7 +611,6 @@ export default function CourseBuilderPage() {
                   ['Tagline', course.tagline],
                   ['Level', course.level],
                   ['Duration', course.estimatedDuration],
-                  ['Phase', course.phaseLabel],
                   ['Content unit', course.contentUnit],
                   ['Type', course.isPaid ? 'Paid' : 'Free'],
                   ['Intro Video', course.introVideoUrl],

@@ -118,11 +118,6 @@ export default function CoursePage() {
               className="rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(245,197,24,0.15),transparent_50%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-8 md:p-12 mb-6"
             >
               <div className="flex flex-wrap items-center gap-3 mb-5">
-                {course.phaseLabel && (
-                  <span className="inline-flex items-center gap-2 border border-white/15 px-3 py-1 rounded-full text-xs font-mono text-white/50 tracking-widest uppercase">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#F5C518]" /> {course.phaseLabel}
-                  </span>
-                )}
                 {course.level && (
                   <span className="text-xs font-semibold text-white/40 border border-white/10 px-3 py-1 rounded-full">
                     {course.level}
@@ -267,12 +262,6 @@ export default function CoursePage() {
           {/* Progress sidebar */}
           <aside className="bg-white/[0.04] border border-white/10 rounded-[28px] p-5 h-fit lg:sticky lg:top-24">
             <div className="mb-5">
-              <div className="inline-flex items-center gap-2 border border-white/15 px-3 py-1 rounded-full mb-4">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#F5C518]" />
-                <span className="text-xs font-mono text-white/50 tracking-[0.18em] uppercase">
-                  {course.phaseLabel || 'Programme'}
-                </span>
-              </div>
               <h1 className="font-display text-xl font-extrabold text-white leading-tight mb-1">{course.title}</h1>
               <p className="text-xs text-white/40 leading-relaxed">{course.tagline}</p>
             </div>

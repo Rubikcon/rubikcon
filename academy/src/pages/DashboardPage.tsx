@@ -178,9 +178,6 @@ export default function DashboardPage() {
                     {/* Course header */}
                     <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-5 border-b border-white/8">
                       <div className="min-w-0">
-                        {course.phaseLabel && (
-                          <p className="text-xs font-mono uppercase tracking-widest text-white/30 mb-1">{course.phaseLabel}</p>
-                        )}
                         <h2 className="font-display text-xl font-extrabold text-white leading-snug">{course.title}</h2>
                       </div>
                       <div className="flex items-center gap-4 shrink-0">

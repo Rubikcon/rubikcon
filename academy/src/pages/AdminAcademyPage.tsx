@@ -75,7 +75,7 @@ export default function AdminAcademyPage() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createForm, setCreateForm] = useState({
-    title: '', slug: '', description: '', tagline: '', level: '', estimatedDuration: '', phaseLabel: '', contentUnit: 'Lesson',
+    title: '', slug: '', description: '', tagline: '', level: '', estimatedDuration: '', contentUnit: 'Lesson',
   })
 
   const [showPasswordChange, setShowPasswordChange] = useState(false)
@@ -84,13 +84,6 @@ export default function AdminAcademyPage() {
 
   const COURSE_LEVELS = ['Beginner', 'Intermediate', 'Advanced'] as const
   const COURSE_DURATIONS = ['2 weeks', '4 weeks', '6 weeks', '8 weeks', '10 weeks', '12 weeks', 'Self-paced'] as const
-  const COURSE_PHASES = [
-    'Phase 1 - Theory',
-    'Phase 2 - Foundations',
-    'Phase 3 - Application',
-    'Phase 4 - Advanced',
-    'Phase 5 - Capstone',
-  ] as const
   const COURSE_UNITS = ['Lesson', 'Week', 'Module', 'Session', 'Chapter', 'Unit'] as const
 
   const auth = getStoredAuth()
@@ -225,7 +218,7 @@ export default function AdminAcademyPage() {
       })
       setCourses(prev => [course, ...prev])
       setShowCreateForm(false)
-      setCreateForm({ title: '', slug: '', description: '', tagline: '', level: '', estimatedDuration: '', phaseLabel: '', contentUnit: 'Lesson' })
+      setCreateForm({ title: '', slug: '', description: '', tagline: '', level: '', estimatedDuration: '', contentUnit: 'Lesson' })
       window.location.href = `/admin/courses/${course.id}`
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create course.')
@@ -380,17 +373,6 @@ export default function AdminAcademyPage() {
                         placeholder="Short hook line"
                         className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-white/40 mb-1">Phase</label>
-                      <select
-                        value={createForm.phaseLabel}
-                        onChange={e => setCreateForm(p => ({ ...p, phaseLabel: e.target.value }))}
-                        className="w-full rounded-xl border border-white/12 bg-[#111] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40 [color-scheme:dark]"
-                      >
-                        <option value="">-- Select phase --</option>
-                        {COURSE_PHASES.map(ph => <option key={ph} value={ph}>{ph}</option>)}
-                      </select>
                     </div>
                     <div>
                       <label className="block text-xs text-white/40 mb-1">Level</label>

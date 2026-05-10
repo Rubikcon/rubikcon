@@ -15,7 +15,6 @@ type PublicCourse = {
   tagline: string | null
   level: string | null
   estimatedDuration: string | null
-  phaseLabel: string | null
   heroImage: string | null
   weekCount: number
   facilitators: Array<{ id: string; name: string; title: string; organization: string; photoUrl: string | null }>
@@ -201,11 +200,10 @@ export default function LandingPage() {
                     transition={{ delay: i * 0.07 }}
                     className="bg-white rounded-2xl p-6 hover:shadow-md transition-shadow flex flex-col"
                   >
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="mb-4">
                       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${levelClass || 'bg-[#E8E0D0] text-[#1C1C1C]'}`}>
                         {level || 'COURSE'}
                       </span>
-                      {course.phaseLabel && <span className="text-xs text-[#1C1C1C]/40 font-mono">{course.phaseLabel}</span>}
                     </div>
                     <h3 className="font-display font-extrabold text-[#1C1C1C] text-lg leading-snug mb-2">{course.title}</h3>
                     <p className="text-[#1C1C1C]/55 text-xs leading-relaxed mb-4 flex-1">{course.tagline}</p>

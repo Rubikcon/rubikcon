@@ -26,7 +26,6 @@ type PublicCourse = {
   tagline: string | null
   level: string | null
   estimatedDuration: string | null
-  phaseLabel: string | null
   heroImage: string | null
   weekCount: number
   contentUnit: string
@@ -126,12 +125,6 @@ function CourseCard({
             <Play size={18} className="text-white ml-0.5" fill="currentColor" />
           </div>
         </div>
-        {/* Phase label */}
-        {course.phaseLabel && (
-          <div className="absolute bottom-3 left-3 text-[10px] font-mono uppercase tracking-[0.18em] text-white/40">
-            {course.phaseLabel}
-          </div>
-        )}
         {/* Enrolled badge */}
         {course.enrolled && (
           <div className="absolute top-3 left-3 flex items-center gap-1.5 rounded-full bg-[#F5C518] px-2.5 py-1 text-[10px] font-bold text-[#0A0A0A]">
