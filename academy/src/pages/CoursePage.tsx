@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'wouter'
 import { motion } from 'framer-motion'
-import { ArrowRight, BookOpen, CheckCircle2, Clock3, Loader2, PlayCircle, Users } from 'lucide-react'
+import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, Clock3, Loader2, PlayCircle, Users } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
@@ -17,6 +17,7 @@ export default function CoursePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [enrolling, setEnrolling] = useState(false)
+  const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({})
   const auth = getStoredAuth()
 
   useEffect(() => {
@@ -389,6 +390,97 @@ export default function CoursePage() {
                 })}
               </div>
             )}
+
+            {/* Module Browser */}
+            <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 md:p-8 mb-6">
+              <div className="mb-6">
+                <p className="text-xs font-mono uppercase tracking-[0.18em] text-white/30 mb-1">Course modules</p>
+                <h3 className="font-display text-2xl font-extrabold text-white">Explore all {units.toLowerCase()}</h3>
+              </div>
+
+              <div className="space-y-3">
+                {weekGroups.map((group) => (
+                  <div key={group.module?.id ?? 'unassigned'}>
+                    {group.module ? (
+                      <>
+                        <button
+                          onClick={() => setExpandedModules(p => ({ ...p, [group.module!.id]: !p[group.module!.id] }))}
+                          className="w-full flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-4 hover:border-white/20 hover:bg-white/[0.06] transition-colors"
+                        >
+                          <div className="text-left min-w-0">
+                            <p className="text-sm font-semibold text-white">{group.module.title}</p>
+                            <p className="text-xs text-white/35 mt-1">{group.weeks.length} {unit.toLowerCase()}{group.weeks.length !== 1 ? 's' : ''}</p>
+                          </div>
+                          <ChevronDown
+                            size={16}
+                            className={`text-white/40 shrink-0 transition-transform duration-200 ${expandedModules[group.module.id] ? 'rotate-180' : ''}`}
+                          />
+                        </button>
+                        {expandedModules[group.module.id] && (
+                          <div className="mt-2 ml-2 space-y-2 pl-4 border-l border-white/10">
+                            {group.weeks.map(week => {
+                              const isComplete = week.progress.status === 'COMPLETE'
+                              const isInProgress = week.progress.status === 'IN_PROGRESS'
+                              return (
+                                <a
+                                  key={week.id}
+                                  href={`/course/${course.slug}/week/${week.slug}`}
+                                  className={`flex items-center justify-between gap-3 rounded-lg p-3 text-sm transition-colors ${
+                                    isComplete
+                                      ? 'border border-[#F5C518]/20 bg-[#F5C518]/5 text-white'
+                                      : isInProgress
+                                        ? 'border border-teal-400/20 bg-teal-400/5 text-white'
+                                        : 'border border-white/8 bg-white/[0.02] text-white/70 hover:bg-white/[0.05]'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {isComplete && <CheckCircle2 size={14} className="text-[#F5C518] shrink-0" />}
+                                    <div className="min-w-0">
+                                      <p className="text-[11px] font-mono text-white/40">{unit} {week.number}</p>
+                                      <p className="font-medium truncate">{week.title}</p>
+                                    </div>
+                                  </div>
+                                  <span className="text-[11px] text-white/30 shrink-0">{week.durationLabel}</span>
+                                </a>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="space-y-2">
+                        {group.weeks.map(week => {
+                          const isComplete = week.progress.status === 'COMPLETE'
+                          const isInProgress = week.progress.status === 'IN_PROGRESS'
+                          return (
+                            <a
+                              key={week.id}
+                              href={`/course/${course.slug}/week/${week.slug}`}
+                              className={`flex items-center justify-between gap-3 rounded-lg p-3 text-sm transition-colors ${
+                                isComplete
+                                  ? 'border border-[#F5C518]/20 bg-[#F5C518]/5 text-white'
+                                  : isInProgress
+                                    ? 'border border-teal-400/20 bg-teal-400/5 text-white'
+                                    : 'border border-white/8 bg-white/[0.02] text-white/70 hover:bg-white/[0.05]'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                {isComplete && <CheckCircle2 size={14} className="text-[#F5C518] shrink-0" />}
+                                <div className="min-w-0">
+                                  <p className="text-[11px] font-mono text-white/40">{unit} {week.number}</p>
+                                  <p className="font-medium truncate">{week.title}</p>
+                                </div>
+                              </div>
+                              <span className="text-[11px] text-white/30 shrink-0">{week.durationLabel}</span>
+                            </a>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
 
             {/* Weekly roadmap */}
             <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 md:p-8">
