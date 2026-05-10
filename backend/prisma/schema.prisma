@@ -189,7 +189,6 @@ model Lesson {
   id          String   @id @default(uuid())
   title       String
   content     String
-  videoUrl    String?
   duration    Int      // minutes
   position    Int
   moduleId    String
@@ -198,9 +197,25 @@ model Lesson {
 
   module    Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   progress  Progress[]
+  videos    LessonVideo[]
 
   @@index([moduleId])
   @@map("lessons")
+}
+
+model LessonVideo {
+  id          String  @id @default(uuid())
+  lessonId    String
+  title       String
+  url         String
+  description String?
+  position    Int
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, position])
+  @@index([lessonId])
+  @@map("lesson_videos")
 }
 
 model Progress {
