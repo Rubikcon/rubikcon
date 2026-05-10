@@ -53,3 +53,19 @@ export function needsOnboarding() {
   const auth = getStoredAuth()
   return auth !== null && auth.user.onboardingCompleted === false
 }
+
+export async function logout() {
+  try {
+    const token = getAuthToken()
+    if (token) {
+      await fetch('/academy/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+    }
+  } catch (err) {
+    console.error('Logout request failed:', err)
+  } finally {
+    clearStoredAuth()
+  }
+}

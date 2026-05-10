@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { URLS } from '../config/urls'
-import { clearStoredAuth, getStoredAuth, isAdmin, isSuperAdmin } from '../lib/auth'
+import { logout, getStoredAuth, isAdmin, isSuperAdmin } from '../lib/auth'
 
 interface NavbarProps {
   showBack?: boolean
@@ -89,8 +89,8 @@ export default function AcademyNavbar({
                 </a>
               )}
               <button
-                onClick={() => {
-                  clearStoredAuth()
+                onClick={async () => {
+                  await logout()
                   window.location.href = '/login'
                 }}
                 className="text-sm px-4 py-1.5 rounded-full bg-[#F5C518] text-[#0A0A0A] font-semibold hover:bg-[#E8B800] transition-colors"

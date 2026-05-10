@@ -116,8 +116,30 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       return sendError(res, 'Invalid email or password.', 401)
     }
 
+    // Check active sessions (limit to 2 concurrent devices)
+    const activeSessions = await prisma.session.findMany({
+      where: {
+        userId: user.id,
+        expiresAt: { gt: new Date() },
+      },
+    })
+
+    if (activeSessions.length >= 2) {
+      return sendError(res, 'Too many devices logged in. Please log out on another device to continue.', 401)
+    }
+
     const onboardingCompleted = user.profile?.onboardingCompleted ?? false
     const token = signToken({ userId: user.id, email: user.email, role: user.role })
+
+    // Create new session
+    const expiresAt = new Date()
+    expiresAt.setDate(expiresAt.getDate() + 30) // 30-day session
+    await prisma.session.create({
+      data: {
+        userId: user.id,
+        expiresAt,
+      },
+    })
 
     // Return reset token if user logged in with blank password during reset
     const resetData = hasActiveReset && password === '' ? { resetToken: user.passwordResetToken } : {}
@@ -296,6 +318,21 @@ router.post('/change-password', requireAuth, async (req: Request, res: Response,
     })
 
     return sendSuccess(res, {}, 'Password changed successfully.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── POST /auth/logout ────────────────────────────────────────────────────────
+
+router.post('/logout', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Mark all sessions for this user as expired
+    await prisma.session.updateMany({
+      where: { userId: req.user!.userId },
+      data: { expiresAt: new Date() },
+    })
+    return sendSuccess(res, {}, 'Logged out successfully.')
   } catch (err) {
     next(err)
   }
