@@ -48,7 +48,7 @@ export default function CourseBuilderPage() {
   const [allFacilitators, setAllFacilitators] = useState<FacilitatorSummary[]>([])
   const [showFacilitatorPanel, setShowFacilitatorPanel] = useState(false)
   const [addingFacilitator, setAddingFacilitator] = useState(false)
-  const [newFacForm, setNewFacForm] = useState({ name: '', title: '', organization: '', email: '', linkedinUrl: '', bio: '' })
+  const [newFacForm, setNewFacForm] = useState({ name: '', title: '', organization: '', email: '', linkedinUrl: '', photoUrl: '', bio: '' })
 
   // Weeks
   const [expandedWeekId, setExpandedWeekId] = useState<string | null>(null)
@@ -199,7 +199,7 @@ export default function CourseBuilderPage() {
         body: JSON.stringify(newFacForm),
       })
       setAllFacilitators(prev => [...prev, fac])
-      setNewFacForm({ name: '', title: '', organization: '', email: '', linkedinUrl: '', bio: '' })
+      setNewFacForm({ name: '', title: '', organization: '', email: '', linkedinUrl: '', photoUrl: '', bio: '' })
       setAddingFacilitator(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create facilitator.')
@@ -646,13 +646,16 @@ export default function CourseBuilderPage() {
 
             <div className="space-y-2">
               {course.courseFacilitators.map(cf => (
-                <div key={cf.id} className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-4 py-3">
-                  <div>
+                <div key={cf.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 px-4 py-3">
+                  {cf.facilitator.photoUrl && (
+                    <img src={cf.facilitator.photoUrl} alt={cf.facilitator.name} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm text-white font-medium">{cf.facilitator.name}</p>
                     <p className="text-xs text-white/40">{cf.facilitator.title} · {cf.facilitator.organization}</p>
                   </div>
                   {!locked && (
-                    <button onClick={() => void removeFacilitator(cf.facilitator.id)} className="text-white/30 hover:text-red-400 transition-colors">
+                    <button onClick={() => void removeFacilitator(cf.facilitator.id)} className="text-white/30 hover:text-red-400 transition-colors flex-shrink-0">
                       <X size={14} />
                     </button>
                   )}
@@ -670,10 +673,15 @@ export default function CourseBuilderPage() {
                         <button
                           key={f.id}
                           onClick={() => void addFacilitatorToCourse(f.id)}
-                          className="w-full text-left rounded-xl border border-white/8 bg-white/[0.02] px-4 py-2 hover:border-[#F5C518]/30 transition-colors"
+                          className="w-full text-left flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-2 hover:border-[#F5C518]/30 transition-colors"
                         >
-                          <p className="text-sm text-white">{f.name}</p>
-                          <p className="text-xs text-white/35">{f.title} · {f.organization}</p>
+                          {f.photoUrl && (
+                            <img src={f.photoUrl} alt={f.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-white">{f.name}</p>
+                            <p className="text-xs text-white/35">{f.title} · {f.organization}</p>
+                          </div>
                         </button>
                       ))}
                     </div>
@@ -689,15 +697,31 @@ export default function CourseBuilderPage() {
                       <div className="grid md:grid-cols-2 gap-3">
                         {(['name', 'title', 'organization', 'email', 'linkedinUrl'] as const).map(field => (
                           <div key={field}>
-                            <label className="block text-xs text-white/40 mb-1 capitalize">{field}</label>
+                            <label className="block text-xs text-white/40 mb-1 capitalize">{field.replace(/Url$/, 'URL')}</label>
                             <input
                               value={newFacForm[field]}
                               onChange={e => setNewFacForm(prev => ({ ...prev, [field]: e.target.value }))}
                               required
+                              type={field === 'email' ? 'email' : field.includes('Url') ? 'url' : 'text'}
                               className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
                             />
                           </div>
                         ))}
+                      </div>
+                      <div>
+                        <label className="block text-xs text-white/40 mb-1">Photo URL</label>
+                        <input
+                          value={newFacForm.photoUrl}
+                          onChange={e => setNewFacForm(prev => ({ ...prev, photoUrl: e.target.value }))}
+                          type="url"
+                          placeholder="https://example.com/photo.jpg"
+                          className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
+                        />
+                        {newFacForm.photoUrl && (
+                          <div className="mt-2 rounded-xl overflow-hidden border border-white/10 w-20 h-20">
+                            <img src={newFacForm.photoUrl} alt="Preview" className="w-full h-full object-cover" />
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs text-white/40 mb-1">Bio</label>
