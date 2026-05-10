@@ -374,42 +374,60 @@ async function getUserWeekState(userId: string, weekId: string, quizId?: string 
 // Public course catalog (with optional enrollment status if logged in)
 router.get('/courses', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const courses = await prisma.course.findMany({
-      where: { published: true },
-      include: {
-        weeks: {
-          where: { published: true },
-          select: { id: true },
-        },
-        courseFacilitators: {
-          include: {
-            facilitator: {
-              select: { id: true, name: true, title: true, organization: true, photoUrl: true },
+    const page = Math.max(1, parseInt(req.query.page as string) || 1)
+    const limit = Math.min(50, parseInt(req.query.limit as string) || 12)
+    const skip = (page - 1) * limit
+
+    const [courses, total] = await Promise.all([
+      prisma.course.findMany({
+        where: { published: true },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          tagline: true,
+          level: true,
+          isPaid: true,
+          estimatedDuration: true,
+          phaseLabel: true,
+          heroImage: true,
+          contentUnit: true,
+          _count: { select: { weeks: true, enrollments: true } },
+          courseFacilitators: {
+            select: {
+              facilitator: {
+                select: { id: true, name: true, title: true, organization: true, photoUrl: true },
+              },
             },
+            orderBy: { position: 'asc' as const },
           },
-          orderBy: { position: 'asc' },
+          enrollments: req.user
+            ? { where: { userId: req.user.userId }, select: { id: true } }
+            : false,
         },
-        enrollments: req.user
-          ? { where: { userId: req.user.userId }, select: { id: true } }
-          : false,
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+      }),
+      prisma.course.count({ where: { published: true } }),
+    ])
+
     const result = courses.map(c => ({
       id: c.id,
       slug: c.slug,
       title: c.title,
       tagline: c.tagline,
       level: c.level,
+      isPaid: c.isPaid,
       estimatedDuration: c.estimatedDuration,
       phaseLabel: c.phaseLabel,
       heroImage: c.heroImage,
       contentUnit: c.contentUnit,
-      weekCount: c.weeks.length,
+      weekCount: c._count.weeks,
       facilitators: c.courseFacilitators.map(cf => cf.facilitator),
       enrolled: req.user ? (c.enrollments as { id: string }[]).length > 0 : false,
     }))
-    return sendSuccess(res, result)
+    return sendSuccess(res, { data: result, pagination: { page, limit, total, pages: Math.ceil(total / limit) } })
   } catch (err) {
     next(err)
   }
@@ -1735,21 +1753,45 @@ router.post('/admin/courses', requireAuth, requireAdmin, async (req: Request, re
 router.get('/admin/courses', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId
+    const page = Math.max(1, parseInt(req.query.page as string) || 1)
+    const limit = Math.min(50, parseInt(req.query.limit as string) || 10)
+    const skip = (page - 1) * limit
+
     // SUPER_ADMIN can see all courses
     const where = req.user!.role === 'SUPER_ADMIN' ? {} : { createdById: userId }
 
-    const courses = await prisma.course.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: { select: { weeks: true } },
-        courseFacilitators: {
-          include: { facilitator: { select: { id: true, name: true, title: true, photoUrl: true } } },
-          orderBy: { position: 'asc' },
+    const [courses, total] = await Promise.all([
+      prisma.course.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          tagline: true,
+          status: true,
+          published: true,
+          isPaid: true,
+          contentUnit: true,
+          approvalNotes: true,
+          submittedAt: true,
+          approvedAt: true,
+          createdAt: true,
+          updatedAt: true,
+          createdBy: { select: { id: true, name: true, email: true } },
+          _count: { select: { weeks: true } },
+          courseFacilitators: {
+            select: {
+              facilitator: { select: { id: true, name: true, title: true, photoUrl: true } },
+            },
+            orderBy: { position: 'asc' as const },
+          },
         },
-        createdBy: { select: { id: true, name: true, email: true } },
-      },
-    })
+      }),
+      prisma.course.count({ where }),
+    ])
 
     const result = courses.map(c => ({
       id: c.id,
@@ -1758,6 +1800,7 @@ router.get('/admin/courses', requireAuth, requireAdmin, async (req: Request, res
       tagline: c.tagline,
       status: c.status,
       published: c.published,
+      isPaid: c.isPaid,
       contentUnit: c.contentUnit,
       weekCount: c._count.weeks,
       facilitators: c.courseFacilitators.map(cf => cf.facilitator),
@@ -1769,7 +1812,7 @@ router.get('/admin/courses', requireAuth, requireAdmin, async (req: Request, res
       updatedAt: c.updatedAt,
     }))
 
-    return sendSuccess(res, result)
+    return sendSuccess(res, { data: result, pagination: { page, limit, total, pages: Math.ceil(total / limit) } })
   } catch (err) {
     next(err)
   }

@@ -1,5 +1,6 @@
 import express from 'express'
 import cors, { CorsOptions } from 'cors'
+import compression from 'compression'
 import { config } from './config/env'
 import prisma from './config/database'
 import { errorHandler, notFoundHandler } from './middleware/error.middleware'
@@ -31,8 +32,28 @@ const corsOptions: CorsOptions = {
 app.use(cors(corsOptions))
 app.options('*', cors(corsOptions))
 
+// Compression middleware for faster responses
+app.use(compression())
+
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
+
+// Cache headers for static assets and API responses
+app.use((req, res, next) => {
+  if (req.method === 'GET') {
+    if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$/)) {
+      // Cache static assets for 1 year
+      res.set('Cache-Control', 'public, max-age=31536000, immutable')
+    } else if (req.path.startsWith('/api/')) {
+      // Cache API GET responses for 5 minutes
+      res.set('Cache-Control', 'public, max-age=300')
+    }
+  } else {
+    // No cache for non-GET requests
+    res.set('Cache-Control', 'no-store')
+  }
+  next()
+})
 
 // Request logger (dev only)
 if (config.isDev) {
