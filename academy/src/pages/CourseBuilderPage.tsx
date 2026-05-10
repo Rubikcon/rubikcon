@@ -4,6 +4,7 @@ import {
   BookOpen, ChevronDown, ChevronUp, Image, Loader2, Plus, Send, Trash2, Users, Video, X,
 } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
+import { VideoSourceBadge } from '../components/VideoEmbed'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
 import type { AdminCourseDetail, AdminWeek, FacilitatorSummary } from '../types/academy'
@@ -1148,7 +1149,10 @@ function WeekCard({
             {week.videos.map((v, i) => (
               <div key={v.id} className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-4 py-3">
                 <div className="min-w-0">
-                  <p className="text-xs text-white/35 mb-0.5">Video {i + 1}</p>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="text-xs text-white/35">Video {i + 1}</p>
+                    <VideoSourceBadge url={v.url} />
+                  </div>
                   <p className="text-sm font-medium text-white truncate">{v.title}</p>
                   <a href={v.url} target="_blank" rel="noreferrer" className="text-xs text-[#F5C518] hover:underline break-all">{v.url}</a>
                   {v.description && <p className="text-xs text-white/35 mt-0.5">{v.description}</p>}

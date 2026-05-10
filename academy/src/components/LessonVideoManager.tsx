@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus, Trash2, GripVertical, Loader2 } from 'lucide-react'
 import { apiRequest } from '../lib/api'
+import { VideoSourceBadge } from './VideoEmbed'
 
 export type LessonVideo = {
   id: string
@@ -82,10 +83,13 @@ export default function LessonVideoManager({
                 <GripVertical size={14} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white">
-                  {idx + 1}. {video.title}
-                </p>
-                <p className="text-xs text-white/50 mt-1 truncate">{video.url}</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm font-medium text-white">
+                    {idx + 1}. {video.title}
+                  </p>
+                  <VideoSourceBadge url={video.url} />
+                </div>
+                <p className="text-xs text-white/50 truncate">{video.url}</p>
                 {video.description && (
                   <p className="text-xs text-white/40 mt-2">{video.description}</p>
                 )}

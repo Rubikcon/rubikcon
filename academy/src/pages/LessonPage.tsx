@@ -20,48 +20,12 @@ import {
 } from 'lucide-react'
 import { apiRequest, ApiError } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
+import VideoEmbed, { getEmbedUrl } from '../components/VideoEmbed'
 import type { CourseSummary, CourseWeekSummary, ReadingType, WeekDetail } from '../types/academy'
 
 type LessonTab = 'overview' | 'resources' | 'quiz' | 'assignment'
 
 const RESOURCE_TAGS: ReadingType[] = ['ARTICLE', 'COURSE', 'DOCUMENTATION', 'WHITEPAPER', 'VIDEO', 'INTERACTIVE']
-
-function getEmbedUrl(url: string): string | null {
-  try {
-    const u = new URL(url)
-    // YouTube watch or short link
-    if (u.hostname.includes('youtube.com') || u.hostname.includes('youtu.be')) {
-      // Already an embed URL — use as-is
-      if (u.pathname.startsWith('/embed/')) return url
-      const id = u.hostname.includes('youtu.be')
-        ? u.pathname.slice(1).split('?')[0]
-        : (u.searchParams.get('v') ?? u.pathname.split('/').pop())
-      if (id) return `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1`
-    }
-    // Vimeo
-    if (u.hostname.includes('vimeo.com')) {
-      if (u.hostname.includes('player.vimeo.com')) return url // already embed
-      const id = u.pathname.replace(/^\//, '').split('/')[0]
-      if (id && /^\d+$/.test(id)) return `https://player.vimeo.com/video/${id}?dnt=1`
-    }
-    // Loom
-    if (u.hostname.includes('loom.com')) {
-      if (u.pathname.startsWith('/embed/')) return url
-      if (u.pathname.startsWith('/share/')) {
-        const id = u.pathname.split('/share/')[1]?.split('?')[0]
-        if (id) return `https://www.loom.com/embed/${id}`
-      }
-    }
-    // Google Drive preview
-    if (u.hostname.includes('drive.google.com') && u.pathname.includes('/file/d/')) {
-      const fileId = u.pathname.split('/file/d/')[1]?.split('/')[0]
-      if (fileId) return `https://drive.google.com/file/d/${fileId}/preview`
-    }
-    return null
-  } catch {
-    return null
-  }
-}
 
 // ── Sidebar group (collapsible module section) ────────────────────────────────
 
