@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express'
 import { z } from 'zod'
 import prisma from '../../config/database'
-import { sendSuccess, sendError } from '../../utils/response'
+import { sendSuccess, sendError, sendPaginated } from '../../utils/response'
 import { optionalAuth, requireAdmin, requireAuth, requireSuperAdmin } from '../../middleware/auth.middleware'
 import { AssignmentSubmissionStatus, CourseStatus, Prisma, QuizAttemptStatus, WeekProgressStatus } from '@prisma/client'
 
@@ -1812,7 +1812,7 @@ router.get('/admin/courses', requireAuth, requireAdmin, async (req: Request, res
       updatedAt: c.updatedAt,
     }))
 
-    return sendSuccess(res, { data: result, pagination: { page, limit, total, pages: Math.ceil(total / limit) } })
+    return sendPaginated(res, result, total, page, limit)
   } catch (err) {
     next(err)
   }
