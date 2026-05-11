@@ -244,13 +244,15 @@ export default function CourseBuilderWizard({ params }: CourseBuilderWizardProps
       {/* Completion modal */}
       {showCompletion && (
         <CompletionModal
+          courseId={actualCourseId}
           course={wizard.courseData}
           modules={wizard.modules}
           lessons={wizard.lessons}
           onClose={() => setShowCompletion(false)}
           onViewCourse={() => {
             wizard.clearSessionStorage()
-            window.location.href = `/courses/${wizard.courseData.slug}`
+            // Public course page lives at /course/:slug (singular) — see App.tsx
+            window.location.href = `/course/${wizard.courseData.slug}`
           }}
           onCreateAnother={() => {
             wizard.reset()
