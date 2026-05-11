@@ -222,7 +222,7 @@ function CourseCard({
           >
             {enrolling
               ? <span className="flex items-center justify-center gap-2"><Loader2 size={12} className="animate-spin" />Enrolling…</span>
-              : 'Enrol for free'}
+              : 'Enrol'}
           </button>
         )}
       </div>
@@ -418,7 +418,7 @@ function FeaturedSpotlight({ course, onEnroll, enrolling }: { course: PublicCour
               className="flex items-center justify-center gap-2 rounded-xl bg-[#F5C518] text-[#0A0A0A] text-sm font-bold px-5 py-2.5 hover:bg-[#FFD020] transition-colors disabled:opacity-50"
             >
               {enrolling ? <Loader2 size={13} className="animate-spin" /> : <Zap size={13} />}
-              {enrolling ? 'Enrolling…' : 'Enrol for free'}
+              {enrolling ? 'Enrolling…' : 'Enrol'}
             </button>
           )}
           <p className="text-center text-[10px] text-white/25">No credit card required</p>

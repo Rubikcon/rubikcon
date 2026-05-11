@@ -473,25 +473,47 @@ export default function LessonPage() {
                 )
               )}
 
-              {/* Video playlist (if multiple) */}
+              {/* Video playlist (if multiple) — VERTICAL list, prominent header */}
               {week.videos.length > 1 && (
-                <div className="flex gap-2 px-4 py-3 border-t border-white/[0.07] overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-                  {week.videos.map((v, i) => (
-                    <button
-                      key={v.id}
-                      onClick={() => setActiveVideoIdx(i)}
-                      className={`flex-shrink-0 flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors ${
-                        i === activeVideoIdx
-                          ? 'bg-[#F5C518]/15 border border-[#F5C518]/30 text-[#F5C518]'
-                          : 'border border-white/8 text-white/50 hover:border-white/20 hover:text-white/75'
-                      }`}
-                    >
-                      <div className={`w-5 h-5 rounded-full flex items-center justify-center ${i === activeVideoIdx ? 'bg-[#F5C518] text-[#0A0A0A]' : 'bg-white/10'}`}>
-                        <Play size={8} fill="currentColor" />
-                      </div>
-                      <span className="max-w-[120px] truncate">{v.title}</span>
-                    </button>
-                  ))}
+                <div className="border-t border-white/[0.07] bg-black/40 px-4 py-3">
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <div className="w-6 h-6 rounded-full bg-[#F5C518] text-[#0A0A0A] flex items-center justify-center text-[10px] font-bold">
+                      {week.videos.length}
+                    </div>
+                    <p className="text-sm font-semibold text-white">
+                      Videos in this lesson
+                    </p>
+                    <p className="text-xs text-white/40 ml-1">— click to switch</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    {week.videos.map((v, i) => (
+                      <button
+                        key={v.id}
+                        onClick={() => setActiveVideoIdx(i)}
+                        className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-left transition-colors ${
+                          i === activeVideoIdx
+                            ? 'bg-[#F5C518]/15 border border-[#F5C518]/30 text-white'
+                            : 'border border-white/8 text-white/60 hover:border-white/20 hover:bg-white/[0.04] hover:text-white/90'
+                        }`}
+                      >
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          i === activeVideoIdx ? 'bg-[#F5C518] text-[#0A0A0A]' : 'bg-white/10 text-white/60'
+                        }`}>
+                          {i === activeVideoIdx ? (
+                            <Play size={10} fill="currentColor" />
+                          ) : (
+                            <span className="text-[11px] font-semibold">{i + 1}</span>
+                          )}
+                        </div>
+                        <span className="flex-1 truncate">{v.title}</span>
+                        {i === activeVideoIdx && (
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#F5C518] flex-shrink-0">
+                            Now playing
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

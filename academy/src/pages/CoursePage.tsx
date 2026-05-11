@@ -405,11 +405,14 @@ export default function CoursePage() {
                       <>
                         <button
                           onClick={() => setExpandedModules(p => ({ ...p, [group.module!.id]: !p[group.module!.id] }))}
-                          className="w-full flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-4 hover:border-white/20 hover:bg-white/[0.06] transition-colors"
+                          className="w-full flex items-center justify-between gap-3 rounded-xl border border-[#F5C518]/20 bg-[#F5C518]/5 p-4 hover:border-[#F5C518]/40 hover:bg-[#F5C518]/10 transition-colors"
                         >
                           <div className="text-left min-w-0">
-                            <p className="text-sm font-semibold text-white">{group.module.title}</p>
-                            <p className="text-xs text-white/35 mt-1">{group.weeks.length} {unit.toLowerCase()}{group.weeks.length !== 1 ? 's' : ''}</p>
+                            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-[#F5C518] mb-1">
+                              Module {group.module.position ?? ''}
+                            </p>
+                            <p className="text-base font-semibold text-white">{group.module.title}</p>
+                            <p className="text-xs text-white/40 mt-1">{group.weeks.length} {unit.toLowerCase()}{group.weeks.length !== 1 ? 's' : ''}</p>
                           </div>
                           <ChevronDown
                             size={16}
