@@ -103,6 +103,7 @@ model Course {
   phaseLabel        String?
   heroImage         String?
   introVideoUrl     String?
+  overviewSlideUrl  String?      // URL to course overview slides (Canva, Google Slides, etc.)
   contentUnit       String       @default("Lesson")
   slug              String       @unique
   published         Boolean      @default(false)

@@ -277,7 +277,7 @@ export default function LandingPage() {
                   >
                     <div className={`bg-gradient-to-br ${INSTRUCTOR_COLORS[i % INSTRUCTOR_COLORS.length]} h-48 flex items-center justify-center`}>
                       {facilitator.photoUrl ? (
-                        <img src={facilitator.photoUrl} alt={facilitator.name} className="w-full h-full object-cover" />
+                        <img src={facilitator.photoUrl} alt={facilitator.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
                         <span className="font-display font-extrabold text-[#F5C518] text-6xl">{initials}</span>
                       )}

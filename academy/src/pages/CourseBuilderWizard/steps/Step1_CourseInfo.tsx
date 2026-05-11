@@ -50,6 +50,7 @@ export default function Step1_CourseInfo({ wizard, courseId, onNext }: Step1_Cou
       if (wizard.courseData.estimatedDuration.trim()) payload.estimatedDuration = wizard.courseData.estimatedDuration.trim()
       if (wizard.courseData.contentUnit.trim()) payload.contentUnit = wizard.courseData.contentUnit.trim()
       if (wizard.courseData.introVideoUrl.trim()) payload.introVideoUrl = wizard.courseData.introVideoUrl.trim()
+      if (wizard.courseData.overviewSlideUrl.trim()) payload.overviewSlideUrl = wizard.courseData.overviewSlideUrl.trim()
 
       await apiRequest(`/academy/admin/courses/${courseId}`, {
         method: 'PATCH',
@@ -262,6 +263,36 @@ export default function Step1_CourseInfo({ wizard, courseId, onNext }: Step1_Cou
               Unable to embed this video. Make sure you've pasted a valid YouTube, Vimeo, Loom, or Google Drive link.
             </div>
           )}
+        </div>
+
+        {/* Course Overview Slides */}
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-[#F5C518]">
+              <rect x="3" y="4" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="2"/>
+              <path d="M3 9h18" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+            <h2 className="text-lg font-semibold text-white">Course Overview Slides</h2>
+          </div>
+          <p className="text-sm text-white/60">
+            Add a link to your course overview slide deck (Canva, Google Slides, etc.). Students will see this on the course page.
+          </p>
+
+          <div>
+            <label className="block text-sm font-medium text-white/80 mb-2">
+              Slide deck URL
+            </label>
+            <input
+              value={wizard.courseData.overviewSlideUrl}
+              onChange={e => wizard.updateCourseData({ overviewSlideUrl: e.target.value })}
+              type="url"
+              placeholder="https://www.canva.com/design/... or https://docs.google.com/presentation/..."
+              className="w-full rounded-xl border border-white/12 bg-black/20 px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#F5C518]/40 transition-colors"
+            />
+            <p className="mt-1 text-xs text-white/40">
+              Leave empty if you don't have one. Use a publicly-viewable link.
+            </p>
+          </div>
         </div>
 
         {/* Submit Button */}

@@ -21,6 +21,7 @@ import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
 import QuizEditor, { type ExistingQuiz } from './WeekEditor/QuizEditor'
 import AssignmentEditor, { type ExistingAssignment } from './WeekEditor/AssignmentEditor'
+import ResourcesEditor, { type ExistingReadingResource, type ExistingSlideDeck } from './WeekEditor/ResourcesEditor'
 
 type WeekDetail = {
   id: string
@@ -42,6 +43,8 @@ type WeekDetail = {
   videos: Array<{ id: string; title: string; url: string; description: string | null; position: number }>
   quiz: ExistingQuiz
   assignments: ExistingAssignment[]
+  readingResources: ExistingReadingResource[]
+  slideDeck: ExistingSlideDeck
 }
 
 export default function WeekEditorPage() {
@@ -301,7 +304,7 @@ export default function WeekEditorPage() {
                 />
               </Field>
 
-              <Field label="Summary" hint="Longer description of the lesson content">
+              <Field label="Lesson Description" hint="Longer written description of this lesson's content — what learners will read or watch">
                 <textarea
                   rows={5} value={basicForm.summary} maxLength={5000}
                   onChange={e => setBasicForm(p => ({ ...p, summary: e.target.value }))}
@@ -434,6 +437,17 @@ export default function WeekEditorPage() {
               />
             </Field>
             <SaveButton saving={savingSection === 'content'} onClick={saveContent} label="Save content" />
+          </Section>
+
+          {/* Resources (Slides + Reading) */}
+          <Section title="Resources (Slides, Articles, Docs)" icon={ListChecks}>
+            <ResourcesEditor
+              courseId={courseId!}
+              weekId={weekId!}
+              resources={week.readingResources || []}
+              slideDeck={week.slideDeck}
+              onChange={loadWeek}
+            />
           </Section>
 
           {/* Quiz */}

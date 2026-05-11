@@ -30,6 +30,7 @@ export type CourseFormData = {
 
   // Media
   introVideoUrl: string
+  overviewSlideUrl: string  // Canva, Google Slides, etc.
 }
 
 // ─── Module Form Data ─────────────────────────────────────────────────────

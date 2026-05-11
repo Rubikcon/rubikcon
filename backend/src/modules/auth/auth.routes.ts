@@ -98,7 +98,8 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
     }
 
-    const { email, password } = parsed.data
+    const { password } = parsed.data
+    const email = parsed.data.email.trim().toLowerCase()
 
     const user = await prisma.user.findUnique({
       where: { email },

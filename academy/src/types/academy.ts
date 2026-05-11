@@ -54,6 +54,7 @@ export type AdminCourseDetail = {
   phaseLabel: string | null
   heroImage: string | null
   introVideoUrl: string | null
+  overviewSlideUrl: string | null
   contentUnit: string
   status: CourseStatus
   published: boolean
@@ -171,6 +172,8 @@ export type CourseSummary = {
   estimatedDuration: string | null
   phaseLabel: string | null
   heroImage: string | null
+  introVideoUrl: string | null
+  overviewSlideUrl: string | null
   contentUnit: string
   enrolled: boolean
   facilitators: Array<{ id: string; name: string; title: string; organization: string; photoUrl: string | null }>

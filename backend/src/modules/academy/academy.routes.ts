@@ -513,6 +513,8 @@ router.get('/courses/:slug', optionalAuth, async (req: Request, res: Response, n
       estimatedDuration: course.estimatedDuration,
       phaseLabel: course.phaseLabel,
       heroImage: course.heroImage,
+      introVideoUrl: course.introVideoUrl,
+      overviewSlideUrl: course.overviewSlideUrl,
       contentUnit: course.contentUnit,
       enrolled,
       facilitators: course.courseFacilitators.map(cf => cf.facilitator),
@@ -1622,6 +1624,7 @@ const createCourseSchema = z.object({
   phaseLabel: z.string().trim().max(100).optional(),
   heroImage: z.string().url().optional(),
   introVideoUrl: z.string().url().optional(),
+  overviewSlideUrl: z.string().url().optional().nullable(),
   contentUnit: z.enum(['Lesson', 'Week', 'Module', 'Session', 'Chapter', 'Unit']).default('Lesson').optional(),
   isPaid: z.boolean().default(false).optional(),
   slug: z.string().trim().regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens').min(3).max(100),
@@ -1873,6 +1876,8 @@ router.get('/admin/courses/:courseId', requireAuth, requireAdmin, async (req: Re
             assignments: { orderBy: { position: 'asc' }, include: { choices: { orderBy: { position: 'asc' } } } },
             images: { orderBy: { position: 'asc' } },
             videos: { orderBy: { position: 'asc' } },
+            readingResources: { orderBy: { position: 'asc' } },
+            slideDeck: true,
           },
         },
         approvals: {
@@ -2571,6 +2576,132 @@ router.delete('/admin/courses/:courseId/weeks/:weekId/quiz', requireAuth, requir
     const result = await prisma.quiz.deleteMany({ where: { weekId: week.id } })
     await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, { deleted: result.count }, 'Quiz deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── Reading Resources (per week) ─────────────────────────────────────────
+
+const readingResourceSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  source: z.string().trim().min(1).max(200),
+  url: z.string().url(),
+  description: z.string().trim().max(2000).default(''),
+  type: z.enum(['ARTICLE', 'COURSE', 'DOCUMENTATION', 'WHITEPAPER', 'VIDEO', 'INTERACTIVE']),
+})
+
+// Add a reading resource (slide link, article, doc, etc.) to a week
+router.post('/admin/courses/:courseId/weeks/:weekId/resources', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const parsed = readingResourceSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const count = await prisma.readingResource.count({ where: { weekId: week.id } })
+    const resource = await prisma.readingResource.create({
+      data: { weekId: week.id, ...parsed.data, position: count + 1 },
+    })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
+    return sendSuccess(res, resource, 'Resource added.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Update a reading resource
+router.patch('/admin/courses/:courseId/weeks/:weekId/resources/:resourceId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const resource = await prisma.readingResource.findFirst({
+      where: { id: req.params.resourceId, week: { id: req.params.weekId, courseId: course.id } },
+    })
+    if (!resource) return sendError(res, 'Resource not found.', 404)
+
+    const parsed = readingResourceSchema.partial().safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const updated = await prisma.readingResource.update({ where: { id: resource.id }, data: parsed.data })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
+    return sendSuccess(res, updated, 'Resource updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Delete a reading resource
+router.delete('/admin/courses/:courseId/weeks/:weekId/resources/:resourceId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const resource = await prisma.readingResource.findFirst({
+      where: { id: req.params.resourceId, week: { id: req.params.weekId, courseId: course.id } },
+    })
+    if (!resource) return sendError(res, 'Resource not found.', 404)
+
+    await prisma.readingResource.delete({ where: { id: resource.id } })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
+    return sendSuccess(res, { id: resource.id }, 'Resource deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── Slide Deck (1 per week — upsert) ─────────────────────────────────────
+
+const slideDeckSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  url: z.string().url(),
+  slideCount: z.number().int().min(1).max(500).default(1),
+  viewerType: z.enum(['MODAL', 'EXTERNAL']).default('EXTERNAL'),
+})
+
+// Upsert a slide deck for a week (POST creates or replaces)
+router.post('/admin/courses/:courseId/weeks/:weekId/slides', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const parsed = slideDeckSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const deck = await prisma.slideDeck.upsert({
+      where: { weekId: week.id },
+      update: { ...parsed.data, lastUpdatedAt: new Date() },
+      create: { ...parsed.data, weekId: week.id, lastUpdatedAt: new Date() },
+    })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
+    return sendSuccess(res, deck, 'Slide deck saved.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Delete a slide deck
+router.delete('/admin/courses/:courseId/weeks/:weekId/slides', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const result = await prisma.slideDeck.deleteMany({ where: { weekId: req.params.weekId } })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
+    return sendSuccess(res, { deleted: result.count }, 'Slide deck deleted.')
   } catch (err) {
     next(err)
   }

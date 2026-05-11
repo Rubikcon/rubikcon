@@ -9,6 +9,24 @@ import type { CourseSummary } from '../types/academy'
 
 const DEFAULT_COURSE_SLUG = 'blockchain-social-impact'
 
+/**
+ * Convert a slide-deck URL into an embeddable URL when needed.
+ *
+ * - Canva: admins paste the embed link directly (Canva → Share → Embed),
+ *   so we pass it through unchanged.
+ * - Google Slides: auto-normalize /edit URLs to /embed URLs.
+ * - Anything else: pass through as-is.
+ */
+function getSlideEmbedUrl(url: string): string {
+  if (!url) return url
+  // Google Slides: /presentation/d/ID/edit → /presentation/d/ID/embed
+  const gsMatch = url.match(/docs\.google\.com\/presentation\/d\/([^/]+)/)
+  if (gsMatch && !url.includes('/embed')) {
+    return `https://docs.google.com/presentation/d/${gsMatch[1]}/embed?start=false&loop=false&delayms=3000`
+  }
+  return url
+}
+
 export default function CoursePage() {
   const params = useParams<{ slug?: string }>()
   const slug = params.slug || DEFAULT_COURSE_SLUG
@@ -366,6 +384,41 @@ export default function CoursePage() {
                 </div>
               )}
             </motion.div>
+
+            {/* Course Overview Slides */}
+            {course.overviewSlideUrl && (
+              <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-[#F5C518]">
+                    <rect x="3" y="4" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="2"/>
+                    <path d="M3 9h18" stroke="currentColor" strokeWidth="2"/>
+                  </svg>
+                  <h3 className="text-sm font-mono uppercase tracking-[0.18em] text-white/40">
+                    Course overview slides
+                  </h3>
+                </div>
+                {/* Embedded slide preview — most slide providers support iframe embed */}
+                <div className="rounded-xl overflow-hidden border border-white/10 bg-black aspect-video mb-3">
+                  <iframe
+                    src={getSlideEmbedUrl(course.overviewSlideUrl)}
+                    title="Course overview slides"
+                    allow="fullscreen"
+                    allowFullScreen
+                    loading="lazy"
+                    className="w-full h-full"
+                    style={{ border: 0 }}
+                  />
+                </div>
+                <a
+                  href={course.overviewSlideUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-[#F5C518] hover:text-[#E8B800] transition-colors"
+                >
+                  Open slides in full screen <ArrowRight size={12} />
+                </a>
+              </div>
+            )}
 
             {/* Facilitators */}
             {course.facilitators.length > 0 && (
