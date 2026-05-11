@@ -1740,9 +1740,18 @@ router.post('/admin/courses', requireAuth, requireAdmin, async (req: Request, re
     const existing = await prisma.course.findUnique({ where: { slug: parsed.data.slug } })
     if (existing) return sendError(res, 'A course with this slug already exists.', 409)
 
-    const course = await prisma.course.create({
+    const created = await prisma.course.create({
       data: { ...parsed.data, createdById: req.user!.userId, status: 'DRAFT' },
     })
+
+    // Return shape compatible with the AdminCourse list type so the frontend can
+    // prepend the new course to its list without rendering crashes.
+    const course = {
+      ...created,
+      weekCount: 0,
+      facilitators: [] as Array<{ id: string; name: string; title: string | null; photoUrl: string | null }>,
+      createdBy: req.user ? { id: req.user.userId, name: null, email: req.user.email } : null,
+    }
     return sendSuccess(res, course, 'Course created.', 201)
   } catch (err) {
     next(err)

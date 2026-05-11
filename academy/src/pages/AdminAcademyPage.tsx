@@ -214,7 +214,14 @@ export default function AdminAcademyPage() {
         method: 'POST',
         body: JSON.stringify(createForm),
       })
-      setCourses(prev => [course, ...prev])
+      // POST /admin/courses returns the raw course row without facilitators/weekCount.
+      // Normalize so list-rendering code (which expects these fields) doesn't crash.
+      const normalized: AdminCourse = {
+        ...course,
+        facilitators: course.facilitators ?? [],
+        weekCount: course.weekCount ?? 0,
+      }
+      setCourses(prev => [normalized, ...prev])
       setShowCreateForm(false)
       setCreateForm({ title: '', slug: '', description: '' })
       window.location.href = `/admin/courses/${course.id}`
@@ -406,6 +413,9 @@ export default function AdminAcademyPage() {
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {courses.map(course => {
                     const canDelete = course.status === 'DRAFT' || course.status === 'REJECTED'
+                    const facilitators = course.facilitators ?? []
+                    const weekCount = course.weekCount ?? 0
+                    const contentUnit = course.contentUnit ?? 'lesson'
                     return (
                       <div
                         key={course.id}
@@ -420,19 +430,19 @@ export default function AdminAcademyPage() {
                           <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-mono ${STATUS_COLORS[course.status]}`}>
                             {course.status.replace('_', ' ')}
                           </span>
-                          <span className="text-xs text-white/30">{course.weekCount} {course.contentUnit.toLowerCase()}{course.weekCount !== 1 ? 's' : ''}</span>
+                          <span className="text-xs text-white/30">{weekCount} {contentUnit.toLowerCase()}{weekCount !== 1 ? 's' : ''}</span>
                         </div>
                         <div className="relative pointer-events-none">
                           <h3 className="font-semibold text-white group-hover:text-[#F5C518] transition-colors mb-0.5">{course.title}</h3>
                           <p className="text-xs text-white/30">/{course.slug}</p>
                         </div>
-                        {course.facilitators.length > 0 && (
+                        {facilitators.length > 0 && (
                           <div className="relative flex flex-wrap gap-1 pointer-events-none">
-                            {course.facilitators.slice(0, 3).map(f => (
+                            {facilitators.slice(0, 3).map(f => (
                               <span key={f.id} className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs text-white/50">{f.name}</span>
                             ))}
-                            {course.facilitators.length > 3 && (
-                              <span className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs text-white/30">+{course.facilitators.length - 3}</span>
+                            {facilitators.length > 3 && (
+                              <span className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs text-white/30">+{facilitators.length - 3}</span>
                             )}
                           </div>
                         )}
