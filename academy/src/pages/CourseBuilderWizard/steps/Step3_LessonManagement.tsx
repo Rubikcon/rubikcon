@@ -64,8 +64,8 @@ export default function Step3_LessonManagement({
       title: lesson.title,
       content: lesson.content,
       duration: lesson.duration,
-      videos: lesson.videos,
-      facilitators: lesson.facilitators,
+      videos: lesson.videos ?? [],
+      facilitators: lesson.facilitators ?? [],
     })
     setShowCreateForm(true)
   }
@@ -299,12 +299,12 @@ export default function Step3_LessonManagement({
                       <h3 className="text-sm font-semibold text-white">{lesson.title}</h3>
                       <span className="text-xs text-white/40">({lesson.duration} min)</span>
                     </div>
-                    {lesson.videos.length > 0 && (
+                    {(lesson.videos?.length ?? 0) > 0 && (
                       <p className="text-xs text-[#F5C518] mt-1 flex items-center gap-1">
                         <Video size={12} /> {lesson.videos.length} video(s)
                       </p>
                     )}
-                    {lesson.facilitators.length > 0 && (
+                    {(lesson.facilitators?.length ?? 0) > 0 && (
                       <p className="text-xs text-blue-400 mt-1 flex items-center gap-1">
                         <Users size={12} /> {lesson.facilitators.length} facilitator(s)
                       </p>
