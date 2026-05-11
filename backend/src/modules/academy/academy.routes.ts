@@ -2196,6 +2196,7 @@ router.post('/admin/courses/:courseId/modules', requireAuth, requireAdmin, async
     const parsed = z.object({
       title: z.string().trim().min(1).max(200),
       description: z.string().trim().max(1000).optional(),
+      introVideoUrl: z.string().url().optional().nullable(),
     }).safeParse(req.body)
     if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
 

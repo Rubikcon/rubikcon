@@ -37,9 +37,23 @@ export default function Step1_CourseInfo({ wizard, courseId, onNext }: Step1_Cou
     wizard.setError(null)
 
     try {
+      // Strip empty strings — backend uses .url() validators that reject "".
+      // Only send fields that have actual values; let the schema's .optional() handle the rest.
+      const payload: Record<string, unknown> = {
+        title: wizard.courseData.title.trim(),
+        slug: wizard.courseData.slug.trim(),
+        description: wizard.courseData.description.trim(),
+        isPaid: wizard.courseData.isPaid,
+      }
+      if (wizard.courseData.tagline.trim()) payload.tagline = wizard.courseData.tagline.trim()
+      if (wizard.courseData.level.trim()) payload.level = wizard.courseData.level.trim()
+      if (wizard.courseData.estimatedDuration.trim()) payload.estimatedDuration = wizard.courseData.estimatedDuration.trim()
+      if (wizard.courseData.contentUnit.trim()) payload.contentUnit = wizard.courseData.contentUnit.trim()
+      if (wizard.courseData.introVideoUrl.trim()) payload.introVideoUrl = wizard.courseData.introVideoUrl.trim()
+
       await apiRequest(`/academy/admin/courses/${courseId}`, {
         method: 'PATCH',
-        body: JSON.stringify(wizard.courseData),
+        body: JSON.stringify(payload),
       })
 
       wizard.setSavingStep(undefined)
