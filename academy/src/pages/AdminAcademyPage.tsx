@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Plus,
   ShieldCheck,
+  Trash2,
   Users,
 } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
@@ -74,17 +75,14 @@ export default function AdminAcademyPage() {
 
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [createForm, setCreateForm] = useState({
-    title: '', slug: '', description: '', tagline: '', level: '', estimatedDuration: '', contentUnit: 'Lesson',
+    title: '', slug: '', description: '',
   })
 
   const [showPasswordChange, setShowPasswordChange] = useState(false)
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [changingPassword, setChangingPassword] = useState(false)
-
-  const COURSE_LEVELS = ['Beginner', 'Intermediate', 'Advanced'] as const
-  const COURSE_DURATIONS = ['2 weeks', '4 weeks', '6 weeks', '8 weeks', '10 weeks', '12 weeks', 'Self-paced'] as const
-  const COURSE_UNITS = ['Lesson', 'Week', 'Module', 'Session', 'Chapter', 'Unit'] as const
 
   const auth = getStoredAuth()
 
@@ -218,12 +216,26 @@ export default function AdminAcademyPage() {
       })
       setCourses(prev => [course, ...prev])
       setShowCreateForm(false)
-      setCreateForm({ title: '', slug: '', description: '', tagline: '', level: '', estimatedDuration: '', contentUnit: 'Lesson' })
+      setCreateForm({ title: '', slug: '', description: '' })
       window.location.href = `/admin/courses/${course.id}`
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create course.')
     } finally {
       setCreating(false)
+    }
+  }
+
+  async function deleteCourse(courseId: string, courseTitle: string) {
+    if (!confirm(`Delete "${courseTitle}"? This action cannot be undone.`)) return
+    setDeletingId(courseId)
+    setError(null)
+    try {
+      await apiRequest(`/academy/admin/courses/${courseId}`, { method: 'DELETE' })
+      setCourses(prev => prev.filter(c => c.id !== courseId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete course.')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -330,7 +342,10 @@ export default function AdminAcademyPage() {
 
               {showCreateForm && (
                 <form onSubmit={createCourse} className="mb-6 rounded-[24px] border border-[#F5C518]/20 bg-[#F5C518]/5 p-6 space-y-4">
-                  <h3 className="text-sm font-semibold text-[#F5C518]">Create new course</h3>
+                  <div>
+                    <h3 className="text-sm font-semibold text-[#F5C518]">Create new course</h3>
+                    <p className="text-xs text-white/40 mt-1">Just the essentials — you'll fill in the rest (level, duration, intro video, etc.) in the course builder.</p>
+                  </div>
                   <div className="grid md:grid-cols-2 gap-4">
                     {[
                       { key: 'title', label: 'Title *', required: true, placeholder: 'Blockchain for Social Impact' },
@@ -354,60 +369,16 @@ export default function AdminAcademyPage() {
                     ))}
                   </div>
                   <div>
-                    <label className="block text-xs text-white/40 mb-1">Description *</label>
+                    <label className="block text-xs text-white/40 mb-1">Description * (min 10 characters)</label>
                     <textarea
                       value={createForm.description}
                       onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))}
                       required
+                      minLength={10}
                       rows={3}
-                      placeholder="A comprehensive course on…"
+                      placeholder="A short description of what learners will gain..."
                       className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
                     />
-                  </div>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
-                      <label className="block text-xs text-white/40 mb-1">Tagline</label>
-                      <input
-                        value={createForm.tagline}
-                        onChange={e => setCreateForm(p => ({ ...p, tagline: e.target.value }))}
-                        placeholder="Short hook line"
-                        className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-white/40 mb-1">Level</label>
-                      <select
-                        value={createForm.level}
-                        onChange={e => setCreateForm(p => ({ ...p, level: e.target.value }))}
-                        className="w-full rounded-xl border border-white/12 bg-[#111] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40 [color-scheme:dark]"
-                      >
-                        <option value="">-- Select level --</option>
-                        {COURSE_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs text-white/40 mb-1">Duration</label>
-                      <select
-                        value={createForm.estimatedDuration}
-                        onChange={e => setCreateForm(p => ({ ...p, estimatedDuration: e.target.value }))}
-                        className="w-full rounded-xl border border-white/12 bg-[#111] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40 [color-scheme:dark]"
-                      >
-                        <option value="">-- Select duration --</option>
-                        {COURSE_DURATIONS.map(d => <option key={d} value={d}>{d}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
-                      <label className="block text-xs text-white/40 mb-1">Content unit</label>
-                      <select
-                        value={createForm.contentUnit}
-                        onChange={e => setCreateForm(p => ({ ...p, contentUnit: e.target.value }))}
-                        className="w-full rounded-xl border border-white/12 bg-[#111] px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40 [color-scheme:dark]"
-                      >
-                        {COURSE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                      </select>
-                    </div>
                   </div>
                   <div className="flex gap-3">
                     <button type="submit" disabled={creating} className="rounded-full bg-[#F5C518] px-5 py-2.5 text-sm font-semibold text-[#0A0A0A] disabled:opacity-50">
@@ -433,44 +404,70 @@ export default function AdminAcademyPage() {
                 </div>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {courses.map(course => (
-                    <a
-                      key={course.id}
-                      href={`/admin/courses/${course.id}`}
-                      className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5 hover:border-white/25 transition-colors group flex flex-col gap-3"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-mono ${STATUS_COLORS[course.status]}`}>
-                          {course.status.replace('_', ' ')}
-                        </span>
-                        <span className="text-xs text-white/30">{course.weekCount} {course.contentUnit.toLowerCase()}{course.weekCount !== 1 ? 's' : ''}</span>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-white group-hover:text-[#F5C518] transition-colors mb-0.5">{course.title}</h3>
-                        <p className="text-xs text-white/30">/{course.slug}</p>
-                      </div>
-                      {course.facilitators.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {course.facilitators.slice(0, 3).map(f => (
-                            <span key={f.id} className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs text-white/50">{f.name}</span>
-                          ))}
-                          {course.facilitators.length > 3 && (
-                            <span className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs text-white/30">+{course.facilitators.length - 3}</span>
-                          )}
+                  {courses.map(course => {
+                    const canDelete = course.status === 'DRAFT' || course.status === 'REJECTED'
+                    return (
+                      <div
+                        key={course.id}
+                        className="relative rounded-[24px] border border-white/10 bg-white/[0.04] p-5 hover:border-white/25 transition-colors group flex flex-col gap-3"
+                      >
+                        <a
+                          href={`/admin/courses/${course.id}`}
+                          className="absolute inset-0 rounded-[24px]"
+                          aria-label={`Open ${course.title}`}
+                        />
+                        <div className="relative flex items-start justify-between gap-3 pointer-events-none">
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-mono ${STATUS_COLORS[course.status]}`}>
+                            {course.status.replace('_', ' ')}
+                          </span>
+                          <span className="text-xs text-white/30">{course.weekCount} {course.contentUnit.toLowerCase()}{course.weekCount !== 1 ? 's' : ''}</span>
                         </div>
-                      )}
-                      {course.status === 'REJECTED' && course.approvalNotes && (
-                        <p className="text-xs text-red-300/70 line-clamp-2 border border-red-400/15 bg-red-400/5 rounded-xl px-3 py-2">
-                          {course.approvalNotes}
-                        </p>
-                      )}
-                      {course.status === 'PENDING_REVIEW' && (
-                        <p className="text-xs text-amber-300/70 border border-amber-400/15 bg-amber-400/5 rounded-xl px-3 py-2">
-                          Awaiting super admin review
-                        </p>
-                      )}
-                    </a>
-                  ))}
+                        <div className="relative pointer-events-none">
+                          <h3 className="font-semibold text-white group-hover:text-[#F5C518] transition-colors mb-0.5">{course.title}</h3>
+                          <p className="text-xs text-white/30">/{course.slug}</p>
+                        </div>
+                        {course.facilitators.length > 0 && (
+                          <div className="relative flex flex-wrap gap-1 pointer-events-none">
+                            {course.facilitators.slice(0, 3).map(f => (
+                              <span key={f.id} className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs text-white/50">{f.name}</span>
+                            ))}
+                            {course.facilitators.length > 3 && (
+                              <span className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs text-white/30">+{course.facilitators.length - 3}</span>
+                            )}
+                          </div>
+                        )}
+                        {course.status === 'REJECTED' && course.approvalNotes && (
+                          <p className="relative text-xs text-red-300/70 line-clamp-2 border border-red-400/15 bg-red-400/5 rounded-xl px-3 py-2 pointer-events-none">
+                            {course.approvalNotes}
+                          </p>
+                        )}
+                        {course.status === 'PENDING_REVIEW' && (
+                          <p className="relative text-xs text-amber-300/70 border border-amber-400/15 bg-amber-400/5 rounded-xl px-3 py-2 pointer-events-none">
+                            Awaiting super admin review
+                          </p>
+                        )}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              deleteCourse(course.id, course.title)
+                            }}
+                            disabled={deletingId === course.id}
+                            title="Delete course"
+                            className="absolute top-3 right-3 z-10 inline-flex items-center justify-center w-8 h-8 rounded-full bg-black/40 border border-white/10 text-white/50 hover:text-red-400 hover:border-red-400/40 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                          >
+                            {deletingId === course.id ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={14} />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
