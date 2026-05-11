@@ -194,7 +194,12 @@ export default function CourseBuilderWizard({ params }: CourseBuilderWizardProps
                 )}
                 {!isSuperAdmin && courseStatus === 'APPROVED' && (
                   <p className="text-xs opacity-70 mt-0.5">
-                    This course is published. Contact a super admin if you need to make changes.
+                    This course is published. Any edit you make here will flip the course back to <strong>Pending Review</strong> for a super admin to approve. The course stays visible to learners while pending.
+                  </p>
+                )}
+                {!isSuperAdmin && courseStatus === 'PENDING_REVIEW' && (
+                  <p className="text-xs opacity-70 mt-0.5">
+                    Awaiting super admin review. You can keep editing — additional changes will be included in the review.
                   </p>
                 )}
               </div>

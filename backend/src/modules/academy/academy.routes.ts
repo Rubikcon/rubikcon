@@ -1695,6 +1695,23 @@ const createFacilitatorSchema = z.object({
 })
 
 // Helper to check course ownership
+/**
+ * If a regular ADMIN edits an APPROVED course, flip the course status back to
+ * PENDING_REVIEW so a SUPER_ADMIN can audit and re-approve the changes.
+ *
+ * SUPER_ADMIN edits are not flagged — their changes go live immediately.
+ * Course stays `published: true` during the pending review so learners don't
+ * lose access while edits are pending audit.
+ */
+async function markCourseDirtyIfNeeded(courseId: string, role: string, currentStatus: string) {
+  if (role === 'SUPER_ADMIN') return
+  if (currentStatus !== 'APPROVED') return
+  await prisma.course.update({
+    where: { id: courseId },
+    data: { status: 'PENDING_REVIEW', submittedAt: new Date() },
+  })
+}
+
 async function getCourseOrFail(courseId: string, userId: string, role: string, res: Response) {
   const course = await prisma.course.findUnique({ where: { id: courseId } })
   if (!course) {
@@ -1898,6 +1915,7 @@ router.patch('/admin/courses/:courseId', requireAuth, requireAdmin, async (req: 
     }
 
     const updated = await prisma.course.update({ where: { id: course.id }, data: parsed.data })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, updated, 'Course updated.')
   } catch (err) {
     next(err)
@@ -1986,6 +2004,10 @@ router.post('/admin/courses/:courseId/weeks', requireAuth, requireAdmin, async (
       data: {
         ...weekData,
         courseId: course.id,
+        // If the course is already approved/published, new weeks must be
+        // published too — otherwise the public course page won't show them
+        // (it filters weeks by `published: true`).
+        published: course.status === 'APPROVED',
         topics: {
           create: topics.map((title, i) => ({ title, position: i + 1 })),
         },
@@ -1999,6 +2021,7 @@ router.post('/admin/courses/:courseId/weeks', requireAuth, requireAdmin, async (
       },
     })
 
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, week, 'Week added.', 201)
   } catch (err) {
     next(err)
@@ -2040,6 +2063,7 @@ router.patch('/admin/courses/:courseId/weeks/:weekId', requireAuth, requireAdmin
       where: { id: week.id },
       include: { topics: { orderBy: { position: 'asc' } }, objectives: { orderBy: { position: 'asc' } } },
     })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, updated, 'Week updated.')
   } catch (err) {
     next(err)
@@ -2058,6 +2082,7 @@ router.delete('/admin/courses/:courseId/weeks/:weekId', requireAuth, requireAdmi
     if (!week) return sendError(res, 'Week not found.', 404)
 
     await prisma.week.delete({ where: { id: week.id } })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, { id: week.id }, 'Week deleted.')
   } catch (err) {
     next(err)
@@ -2077,6 +2102,7 @@ router.patch('/admin/courses/:courseId/weeks/:weekId/content', requireAuth, requ
 
     const { lessonContent } = z.object({ lessonContent: z.string().trim().max(50000) }).parse(req.body)
     const updated = await prisma.week.update({ where: { id: week.id }, data: { lessonContent } })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, { lessonContent: updated.lessonContent }, 'Lesson content saved.')
   } catch (err) {
     next(err)
@@ -2155,6 +2181,7 @@ router.post('/admin/courses/:courseId/weeks/:weekId/videos', requireAuth, requir
     const video = await prisma.weekVideo.create({
       data: { weekId: week.id, ...parsed.data, position: count + 1 },
     })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, video, 'Video added.', 201)
   } catch (err) {
     next(err)
@@ -2202,6 +2229,7 @@ router.delete('/admin/courses/:courseId/weeks/:weekId/videos/:videoId', requireA
     if (!video) return sendError(res, 'Video not found.', 404)
 
     await prisma.weekVideo.delete({ where: { id: video.id } })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, { id: video.id }, 'Video deleted.')
   } catch (err) {
     next(err)
@@ -2229,6 +2257,7 @@ router.post('/admin/courses/:courseId/modules', requireAuth, requireAdmin, async
     const mod = await prisma.module.create({
       data: { courseId: course.id, ...parsed.data, position: count + 1 },
     })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, mod, 'Module created.', 201)
   } catch (err) {
     next(err)
@@ -2254,6 +2283,7 @@ router.patch('/admin/courses/:courseId/modules/:moduleId', requireAuth, requireA
     if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
 
     const updated = await prisma.module.update({ where: { id: mod.id }, data: parsed.data })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, updated, 'Module updated.')
   } catch (err) {
     next(err)
@@ -2274,6 +2304,7 @@ router.delete('/admin/courses/:courseId/modules/:moduleId', requireAuth, require
     // Unassign all weeks from this module before deleting
     await prisma.week.updateMany({ where: { moduleId: mod.id }, data: { moduleId: null } })
     await prisma.module.delete({ where: { id: mod.id } })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, { id: mod.id }, 'Module deleted.')
   } catch (err) {
     next(err)
@@ -2460,6 +2491,7 @@ router.post('/admin/courses/:courseId/weeks/:weekId/quiz', requireAuth, requireA
       include: { questions: { include: { options: true }, orderBy: { position: 'asc' } } },
     })
 
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, quiz, 'Quiz saved.', 201)
   } catch (err) {
     next(err)
@@ -2496,6 +2528,7 @@ router.post('/admin/courses/:courseId/weeks/:weekId/assignments', requireAuth, r
       include: { choices: { orderBy: { position: 'asc' } } },
     })
 
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, assignment, 'Assignment created.', 201)
   } catch (err) {
     next(err)
@@ -2517,6 +2550,7 @@ router.delete('/admin/courses/:courseId/weeks/:weekId/assignments/:assignmentId'
     if (!assignment) return sendError(res, 'Assignment not found.', 404)
 
     await prisma.assignment.delete({ where: { id: assignment.id } })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, { id: assignment.id }, 'Assignment deleted.')
   } catch (err) {
     next(err)
@@ -2535,6 +2569,7 @@ router.delete('/admin/courses/:courseId/weeks/:weekId/quiz', requireAuth, requir
     if (!week) return sendError(res, 'Week not found.', 404)
 
     const result = await prisma.quiz.deleteMany({ where: { weekId: week.id } })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, { deleted: result.count }, 'Quiz deleted.')
   } catch (err) {
     next(err)
@@ -2664,6 +2699,13 @@ router.post('/superadmin/courses/:courseId/approve', requireAuth, requireSuperAd
       prisma.course.update({
         where: { id: course.id },
         data: { status: 'APPROVED', published: true, publishedAt: new Date(), approvedAt: new Date(), approvalNotes: null },
+      }),
+      // Publish ALL weeks under the course so they appear on the public course page.
+      // Without this, learners would see "0 lessons" on a published course because
+      // the public /courses/:slug endpoint filters weeks by `published: true`.
+      prisma.week.updateMany({
+        where: { courseId: course.id },
+        data: { published: true },
       }),
       prisma.courseApproval.create({
         data: { courseId: course.id, reviewerId: req.user!.userId, action: 'APPROVED', notes: notes ?? null },
