@@ -37,7 +37,7 @@ export default function Step1_CourseInfo({ wizard, courseId, onNext }: Step1_Cou
     wizard.setError(null)
 
     try {
-      await apiRequest(`/admin/courses/${courseId}`, {
+      await apiRequest(`/academy/admin/courses/${courseId}`, {
         method: 'PATCH',
         body: JSON.stringify(wizard.courseData),
       })

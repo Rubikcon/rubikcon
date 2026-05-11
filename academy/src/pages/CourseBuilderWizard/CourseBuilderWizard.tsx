@@ -38,7 +38,7 @@ export default function CourseBuilderWizard({ params }: CourseBuilderWizardProps
   useEffect(() => {
     async function loadCourse() {
       try {
-        const response = await apiRequest<AdminCourseDetail>(`/admin/courses/${actualCourseId}`, {
+        const response = await apiRequest<AdminCourseDetail>(`/academy/admin/courses/${actualCourseId}`, {
           method: 'GET',
         })
         const course = response as AdminCourseDetail

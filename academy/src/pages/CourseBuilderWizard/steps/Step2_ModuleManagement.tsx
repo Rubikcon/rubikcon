@@ -58,7 +58,7 @@ export default function Step2_ModuleManagement({
       if (editingId) {
         // Update existing module
         await apiRequest(
-          `/admin/courses/${courseId}/modules/${editingId}`,
+          `/academy/admin/courses/${courseId}/modules/${editingId}`,
           {
             method: 'PATCH',
             body: JSON.stringify({
@@ -74,7 +74,7 @@ export default function Step2_ModuleManagement({
       } else {
         // Create new module
         const response = await apiRequest<{ data: CreatedModule }>(
-          `/admin/courses/${courseId}/modules`,
+          `/academy/admin/courses/${courseId}/modules`,
           {
             method: 'POST',
             body: JSON.stringify({
@@ -109,7 +109,7 @@ export default function Step2_ModuleManagement({
     wizard.setError(null)
 
     try {
-      await apiRequest(`/admin/courses/${courseId}/modules/${moduleId}`, {
+      await apiRequest(`/academy/admin/courses/${courseId}/modules/${moduleId}`, {
         method: 'DELETE',
       })
 

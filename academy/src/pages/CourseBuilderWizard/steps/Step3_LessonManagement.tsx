@@ -140,7 +140,7 @@ export default function Step3_LessonManagement({
     try {
       if (editingId) {
         // Update existing lesson
-        await apiRequest(`/lesson/${editingId}`, {
+        await apiRequest(`/academy/lesson/${editingId}`, {
           method: 'PATCH',
           body: JSON.stringify({
             title: formData.title,
@@ -153,7 +153,7 @@ export default function Step3_LessonManagement({
       } else {
         // Create new lesson
         const response = await apiRequest<any>(
-          `/admin/courses/${courseId}/modules/${selectedModuleId}/lessons`,
+          `/academy/admin/courses/${courseId}/modules/${selectedModuleId}/lessons`,
           {
             method: 'POST',
             body: JSON.stringify({
@@ -192,7 +192,7 @@ export default function Step3_LessonManagement({
     wizard.setError(null)
 
     try {
-      await apiRequest(`/lesson/${lessonId}`, { method: 'DELETE' })
+      await apiRequest(`/academy/lesson/${lessonId}`, { method: 'DELETE' })
 
       wizard.deleteLesson(selectedModuleId, lessonId)
       setIsSubmitting(false)
