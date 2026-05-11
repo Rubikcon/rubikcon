@@ -69,6 +69,32 @@ export default function CourseBuilderWizard({ params }: CourseBuilderWizardProps
           )
         }
 
+        // Populate lessons (stored as weeks under modules — Path B)
+        if (course.weeks && course.weeks.length > 0) {
+          const lessonsByModule: Record<string, any[]> = {}
+          for (const w of course.weeks) {
+            if (!w.moduleId) continue // skip weeks not assigned to any module
+            if (!lessonsByModule[w.moduleId]) lessonsByModule[w.moduleId] = []
+            lessonsByModule[w.moduleId].push({
+              id: w.id,
+              title: w.title,
+              slug: w.slug,
+              content: w.lessonContent || '',
+              duration: w.estimatedCompletionMinutes,
+              moduleId: w.moduleId,
+              videos: (w.videos || []).map(v => ({
+                id: v.id, title: v.title, url: v.url, description: v.description || '',
+              })),
+              facilitators: [],
+              // A week is "detailed" if it has non-placeholder content
+              hasDetails:
+                w.whatToExpect !== 'Details coming soon.' &&
+                w.summary !== 'Summary coming soon.',
+            })
+          }
+          wizard.setLessons(lessonsByModule)
+        }
+
         setInitializing(false)
       } catch (err) {
         console.error('Failed to load course:', err)

@@ -127,12 +127,18 @@ export function useCourseWizardState(courseId: string) {
   // ─── Lesson Management ────────────────────────────────────────────────
 
   const addLesson = useCallback(
-    (moduleId: string, lesson: Omit<LessonFormData, 'id' | 'moduleId'>) => {
+    (moduleId: string, lesson: Partial<LessonFormData> & { title: string; duration: number }) => {
       setState(prev => {
         const newLesson: LessonFormData = {
-          id: `temp-${Date.now()}`,
+          id: lesson.id ?? `temp-${Date.now()}`,
           moduleId,
-          ...lesson,
+          title: lesson.title,
+          content: lesson.content ?? '',
+          duration: lesson.duration,
+          videos: lesson.videos ?? [],
+          facilitators: lesson.facilitators ?? [],
+          slug: lesson.slug,
+          hasDetails: lesson.hasDetails ?? false,
         }
         const moduleLessons = prev.lessons[moduleId] || []
         return {
@@ -164,6 +170,10 @@ export function useCourseWizardState(courseId: string) {
     },
     []
   )
+
+  const setLessons = useCallback((lessons: Record<string, LessonFormData[]>) => {
+    setState(prev => ({ ...prev, lessons }))
+  }, [])
 
   const deleteLesson = useCallback((moduleId: string, lessonId: string) => {
     setState(prev => {
@@ -353,6 +363,7 @@ export function useCourseWizardState(courseId: string) {
     addLesson,
     updateLesson,
     deleteLesson,
+    setLessons,
     addLessonVideo,
     removeLessonVideo,
     addLessonFacilitator,

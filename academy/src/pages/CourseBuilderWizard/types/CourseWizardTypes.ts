@@ -60,15 +60,20 @@ export type LessonFacilitatorData = {
 }
 
 // ─── Lesson Form Data ─────────────────────────────────────────────────────
+// Note: the wizard creates these as Week records under the hood (Path B),
+// so the type carries the minimum week fields needed for the list view.
 
 export type LessonFormData = {
   id?: string
   title: string
+  slug?: string // Used for week URL; auto-generated from title
   content: string
   duration: number
   moduleId: string
   videos: LessonVideoData[]
   facilitators: LessonFacilitatorData[]
+  // Week-specific status flags surfaced in the list
+  hasDetails?: boolean // True if whatToExpect/topics/objectives have been filled
 }
 
 // ─── Wizard State ─────────────────────────────────────────────────────────

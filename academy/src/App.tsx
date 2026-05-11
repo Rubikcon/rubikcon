@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage'
 import AdminAcademyPage from './pages/AdminAcademyPage'
 import { CourseBuilderWizard } from './pages/CourseBuilderWizard'
 import LessonEditorPage from './pages/LessonEditorPage'
+import WeekEditorPage from './pages/WeekEditorPage'
 import SuperAdminPage from './pages/SuperAdminPage'
 import SuperAdminCourseDetailPage from './pages/SuperAdminCourseDetailPage'
 import CoursesPage from './pages/CoursesPage'
@@ -23,6 +24,7 @@ export default function App() {
       <Route path="/admin/academy" component={AdminAcademyPage} />
       <Route path="/admin/courses/:courseId" component={CourseBuilderWizard} />
       <Route path="/admin/courses/:courseId/lessons/:lessonId" component={LessonEditorPage} />
+      <Route path="/admin/courses/:courseId/weeks/:weekId" component={WeekEditorPage} />
       <Route path="/admin/superadmin" component={SuperAdminPage} />
       <Route path="/admin/superadmin/courses/:courseId" component={SuperAdminCourseDetailPage} />
       <Route path="/courses" component={CoursesPage} />

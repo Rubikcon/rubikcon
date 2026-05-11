@@ -1633,12 +1633,18 @@ const createWeekSchema = z.object({
   number: z.number().int().min(1),
   title: z.string().trim().min(3).max(200),
   slug: z.string().trim().regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens').min(3).max(100),
-  durationLabel: z.string().trim().min(1).max(100),
-  difficulty: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']),
-  hook: z.string().trim().min(1).max(500),
-  whatToExpect: z.string().trim().min(1).max(2000),
-  summary: z.string().trim().min(1).max(5000),
-  estimatedCompletionMinutes: z.number().int().min(1).max(600),
+  // The wizard creates "skeleton" weeks where the admin fills detail later.
+  // These fields default to placeholders so the create call doesn't require
+  // 10 inputs upfront — they're still required at the DB level so the
+  // placeholder strings keep the row valid until the admin edits them.
+  durationLabel: z.string().trim().min(1).max(100).default('30 min'),
+  difficulty: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']).default('BEGINNER'),
+  hook: z.string().trim().min(1).max(500).default('Hook coming soon.'),
+  whatToExpect: z.string().trim().min(1).max(2000).default('Details coming soon.'),
+  summary: z.string().trim().min(1).max(5000).default('Summary coming soon.'),
+  estimatedCompletionMinutes: z.number().int().min(1).max(600).default(30),
+  // Optional module assignment — wizard sets this when creating under a module
+  moduleId: z.string().uuid().optional().nullable(),
   videoTitle: z.string().trim().max(200).optional(),
   videoUrl: z.string().url().optional(),
   lessonContent: z.string().trim().max(50000).optional(),
@@ -1963,6 +1969,12 @@ router.post('/admin/courses/:courseId/weeks', requireAuth, requireAdmin, async (
 
     const numberExists = await prisma.week.findUnique({ where: { courseId_number: { courseId: course.id, number: parsed.data.number } } })
     if (numberExists) return sendError(res, `Week ${parsed.data.number} already exists in this course.`, 409)
+
+    // If moduleId is provided, verify it belongs to this course
+    if (parsed.data.moduleId) {
+      const mod = await prisma.module.findFirst({ where: { id: parsed.data.moduleId, courseId: course.id } })
+      if (!mod) return sendError(res, 'Module not found in this course.', 404)
+    }
 
     const { topics, objectives, ...weekData } = parsed.data
 
