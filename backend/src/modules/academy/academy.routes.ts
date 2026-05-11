@@ -2498,6 +2498,45 @@ router.post('/admin/courses/:courseId/weeks/:weekId/assignments', requireAuth, r
   }
 })
 
+// Delete an assignment from a week
+router.delete('/admin/courses/:courseId/weeks/:weekId/assignments/:assignmentId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const assignment = await prisma.assignment.findFirst({ where: { id: req.params.assignmentId, weekId: week.id } })
+    if (!assignment) return sendError(res, 'Assignment not found.', 404)
+
+    await prisma.assignment.delete({ where: { id: assignment.id } })
+    return sendSuccess(res, { id: assignment.id }, 'Assignment deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Delete a quiz from a week
+router.delete('/admin/courses/:courseId/weeks/:weekId/quiz', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const result = await prisma.quiz.deleteMany({ where: { weekId: week.id } })
+    return sendSuccess(res, { deleted: result.count }, 'Quiz deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
 // Add facilitator to course
 router.post('/admin/courses/:courseId/facilitators', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {

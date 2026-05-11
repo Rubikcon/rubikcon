@@ -19,6 +19,8 @@ import { ArrowLeft, Loader2, Plus, Save, Trash2, Video as VideoIcon, ListChecks,
 import AcademyNavbar from '../components/AcademyNavbar'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
+import QuizEditor, { type ExistingQuiz } from './WeekEditor/QuizEditor'
+import AssignmentEditor, { type ExistingAssignment } from './WeekEditor/AssignmentEditor'
 
 type WeekDetail = {
   id: string
@@ -38,8 +40,8 @@ type WeekDetail = {
   topics: Array<{ id: string; title: string; position: number }>
   objectives: Array<{ id: string; body: string; position: number }>
   videos: Array<{ id: string; title: string; url: string; description: string | null; position: number }>
-  quiz: any | null
-  assignments: any[]
+  quiz: ExistingQuiz
+  assignments: ExistingAssignment[]
 }
 
 export default function WeekEditorPage() {
@@ -434,36 +436,24 @@ export default function WeekEditorPage() {
             <SaveButton saving={savingSection === 'content'} onClick={saveContent} label="Save content" />
           </Section>
 
-          {/* Quiz / Assignment links */}
-          <Section title="Quiz & Assignments" icon={FileQuestion}>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <FileQuestion size={16} className="text-[#F5C518]" />
-                  <h4 className="text-sm font-semibold text-white">Quiz</h4>
-                </div>
-                {week.quiz ? (
-                  <p className="text-sm text-emerald-300/80">✓ {week.quiz.title} ({week.quiz.questions?.length || 0} questions)</p>
-                ) : (
-                  <p className="text-xs text-white/40">No quiz yet</p>
-                )}
-                <p className="text-xs text-white/50 mt-2">
-                  Quiz editor coming soon. For now, contact a super admin to add a quiz.
-                </p>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Target size={16} className="text-blue-400" />
-                  <h4 className="text-sm font-semibold text-white">Assignments</h4>
-                </div>
-                <p className="text-sm text-white/70">
-                  {week.assignments.length} assignment{week.assignments.length !== 1 ? 's' : ''}
-                </p>
-                <p className="text-xs text-white/50 mt-2">
-                  Assignment editor coming soon. For now, contact a super admin to add assignments.
-                </p>
-              </div>
-            </div>
+          {/* Quiz */}
+          <Section title="Quiz" icon={FileQuestion}>
+            <QuizEditor
+              courseId={courseId!}
+              weekId={weekId!}
+              quiz={week.quiz}
+              onChange={loadWeek}
+            />
+          </Section>
+
+          {/* Assignments */}
+          <Section title="Assignments" icon={Target}>
+            <AssignmentEditor
+              courseId={courseId!}
+              weekId={weekId!}
+              assignments={week.assignments}
+              onChange={loadWeek}
+            />
           </Section>
 
         </div>
