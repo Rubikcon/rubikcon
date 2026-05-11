@@ -4,6 +4,7 @@ import { Plus, Trash2, Pencil, ExternalLink } from 'lucide-react'
 import { apiRequest } from '../../../lib/api'
 import type { UseWizardState } from '../hooks/useCourseWizardState'
 import type { LessonFormData } from '../types/CourseWizardTypes'
+import type { AdminCourseDetail } from '../../../types/academy'
 
 interface Step3_LessonManagementProps {
   wizard: UseWizardState
@@ -38,19 +39,12 @@ export default function Step3_LessonManagement({
     return wizard.lessons[selectedModuleId] || []
   }, [selectedModuleId, wizard.lessons])
 
-  // Compute the next available week number across the whole course
-  const nextWeekNumber = useMemo(() => {
-    const allLessons = Object.values(wizard.lessons).flat()
-    return allLessons.length + 1
-  }, [wizard.lessons])
-
   function slugify(text: string): string {
     return text
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
-      .slice(0, 100)
   }
 
   function resetForm() {
@@ -77,10 +71,21 @@ export default function Step3_LessonManagement({
     wizard.setError(null)
 
     try {
-      // Make slug unique by appending the week number to avoid collisions
-      // across courses (slugs are globally unique in the schema).
+      // Compute next week number from the AUTHORITATIVE list of weeks in the
+      // course (refetch it). The wizard's in-memory state only tracks weeks
+      // that have a moduleId — orphan weeks would otherwise collide on number.
+      const courseDetail = await apiRequest<AdminCourseDetail>(
+        `/academy/admin/courses/${courseId}`
+      )
+      const existingNumbers = (courseDetail.weeks || []).map(w => w.number)
+      const nextWeekNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1
+
+      // Slug must be 3-100 chars matching /^[a-z0-9-]+$/. Compose with a short
+      // unique suffix and keep the whole thing under 100.
+      const uniqueSuffix = `-${nextWeekNumber}-${Date.now().toString(36).slice(-6)}`
       const baseSlug = slugify(formData.title) || 'lesson'
-      const slug = `${baseSlug}-${nextWeekNumber}-${Date.now().toString(36)}`
+      const maxBaseLen = 100 - uniqueSuffix.length
+      const slug = `${baseSlug.slice(0, maxBaseLen)}${uniqueSuffix}`
 
       const response = await apiRequest<any>(
         `/academy/admin/courses/${courseId}/weeks`,

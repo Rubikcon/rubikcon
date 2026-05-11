@@ -412,7 +412,9 @@ export default function AdminAcademyPage() {
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {courses.map(course => {
-                    const canDelete = course.status === 'DRAFT' || course.status === 'REJECTED'
+                    // SUPER_ADMIN can delete any course; regular admins only their drafts/rejected
+                    const isSuperAdmin = auth?.user.role === 'SUPER_ADMIN'
+                    const canDelete = isSuperAdmin || course.status === 'DRAFT' || course.status === 'REJECTED'
                     const facilitators = course.facilitators ?? []
                     const weekCount = course.weekCount ?? 0
                     const contentUnit = course.contentUnit ?? 'lesson'

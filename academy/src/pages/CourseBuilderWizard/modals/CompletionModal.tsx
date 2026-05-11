@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle, Book, Layers, BookOpen, Users, Plus, X, Send, Loader2, ExternalLink } from 'lucide-react'
 import { apiRequest } from '../../../lib/api'
+import { getStoredAuth } from '../../../lib/auth'
 import type { CourseFormData, ModuleFormData } from '../types/CourseWizardTypes'
 
 type SystemFacilitator = {
@@ -33,6 +34,8 @@ export default function CompletionModal({
   onCreateAnother,
 }: CompletionModalProps) {
   const totalLessons = Object.values(lessons).reduce((sum, arr) => sum + arr.length, 0)
+  const auth = getStoredAuth()
+  const isSuperAdmin = auth?.user.role === 'SUPER_ADMIN'
 
   const [allFacilitators, setAllFacilitators] = useState<SystemFacilitator[]>([])
   const [assignedFacilitators, setAssignedFacilitators] = useState<SystemFacilitator[]>([])
@@ -224,7 +227,7 @@ export default function CompletionModal({
                           {f.title || f.email}
                         </p>
                       </div>
-                      {!submitted && (
+                      {(!submitted || isSuperAdmin) && (
                         <button
                           onClick={() => removeFacilitator(f.id)}
                           disabled={removingFacilitatorId === f.id}
@@ -242,7 +245,7 @@ export default function CompletionModal({
               )}
 
               {/* Add facilitator search */}
-              {!submitted && (
+              {(!submitted || isSuperAdmin) && (
                 <div className="space-y-2">
                   <input
                     value={facilitatorSearch}

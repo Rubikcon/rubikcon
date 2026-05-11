@@ -1904,15 +1904,19 @@ router.patch('/admin/courses/:courseId', requireAuth, requireAdmin, async (req: 
   }
 })
 
-// Delete a draft course
+// Delete a course
+// SUPER_ADMIN can delete a course in any state. Regular admins are restricted
+// to DRAFT or REJECTED courses (so they can't accidentally pull a published
+// course out from under enrolled learners).
 router.delete('/admin/courses/:courseId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId
     const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
     if (!course) return
 
-    if (course.status !== 'DRAFT' && course.status !== 'REJECTED') {
-      return sendError(res, 'Only DRAFT or REJECTED courses can be deleted.', 400)
+    const isSuperAdmin = req.user!.role === 'SUPER_ADMIN'
+    if (!isSuperAdmin && course.status !== 'DRAFT' && course.status !== 'REJECTED') {
+      return sendError(res, 'Only DRAFT or REJECTED courses can be deleted. Contact a super admin to remove a published course.', 400)
     }
 
     await prisma.course.delete({ where: { id: course.id } })

@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { ShieldCheck } from 'lucide-react'
 import { apiRequest } from '../../lib/api'
+import { getStoredAuth } from '../../lib/auth'
 import { useCourseWizardState } from './hooks/useCourseWizardState'
 import WizardProgressBar from './WizardProgressBar'
 import Step1_CourseInfo from './steps/Step1_CourseInfo'
 import Step2_ModuleManagement from './steps/Step2_ModuleManagement'
 import Step3_LessonManagement from './steps/Step3_LessonManagement'
 import CompletionModal from './modals/CompletionModal'
-import type { AdminCourseDetail } from '../../types/academy'
+import type { AdminCourseDetail, CourseStatus } from '../../types/academy'
 
 const TOTAL_STEPS = 3
 
@@ -33,6 +35,9 @@ export default function CourseBuilderWizard({ params }: CourseBuilderWizardProps
   const wizard = useCourseWizardState(actualCourseId)
   const [initializing, setInitializing] = useState(true)
   const [showCompletion, setShowCompletion] = useState(false)
+  const [courseStatus, setCourseStatus] = useState<CourseStatus | null>(null)
+  const auth = getStoredAuth()
+  const isSuperAdmin = auth?.user.role === 'SUPER_ADMIN'
 
   // Load course data on mount
   useEffect(() => {
@@ -42,6 +47,7 @@ export default function CourseBuilderWizard({ params }: CourseBuilderWizardProps
           method: 'GET',
         })
         const course = response as AdminCourseDetail
+        setCourseStatus(course.status)
 
         // Populate wizard state with existing course data
         wizard.setCourseData({
@@ -168,6 +174,33 @@ export default function CourseBuilderWizard({ params }: CourseBuilderWizardProps
       {/* Main content */}
       <div className="pt-24 pb-20 px-4">
         <div className="max-w-4xl mx-auto">
+          {/* Status / super admin banner */}
+          {courseStatus && courseStatus !== 'DRAFT' && (
+            <div className={`mb-6 rounded-2xl border px-4 py-3 text-sm flex items-center gap-3 ${
+              courseStatus === 'APPROVED' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100' :
+              courseStatus === 'PENDING_REVIEW' ? 'border-amber-500/30 bg-amber-500/10 text-amber-100' :
+              'border-red-500/30 bg-red-500/10 text-red-100'
+            }`}>
+              {isSuperAdmin && <ShieldCheck size={16} className="flex-shrink-0" />}
+              <div className="flex-1">
+                <p className="font-medium">
+                  Status: {courseStatus.replace('_', ' ')}
+                  {isSuperAdmin && courseStatus === 'APPROVED' && ' — full edit access as super admin'}
+                </p>
+                {isSuperAdmin && courseStatus === 'APPROVED' && (
+                  <p className="text-xs opacity-70 mt-0.5">
+                    Changes you make here go live immediately. Edit with care.
+                  </p>
+                )}
+                {!isSuperAdmin && courseStatus === 'APPROVED' && (
+                  <p className="text-xs opacity-70 mt-0.5">
+                    This course is published. Contact a super admin if you need to make changes.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Error banner */}
           {wizard.error && (
             <motion.div
