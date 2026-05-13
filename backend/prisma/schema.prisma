@@ -299,7 +299,7 @@ model Week {
   facilitators   WeekFacilitator[]
   topics         WeekTopic[]
   objectives     WeekObjective[]
-  slideDeck      SlideDeck?
+  slideDecks     SlideDeck[]
   glossaryTerms  GlossaryTerm[]
   readingResources ReadingResource[]
   quiz           Quiz?
@@ -386,16 +386,18 @@ model WeekObjective {
 
 model SlideDeck {
   id            String              @id @default(uuid())
-  weekId         String              @unique
+  weekId        String
   title         String
   url           String
   slideCount    Int
   lastUpdatedAt DateTime
+  position      Int                 @default(1)
   viewerType    SlideDeckViewerType @default(EXTERNAL)
 
   week     Week               @relation(fields: [weekId], references: [id], onDelete: Cascade)
   sections SlideDeckSection[]
 
+  @@index([weekId])
   @@map("slide_decks")
 }
 

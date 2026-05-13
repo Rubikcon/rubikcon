@@ -257,6 +257,7 @@ export type WeekDetail = {
     summary: string
   }
   resources: {
+    /** Primary/first slide deck (kept for backwards compatibility). */
     slideDeck: {
       id: string
       title: string
@@ -266,6 +267,17 @@ export type WeekDetail = {
       viewerType: 'MODAL' | 'EXTERNAL'
       sections: string[]
     } | null
+    /** Full list of slide decks attached to this lesson. */
+    slideDecks: Array<{
+      id: string
+      title: string
+      url: string
+      slideCount: number
+      lastUpdatedAt: string
+      viewerType: 'MODAL' | 'EXTERNAL'
+      position: number
+      sections: string[]
+    }>
     glossary: Array<{
       id: string
       term: string

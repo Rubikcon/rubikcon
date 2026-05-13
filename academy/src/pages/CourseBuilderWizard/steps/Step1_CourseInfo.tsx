@@ -190,17 +190,6 @@ export default function Step1_CourseInfo({ wizard, courseId, onNext }: Step1_Cou
               </select>
             </div>
 
-            <div>
-              <label className="flex items-center gap-3 text-white/80 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={wizard.courseData.isPaid}
-                  onChange={e => wizard.updateCourseData({ isPaid: e.target.checked })}
-                  className="w-4 h-4 accent-[#F5C518] rounded"
-                />
-                <span className="text-sm font-medium">This is a paid course</span>
-              </label>
-            </div>
           </div>
 
           <div>

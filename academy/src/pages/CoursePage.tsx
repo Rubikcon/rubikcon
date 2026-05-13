@@ -179,7 +179,7 @@ export default function CoursePage() {
                   className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-bold px-8 py-3.5 rounded-full hover:bg-[#E8B800] transition-colors disabled:opacity-60 text-base"
                 >
                   {enrolling && <Loader2 size={16} className="animate-spin" />}
-                  {enrolling ? 'Enrolling...' : 'Enrol now — free'}
+                  {enrolling ? 'Enrolling...' : 'Enrol now'}
                   {!enrolling && <ArrowRight size={16} />}
                 </button>
                 <a href="/courses" className="text-sm text-white/40 hover:text-white/60 transition-colors">

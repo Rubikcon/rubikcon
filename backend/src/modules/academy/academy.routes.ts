@@ -582,7 +582,8 @@ router.get('/weeks/:weekSlug', optionalAuth, async (req: Request, res: Response,
         objectives: {
           orderBy: { position: 'asc' },
         },
-        slideDeck: {
+        slideDecks: {
+          orderBy: { position: 'asc' },
           include: {
             sections: {
               orderBy: { position: 'asc' },
@@ -736,17 +737,29 @@ router.get('/weeks/:weekSlug', optionalAuth, async (req: Request, res: Response,
         })),
       },
       resources: {
-        slideDeck: week.slideDeck
+        // Keep `slideDeck` (first/primary deck) for backwards compatibility
+        slideDeck: week.slideDecks[0]
           ? {
-              id: week.slideDeck.id,
-              title: week.slideDeck.title,
-              url: week.slideDeck.url,
-              slideCount: week.slideDeck.slideCount,
-              lastUpdatedAt: week.slideDeck.lastUpdatedAt,
-              viewerType: week.slideDeck.viewerType,
-              sections: week.slideDeck.sections.map(section => section.label),
+              id: week.slideDecks[0].id,
+              title: week.slideDecks[0].title,
+              url: week.slideDecks[0].url,
+              slideCount: week.slideDecks[0].slideCount,
+              lastUpdatedAt: week.slideDecks[0].lastUpdatedAt,
+              viewerType: week.slideDecks[0].viewerType,
+              sections: week.slideDecks[0].sections.map(section => section.label),
             }
           : null,
+        // New field — full list of decks for multi-slide rendering
+        slideDecks: week.slideDecks.map(deck => ({
+          id: deck.id,
+          title: deck.title,
+          url: deck.url,
+          slideCount: deck.slideCount,
+          lastUpdatedAt: deck.lastUpdatedAt,
+          viewerType: deck.viewerType,
+          position: deck.position,
+          sections: deck.sections.map(section => section.label),
+        })),
         glossary: week.glossaryTerms.map(term => ({
           id: term.id,
           term: term.term,
@@ -794,7 +807,7 @@ router.get('/weeks/:weekSlug/resources', optionalAuth, async (req: Request, res:
     const week = await prisma.week.findUnique({
       where: { slug: req.params.weekSlug },
       include: {
-        slideDeck: { include: { sections: { orderBy: { position: 'asc' } } } },
+        slideDecks: { orderBy: { position: 'asc' }, include: { sections: { orderBy: { position: 'asc' } } } },
         glossaryTerms: { orderBy: { position: 'asc' } },
         readingResources: { orderBy: { position: 'asc' } },
       },
@@ -818,17 +831,27 @@ router.get('/weeks/:weekSlug/resources', optionalAuth, async (req: Request, res:
     const readResourceIds = new Set(readItems.map(item => item.resourceId))
 
     return sendSuccess(res, {
-      slideDeck: week.slideDeck
+      slideDeck: week.slideDecks[0]
         ? {
-            id: week.slideDeck.id,
-            title: week.slideDeck.title,
-            url: week.slideDeck.url,
-            slideCount: week.slideDeck.slideCount,
-            lastUpdatedAt: week.slideDeck.lastUpdatedAt,
-            viewerType: week.slideDeck.viewerType,
-            sections: week.slideDeck.sections.map(item => item.label),
+            id: week.slideDecks[0].id,
+            title: week.slideDecks[0].title,
+            url: week.slideDecks[0].url,
+            slideCount: week.slideDecks[0].slideCount,
+            lastUpdatedAt: week.slideDecks[0].lastUpdatedAt,
+            viewerType: week.slideDecks[0].viewerType,
+            sections: week.slideDecks[0].sections.map(item => item.label),
           }
         : null,
+      slideDecks: week.slideDecks.map(deck => ({
+        id: deck.id,
+        title: deck.title,
+        url: deck.url,
+        slideCount: deck.slideCount,
+        lastUpdatedAt: deck.lastUpdatedAt,
+        viewerType: deck.viewerType,
+        position: deck.position,
+        sections: deck.sections.map(item => item.label),
+      })),
       glossary: week.glossaryTerms.map(term => ({
         id: term.id,
         term: term.term,
@@ -1877,7 +1900,7 @@ router.get('/admin/courses/:courseId', requireAuth, requireAdmin, async (req: Re
             images: { orderBy: { position: 'asc' } },
             videos: { orderBy: { position: 'asc' } },
             readingResources: { orderBy: { position: 'asc' } },
-            slideDeck: true,
+            slideDecks: { orderBy: { position: 'asc' } },
           },
         },
         approvals: {
@@ -2658,7 +2681,7 @@ router.delete('/admin/courses/:courseId/weeks/:weekId/resources/:resourceId', re
   }
 })
 
-// ─── Slide Deck (1 per week — upsert) ─────────────────────────────────────
+// ─── Slide Decks (multiple per week) ──────────────────────────────────────
 
 const slideDeckSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -2667,7 +2690,7 @@ const slideDeckSchema = z.object({
   viewerType: z.enum(['MODAL', 'EXTERNAL']).default('EXTERNAL'),
 })
 
-// Upsert a slide deck for a week (POST creates or replaces)
+// Add a slide deck to a week (one of many)
 router.post('/admin/courses/:courseId/weeks/:weekId/slides', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId
@@ -2680,28 +2703,63 @@ router.post('/admin/courses/:courseId/weeks/:weekId/slides', requireAuth, requir
     const parsed = slideDeckSchema.safeParse(req.body)
     if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
 
-    const deck = await prisma.slideDeck.upsert({
-      where: { weekId: week.id },
-      update: { ...parsed.data, lastUpdatedAt: new Date() },
-      create: { ...parsed.data, weekId: week.id, lastUpdatedAt: new Date() },
+    const count = await prisma.slideDeck.count({ where: { weekId: week.id } })
+    const deck = await prisma.slideDeck.create({
+      data: {
+        ...parsed.data,
+        weekId: week.id,
+        lastUpdatedAt: new Date(),
+        position: count + 1,
+      },
     })
     await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
-    return sendSuccess(res, deck, 'Slide deck saved.', 201)
+    return sendSuccess(res, deck, 'Slide deck added.', 201)
   } catch (err) {
     next(err)
   }
 })
 
-// Delete a slide deck
-router.delete('/admin/courses/:courseId/weeks/:weekId/slides', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+// Update a specific slide deck
+router.patch('/admin/courses/:courseId/weeks/:weekId/slides/:slideId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId
     const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
     if (!course) return
 
-    const result = await prisma.slideDeck.deleteMany({ where: { weekId: req.params.weekId } })
+    const deck = await prisma.slideDeck.findFirst({
+      where: { id: req.params.slideId, week: { id: req.params.weekId, courseId: course.id } },
+    })
+    if (!deck) return sendError(res, 'Slide deck not found.', 404)
+
+    const parsed = slideDeckSchema.partial().safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const updated = await prisma.slideDeck.update({
+      where: { id: deck.id },
+      data: { ...parsed.data, lastUpdatedAt: new Date() },
+    })
     await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
-    return sendSuccess(res, { deleted: result.count }, 'Slide deck deleted.')
+    return sendSuccess(res, updated, 'Slide deck updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Delete a specific slide deck
+router.delete('/admin/courses/:courseId/weeks/:weekId/slides/:slideId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const deck = await prisma.slideDeck.findFirst({
+      where: { id: req.params.slideId, week: { id: req.params.weekId, courseId: course.id } },
+    })
+    if (!deck) return sendError(res, 'Slide deck not found.', 404)
+
+    await prisma.slideDeck.delete({ where: { id: deck.id } })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
+    return sendSuccess(res, { id: deck.id }, 'Slide deck deleted.')
   } catch (err) {
     next(err)
   }

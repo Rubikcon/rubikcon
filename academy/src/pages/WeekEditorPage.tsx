@@ -44,7 +44,7 @@ type WeekDetail = {
   quiz: ExistingQuiz
   assignments: ExistingAssignment[]
   readingResources: ExistingReadingResource[]
-  slideDeck: ExistingSlideDeck
+  slideDecks: ExistingSlideDeck[]
 }
 
 export default function WeekEditorPage() {
@@ -445,7 +445,7 @@ export default function WeekEditorPage() {
               courseId={courseId!}
               weekId={weekId!}
               resources={week.readingResources || []}
-              slideDeck={week.slideDeck}
+              slideDecks={week.slideDecks || []}
               onChange={loadWeek}
             />
           </Section>

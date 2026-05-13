@@ -431,12 +431,12 @@ export default function LandingPage() {
               <span className="text-[#F5C518]">Web3?</span>
             </h2>
             <p className="text-white/50 text-base max-w-lg mx-auto mb-10 leading-relaxed">
-              Join {totalStudents.toLocaleString()} learners already studying with Rubikcon Academy — completely free to start.
+              Join {totalStudents.toLocaleString()} learners already studying with Rubikcon Academy.
             </p>
             <div className="flex items-center justify-center gap-4 flex-wrap">
               <a href="/courses"
                 className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-semibold px-8 py-3.5 rounded-full hover:bg-[#E8B800] transition-colors text-sm">
-                Browse courses — free →
+                Browse courses →
               </a>
               <a href="/login"
                 className="inline-flex items-center gap-2 border border-white/20 text-white px-7 py-3.5 rounded-full hover:border-white/40 transition-colors text-sm">

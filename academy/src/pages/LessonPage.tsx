@@ -128,7 +128,8 @@ export default function LessonPage() {
   const [assignmentSavingId, setAssignmentSavingId] = useState<string | null>(null)
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, { choiceId?: string; textResponse: string }>>({})
   const [activeVideoIdx, setActiveVideoIdx] = useState(0)
-  const [slideViewerOpen, setSlideViewerOpen] = useState(false)
+  // Active slide-deck id when the modal viewer is open (null = closed)
+  const [activeSlideDeckId, setActiveSlideDeckId] = useState<string | null>(null)
 
   const auth = getStoredAuth()
 
@@ -317,7 +318,7 @@ export default function LessonPage() {
 
   const TABS: Array<{ id: LessonTab; label: string; icon: typeof BookOpen; hidden?: boolean }> = [
     { id: 'overview',    label: 'Overview',    icon: BookOpen },
-    { id: 'resources',   label: 'Resources',   icon: ExternalLink,  hidden: !week.resources.slideDeck && !week.resources.readings.length && !week.resources.glossary.length },
+    { id: 'resources',   label: 'Resources',   icon: ExternalLink,  hidden: !week.resources.slideDecks?.length && !week.resources.readings.length && !week.resources.glossary.length },
     { id: 'quiz',        label: 'Quiz',        icon: HelpCircle,    hidden: !week.assignment.quiz },
     { id: 'assignment',  label: 'Assignment',  icon: ClipboardCheck, hidden: week.assignment.tasks.length === 0 },
   ]
@@ -669,55 +670,78 @@ export default function LessonPage() {
             {/* ── Resources tab ── */}
             {activeTab === 'resources' && (
               <div className="space-y-6">
-                {/* Slide deck */}
-                {week.resources.slideDeck && (
-                  <>
-                    <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-5">
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div>
-                          <p className="text-[11px] font-mono uppercase tracking-widest text-white/30 mb-2">Slide deck</p>
-                          <h4 className="font-semibold text-white mb-1">{week.resources.slideDeck.title}</h4>
-                          <div className="flex flex-wrap gap-3 text-xs text-white/35 mb-3">
-                            <span>{week.resources.slideDeck.slideCount} slides</span>
-                            <span>Updated {new Date(week.resources.slideDeck.lastUpdatedAt).toLocaleDateString()}</span>
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {week.resources.slideDeck.sections.map(section => (
-                              <span key={section} className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-white/50">{section}</span>
-                            ))}
-                          </div>
+                {/* Slide decks — multiple per lesson supported */}
+                {week.resources.slideDecks && week.resources.slideDecks.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-[11px] font-mono uppercase tracking-widest text-white/30">
+                      Slide deck{week.resources.slideDecks.length !== 1 ? 's' : ''} ({week.resources.slideDecks.length})
+                    </p>
+                    {week.resources.slideDecks.map(deck => (
+                      <div key={deck.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-5">
+                        {/* Inline embedded preview for at-a-glance view */}
+                        <div className="rounded-xl overflow-hidden border border-white/10 bg-black aspect-video mb-4">
+                          <iframe
+                            src={deck.url}
+                            title={deck.title}
+                            allow="fullscreen"
+                            allowFullScreen
+                            loading="lazy"
+                            className="w-full h-full"
+                            style={{ border: 0 }}
+                          />
                         </div>
-                        <div className="flex gap-2 flex-wrap flex-shrink-0">
-                          {week.resources.slideDeck.viewerType === 'MODAL' && (
-                            <button
-                              onClick={() => setSlideViewerOpen(true)}
-                              className="inline-flex items-center gap-2 rounded-xl bg-[#F5C518] px-4 py-2.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#FFD020] transition-colors"
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <h4 className="font-semibold text-white mb-1 truncate">{deck.title}</h4>
+                            <div className="flex flex-wrap gap-3 text-xs text-white/35 mb-2">
+                              <span>{deck.slideCount} slide{deck.slideCount !== 1 ? 's' : ''}</span>
+                              <span>Updated {new Date(deck.lastUpdatedAt).toLocaleDateString()}</span>
+                            </div>
+                            {deck.sections.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {deck.sections.map(section => (
+                                  <span key={section} className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-white/50">{section}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2 flex-wrap flex-shrink-0">
+                            {deck.viewerType === 'MODAL' && (
+                              <button
+                                onClick={() => setActiveSlideDeckId(deck.id)}
+                                className="inline-flex items-center gap-2 rounded-xl bg-[#F5C518] px-4 py-2.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#FFD020] transition-colors"
+                              >
+                                View Slides
+                              </button>
+                            )}
+                            <a
+                              href={deck.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition-colors"
                             >
-                              View Slides
-                            </button>
-                          )}
-                          <a
-                            href={week.resources.slideDeck.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition-colors"
-                          >
-                            Open <ExternalLink size={13} />
-                          </a>
+                              Open <ExternalLink size={13} />
+                            </a>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    {slideViewerOpen && (
-                      <SlideViewer
-                        url={week.resources.slideDeck.url}
-                        title={week.resources.slideDeck.title}
-                        slideCount={week.resources.slideDeck.slideCount}
-                        sections={week.resources.slideDeck.sections}
-                        viewerType={week.resources.slideDeck.viewerType}
-                        onClose={() => setSlideViewerOpen(false)}
-                      />
-                    )}
-                  </>
+                    ))}
+                    {/* Modal viewer (only mounted when MODAL-type deck is active) */}
+                    {(() => {
+                      const active = week.resources.slideDecks.find(d => d.id === activeSlideDeckId)
+                      if (!active) return null
+                      return (
+                        <SlideViewer
+                          url={active.url}
+                          title={active.title}
+                          slideCount={active.slideCount}
+                          sections={active.sections}
+                          viewerType={active.viewerType}
+                          onClose={() => setActiveSlideDeckId(null)}
+                        />
+                      )
+                    })()}
+                  </div>
                 )}
 
                 {/* Readings */}

@@ -185,10 +185,6 @@ function CourseCard({
           {course.estimatedDuration && (
             <span className="flex items-center gap-1"><Clock size={9} />{course.estimatedDuration}</span>
           )}
-          <span className="flex items-center gap-1">
-            <Star size={9} className="text-[#F5C518]/60" fill="currentColor" />
-            Free
-          </span>
         </div>
 
         {/* Progress */}
@@ -667,7 +663,7 @@ export default function CoursesPage() {
             <div className="relative p-10 md:p-14 text-center">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#F5C518]/20 bg-[#F5C518]/8 px-3 py-1 text-[10px] font-mono text-[#F5C518]/70 mb-4 uppercase tracking-widest">
                 <Zap size={9} />
-                Free forever
+                Get started
               </div>
               <h3 className="font-display text-3xl md:text-4xl font-extrabold text-white mb-3 leading-tight">
                 Start your Web3 journey<br />
@@ -678,7 +674,7 @@ export default function CoursesPage() {
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <a href="/login?mode=signup" className="inline-flex items-center gap-2 rounded-full bg-[#F5C518] px-7 py-3 text-sm font-bold text-[#0A0A0A] hover:bg-[#FFD020] transition-colors shadow-[0_4px_32px_rgba(245,197,24,0.25)]">
-                  Create free account <ArrowRight size={14} />
+                  Create account <ArrowRight size={14} />
                 </a>
                 <a href="/login" className="inline-flex items-center gap-2 rounded-full border border-white/12 px-7 py-3 text-sm text-white/60 hover:border-white/25 hover:text-white transition-colors">
                   Log in
