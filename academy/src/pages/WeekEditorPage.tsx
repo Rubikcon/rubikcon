@@ -22,6 +22,7 @@ import { getStoredAuth } from '../lib/auth'
 import QuizEditor, { type ExistingQuiz } from './WeekEditor/QuizEditor'
 import AssignmentEditor, { type ExistingAssignment } from './WeekEditor/AssignmentEditor'
 import ResourcesEditor, { type ExistingReadingResource, type ExistingSlideDeck } from './WeekEditor/ResourcesEditor'
+import GlossaryEditor, { type ExistingGlossaryTerm } from './WeekEditor/GlossaryEditor'
 
 type WeekDetail = {
   id: string
@@ -45,6 +46,7 @@ type WeekDetail = {
   assignments: ExistingAssignment[]
   readingResources: ExistingReadingResource[]
   slideDecks: ExistingSlideDeck[]
+  glossaryTerms: ExistingGlossaryTerm[]
 }
 
 export default function WeekEditorPage() {
@@ -446,6 +448,16 @@ export default function WeekEditorPage() {
               weekId={weekId!}
               resources={week.readingResources || []}
               slideDecks={week.slideDecks || []}
+              onChange={loadWeek}
+            />
+          </Section>
+
+          {/* Glossary */}
+          <Section title="Glossary" icon={ListChecks}>
+            <GlossaryEditor
+              courseId={courseId!}
+              weekId={weekId!}
+              terms={week.glossaryTerms || []}
               onChange={loadWeek}
             />
           </Section>

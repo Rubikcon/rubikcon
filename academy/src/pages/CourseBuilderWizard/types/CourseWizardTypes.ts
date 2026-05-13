@@ -31,6 +31,7 @@ export type CourseFormData = {
   // Media
   introVideoUrl: string
   overviewSlideUrl: string  // Canva, Google Slides, etc.
+  heroImage: string         // URL to hero image used on course cards
 }
 
 // ─── Module Form Data ─────────────────────────────────────────────────────

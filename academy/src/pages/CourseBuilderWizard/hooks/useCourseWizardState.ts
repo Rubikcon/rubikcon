@@ -32,6 +32,7 @@ function getInitialWizardState(courseId: string): WizardState {
       isPaid: false,
       introVideoUrl: '',
       overviewSlideUrl: '',
+      heroImage: '',
     },
     modules: [],
     lessons: {},

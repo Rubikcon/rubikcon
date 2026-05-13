@@ -61,6 +61,7 @@ export default function CourseBuilderWizard({ params }: CourseBuilderWizardProps
           isPaid: course.isPaid,
           introVideoUrl: course.introVideoUrl || '',
           overviewSlideUrl: course.overviewSlideUrl || '',
+          heroImage: course.heroImage || '',
         })
 
         // Populate modules

@@ -51,6 +51,7 @@ export default function Step1_CourseInfo({ wizard, courseId, onNext }: Step1_Cou
       if (wizard.courseData.contentUnit.trim()) payload.contentUnit = wizard.courseData.contentUnit.trim()
       if (wizard.courseData.introVideoUrl.trim()) payload.introVideoUrl = wizard.courseData.introVideoUrl.trim()
       if (wizard.courseData.overviewSlideUrl.trim()) payload.overviewSlideUrl = wizard.courseData.overviewSlideUrl.trim()
+      if (wizard.courseData.heroImage.trim()) payload.heroImage = wizard.courseData.heroImage.trim()
 
       await apiRequest(`/academy/admin/courses/${courseId}`, {
         method: 'PATCH',
@@ -251,6 +252,54 @@ export default function Step1_CourseInfo({ wizard, courseId, onNext }: Step1_Cou
             <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
               Unable to embed this video. Make sure you've pasted a valid YouTube, Vimeo, Loom, or Google Drive link.
             </div>
+          )}
+        </div>
+
+        {/* Course Hero Image */}
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-[#F5C518]">
+              <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="2" />
+              <path d="M21 15l-5-5L5 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            <h2 className="text-lg font-semibold text-white">Hero Image</h2>
+          </div>
+          <p className="text-sm text-white/60">
+            Background image shown on course cards in the listing. Wide landscape image works best (16:9 or similar).
+          </p>
+
+          <div>
+            <label className="block text-sm font-medium text-white/80 mb-2">
+              Image URL
+            </label>
+            <input
+              value={wizard.courseData.heroImage}
+              onChange={e => wizard.updateCourseData({ heroImage: e.target.value })}
+              type="url"
+              placeholder="https://... — direct image link (jpg, png, webp)"
+              className="w-full rounded-xl border border-white/12 bg-black/20 px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#F5C518]/40 transition-colors"
+            />
+            <p className="mt-1 text-xs text-white/40">
+              Leave empty to use the default gradient backdrop.
+            </p>
+          </div>
+
+          {/* Preview */}
+          {wizard.courseData.heroImage && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-xl overflow-hidden border border-white/10 bg-black/40 aspect-video"
+            >
+              <img
+                src={wizard.courseData.heroImage}
+                alt="Hero preview"
+                loading="lazy"
+                className="w-full h-full object-cover"
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+              />
+            </motion.div>
           )}
         </div>
 

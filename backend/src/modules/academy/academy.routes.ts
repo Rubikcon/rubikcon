@@ -1680,10 +1680,22 @@ const createWeekSchema = z.object({
 
 const updateWeekSchema = createWeekSchema.partial()
 
+const quizQuestionInputSchema = z.object({
+  prompt: z.string().trim().min(5).max(2000),
+  explanation: z.string().trim().max(2000).default(''),
+  options: z.array(z.object({
+    label: z.string().trim().min(1).max(500),
+    isCorrect: z.boolean().default(false),
+  })).min(2).max(8),
+})
+
 const createQuizSchema = z.object({
   title: z.string().trim().min(3).max(200),
   passMark: z.number().int().min(1).max(100).default(70),
   attemptLimit: z.number().int().min(1).max(10).default(1),
+  // Allow creating an empty-quiz shell so admins can add questions one by one
+  // afterwards. Backwards compatible — existing callers can still send a full
+  // list of questions in one shot.
   questions: z.array(z.object({
     prompt: z.string().trim().min(5).max(2000),
     explanation: z.string().trim().max(2000).default(''),
@@ -1693,7 +1705,13 @@ const createQuizSchema = z.object({
       isCorrect: z.boolean().default(false),
       position: z.number().int().min(1),
     })).min(2).max(8),
-  })).min(1).max(30),
+  })).min(0).max(30).default([]),
+})
+
+const quizSettingsSchema = z.object({
+  title: z.string().trim().min(3).max(200).optional(),
+  passMark: z.number().int().min(1).max(100).optional(),
+  attemptLimit: z.number().int().min(1).max(10).optional(),
 })
 
 const createAssignmentSchema = z.object({
@@ -1901,6 +1919,7 @@ router.get('/admin/courses/:courseId', requireAuth, requireAdmin, async (req: Re
             videos: { orderBy: { position: 'asc' } },
             readingResources: { orderBy: { position: 'asc' } },
             slideDecks: { orderBy: { position: 'asc' } },
+            glossaryTerms: { orderBy: { position: 'asc' } },
           },
         },
         approvals: {
@@ -2526,6 +2545,141 @@ router.post('/admin/courses/:courseId/weeks/:weekId/quiz', requireAuth, requireA
   }
 })
 
+// ─── Granular quiz editing (per-question) ─────────────────────────────────
+
+// Update only quiz settings (title, pass mark, attempt limit) — doesn't touch questions
+router.patch('/admin/courses/:courseId/weeks/:weekId/quiz/settings', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const quiz = await prisma.quiz.findFirst({ where: { weekId: week.id } })
+    if (!quiz) return sendError(res, 'Quiz not found. Create the quiz first.', 404)
+
+    const parsed = quizSettingsSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const updated = await prisma.quiz.update({ where: { id: quiz.id }, data: parsed.data })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
+    return sendSuccess(res, updated, 'Quiz settings updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Add a question (with options) to an existing quiz
+router.post('/admin/courses/:courseId/weeks/:weekId/quiz/questions', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const quiz = await prisma.quiz.findFirst({ where: { weekId: week.id } })
+    if (!quiz) return sendError(res, 'Quiz not found. Create the quiz first.', 404)
+
+    const parsed = quizQuestionInputSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const count = await prisma.quizQuestion.count({ where: { quizId: quiz.id } })
+    if (count >= 30) return sendError(res, 'Quiz cannot have more than 30 questions.', 400)
+
+    const question = await prisma.quizQuestion.create({
+      data: {
+        quizId: quiz.id,
+        prompt: parsed.data.prompt,
+        explanation: parsed.data.explanation,
+        position: count + 1,
+        options: {
+          create: parsed.data.options.map((o, i) => ({
+            label: o.label,
+            isCorrect: o.isCorrect,
+            position: i + 1,
+          })),
+        },
+      },
+      include: { options: { orderBy: { position: 'asc' } } },
+    })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
+    return sendSuccess(res, question, 'Question added.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Update a single question (prompt + explanation + replace options)
+router.patch('/admin/courses/:courseId/weeks/:weekId/quiz/questions/:questionId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const question = await prisma.quizQuestion.findFirst({
+      where: { id: req.params.questionId, quiz: { week: { id: req.params.weekId, courseId: course.id } } },
+    })
+    if (!question) return sendError(res, 'Question not found.', 404)
+
+    const parsed = quizQuestionInputSchema.partial().safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    // Update question fields; replace options if provided
+    await prisma.$transaction(async (tx) => {
+      const updateData: { prompt?: string; explanation?: string } = {}
+      if (parsed.data.prompt !== undefined) updateData.prompt = parsed.data.prompt
+      if (parsed.data.explanation !== undefined) updateData.explanation = parsed.data.explanation
+      if (Object.keys(updateData).length > 0) {
+        await tx.quizQuestion.update({ where: { id: question.id }, data: updateData })
+      }
+      if (parsed.data.options) {
+        await tx.quizOption.deleteMany({ where: { questionId: question.id } })
+        await tx.quizOption.createMany({
+          data: parsed.data.options.map((o, i) => ({
+            questionId: question.id,
+            label: o.label,
+            isCorrect: o.isCorrect,
+            position: i + 1,
+          })),
+        })
+      }
+    })
+
+    const updated = await prisma.quizQuestion.findUnique({
+      where: { id: question.id },
+      include: { options: { orderBy: { position: 'asc' } } },
+    })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
+    return sendSuccess(res, updated, 'Question updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Delete a single question
+router.delete('/admin/courses/:courseId/weeks/:weekId/quiz/questions/:questionId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const question = await prisma.quizQuestion.findFirst({
+      where: { id: req.params.questionId, quiz: { week: { id: req.params.weekId, courseId: course.id } } },
+    })
+    if (!question) return sendError(res, 'Question not found.', 404)
+
+    await prisma.quizQuestion.delete({ where: { id: question.id } })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
+    return sendSuccess(res, { id: question.id }, 'Question deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
 // Create assignment for a week
 router.post('/admin/courses/:courseId/weeks/:weekId/assignments', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -2599,6 +2753,96 @@ router.delete('/admin/courses/:courseId/weeks/:weekId/quiz', requireAuth, requir
     const result = await prisma.quiz.deleteMany({ where: { weekId: week.id } })
     await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, { deleted: result.count }, 'Quiz deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── Glossary Terms (per week) ────────────────────────────────────────────
+
+const glossaryTermSchema = z.object({
+  term: z.string().trim().min(1).max(200),
+  definition: z.string().trim().min(1).max(2000),
+  example: z.string().trim().max(2000).optional().nullable(),
+})
+
+router.post('/admin/courses/:courseId/weeks/:weekId/glossary', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const parsed = glossaryTermSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    // Term is unique per week — reject duplicates with a friendly message
+    const existing = await prisma.glossaryTerm.findUnique({
+      where: { weekId_term: { weekId: week.id, term: parsed.data.term } },
+    })
+    if (existing) return sendError(res, `A glossary term "${parsed.data.term}" already exists for this lesson.`, 409)
+
+    const count = await prisma.glossaryTerm.count({ where: { weekId: week.id } })
+    const term = await prisma.glossaryTerm.create({
+      data: {
+        weekId: week.id,
+        term: parsed.data.term,
+        definition: parsed.data.definition,
+        example: parsed.data.example || null,
+        position: count + 1,
+      },
+    })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
+    return sendSuccess(res, term, 'Glossary term added.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.patch('/admin/courses/:courseId/weeks/:weekId/glossary/:termId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const term = await prisma.glossaryTerm.findFirst({
+      where: { id: req.params.termId, week: { id: req.params.weekId, courseId: course.id } },
+    })
+    if (!term) return sendError(res, 'Glossary term not found.', 404)
+
+    const parsed = glossaryTermSchema.partial().safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const updated = await prisma.glossaryTerm.update({
+      where: { id: term.id },
+      data: {
+        ...parsed.data,
+        example: parsed.data.example === undefined ? undefined : (parsed.data.example || null),
+      },
+    })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
+    return sendSuccess(res, updated, 'Glossary term updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.delete('/admin/courses/:courseId/weeks/:weekId/glossary/:termId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const term = await prisma.glossaryTerm.findFirst({
+      where: { id: req.params.termId, week: { id: req.params.weekId, courseId: course.id } },
+    })
+    if (!term) return sendError(res, 'Glossary term not found.', 404)
+
+    await prisma.glossaryTerm.delete({ where: { id: term.id } })
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
+    return sendSuccess(res, { id: term.id }, 'Glossary term deleted.')
   } catch (err) {
     next(err)
   }
