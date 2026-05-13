@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'wouter'
 import { motion } from 'framer-motion'
-import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, Clock3, Loader2, PlayCircle, Users } from 'lucide-react'
+import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, Clock3, Loader2, PlayCircle, Users, Video } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
+import VideoEmbed from '../components/VideoEmbed'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
 import type { CourseSummary } from '../types/academy'
@@ -384,6 +385,21 @@ export default function CoursePage() {
                 </div>
               )}
             </motion.div>
+
+            {/* Course Preview Video */}
+            {course.introVideoUrl && (
+              <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Video size={14} className="text-[#F5C518]" />
+                  <h3 className="text-sm font-mono uppercase tracking-[0.18em] text-white/40">
+                    Course preview
+                  </h3>
+                </div>
+                <div className="rounded-xl overflow-hidden border border-white/10 bg-black">
+                  <VideoEmbed url={course.introVideoUrl} title={`${course.title} — preview`} />
+                </div>
+              </div>
+            )}
 
             {/* Course Overview Slides */}
             {course.overviewSlideUrl && (
