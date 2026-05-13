@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'wouter'
 import { motion } from 'framer-motion'
-import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, Clock3, Loader2, PlayCircle, Users, Video } from 'lucide-react'
+import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, Clock3, Loader2, PlayCircle, Users } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
 import VideoEmbed from '../components/VideoEmbed'
 import { apiRequest } from '../lib/api'
@@ -367,6 +367,13 @@ export default function CoursePage() {
               <h2 className="font-display text-3xl md:text-4xl font-extrabold text-white leading-tight mb-3">{course.title}</h2>
               <p className="text-white/55 leading-relaxed mb-6">{course.description}</p>
 
+              {/* Course preview video — blended into the hero, sits between the description and the CTAs */}
+              {course.introVideoUrl && (
+                <div className="mb-6 rounded-2xl overflow-hidden border border-white/10 bg-black/40">
+                  <VideoEmbed url={course.introVideoUrl} title={`${course.title} — preview`} />
+                </div>
+              )}
+
               {continueWeek && (
                 <div className="flex flex-wrap items-center gap-3">
                   <a
@@ -385,21 +392,6 @@ export default function CoursePage() {
                 </div>
               )}
             </motion.div>
-
-            {/* Course Preview Video */}
-            {course.introVideoUrl && (
-              <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <Video size={14} className="text-[#F5C518]" />
-                  <h3 className="text-sm font-mono uppercase tracking-[0.18em] text-white/40">
-                    Course preview
-                  </h3>
-                </div>
-                <div className="rounded-xl overflow-hidden border border-white/10 bg-black">
-                  <VideoEmbed url={course.introVideoUrl} title={`${course.title} — preview`} />
-                </div>
-              </div>
-            )}
 
             {/* Course Overview Slides */}
             {course.overviewSlideUrl && (
