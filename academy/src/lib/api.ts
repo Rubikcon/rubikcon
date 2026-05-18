@@ -42,10 +42,22 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   return payload.data
 }
 
-export async function login(email: string, password: string) {
-  const result = await apiRequest<{ user: StoredAuth['user']; token: string }>('/auth/login', {
+type LoginOptions = {
+  /** When true and the user is at the device limit, expire other sessions before issuing this login. */
+  forceLogoutOthers?: boolean
+}
+
+export type LoginResult = {
+  user: StoredAuth['user']
+  token: string
+  /** Present when the user logged in with a blank password during an active password reset window. */
+  resetToken?: string
+}
+
+export async function login(email: string, password: string, options: LoginOptions = {}): Promise<LoginResult> {
+  const result = await apiRequest<LoginResult>('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, forceLogoutOthers: options.forceLogoutOthers }),
   })
 
   setStoredAuth({

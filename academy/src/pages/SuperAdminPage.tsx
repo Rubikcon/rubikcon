@@ -991,16 +991,16 @@ export default function SuperAdminPage() {
               <ol className="text-white/60 space-y-1.5 text-xs leading-relaxed ml-4 list-decimal">
                 <li>Go to the login page</li>
                 <li>Enter your email address</li>
-                <li>Leave the password field empty and click "Login with reset"</li>
+                <li>Leave the password field <strong className="text-white">empty</strong> and click <strong className="text-white">Log in</strong></li>
                 <li>You'll be prompted to set a new password</li>
-                <li>This reset link is valid for 10 minutes</li>
+                <li>This reset window is valid for 10 minutes</li>
               </ol>
             </div>
 
             <div className="flex gap-3">
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(`Password reset token: ${resetPasswordData.resetToken}\n\nValid until: ${new Date(resetPasswordData.expiresAt).toLocaleString()}\n\nInstructions:\n1. Go to login\n2. Enter email\n3. Leave password empty\n4. Click "Login with reset"\n5. Set new password`)
+                  navigator.clipboard.writeText(`Your Rubikcon Academy password has been reset.\n\nValid until: ${new Date(resetPasswordData.expiresAt).toLocaleString()}\n\nHow to sign in:\n1. Go to https://www.rubikconacademy.xyz/login\n2. Enter your email address\n3. Leave the password field empty\n4. Click "Log in"\n5. You'll be prompted to set a new password\n\n(The reset window expires in 10 minutes — please sign in before then.)`)
                 }}
                 className="flex-1 rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
               >

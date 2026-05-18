@@ -17,7 +17,11 @@ const signupSchema = z.object({
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
+  password: z.string().min(0), // password can be empty during password-reset window
+  // When true and the device limit has been hit, expire all existing
+  // sessions for this user before issuing the new one. Used by the
+  // "Sign out other devices" flow on the login page.
+  forceLogoutOthers: z.boolean().optional(),
 })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -98,7 +102,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
     }
 
-    const { password } = parsed.data
+    const { password, forceLogoutOthers } = parsed.data
     const email = parsed.data.email.trim().toLowerCase()
 
     const user = await prisma.user.findUnique({
@@ -117,16 +121,32 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       return sendError(res, 'Invalid email or password.', 401)
     }
 
-    // Check active sessions (limit to 5 concurrent devices)
+    // Check active sessions (limit to 5 concurrent devices). If the user
+    // opted in via `forceLogoutOthers`, expire all existing sessions first
+    // so they can sign in cleanly without juggling other devices.
     const activeSessions = await prisma.session.findMany({
       where: {
         userId: user.id,
         expiresAt: { gt: new Date() },
       },
+      orderBy: { createdAt: 'asc' },
     })
 
-    if (activeSessions.length >= 5) {
-      return sendError(res, 'Too many devices logged in. Please log out on another device to continue.', 401)
+    const DEVICE_LIMIT = 5
+    if (activeSessions.length >= DEVICE_LIMIT) {
+      if (forceLogoutOthers) {
+        await prisma.session.updateMany({
+          where: { userId: user.id, expiresAt: { gt: new Date() } },
+          data: { expiresAt: new Date() },
+        })
+      } else {
+        return sendError(
+          res,
+          `You're signed in on ${activeSessions.length} other device${activeSessions.length === 1 ? '' : 's'}. Sign out on another device, or use "Sign out other devices" below to continue here.`,
+          401,
+          { code: 'DEVICE_LIMIT', activeSessions: activeSessions.length, limit: DEVICE_LIMIT }
+        )
+      }
     }
 
     const onboardingCompleted = user.profile?.onboardingCompleted ?? false

@@ -1,8 +1,10 @@
 import { FormEvent, useMemo, useState } from 'react'
 import { useLocation } from 'wouter'
-import { Check, X } from 'lucide-react'
+import { Check, X, KeyRound, ShieldAlert, Loader2 } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
-import { login, signup } from '../lib/api'
+import { apiRequest, login, signup, ApiError } from '../lib/api'
+import type { StoredAuth } from '../lib/auth'
+import { setStoredAuth, getStoredAuth } from '../lib/auth'
 
 export default function LoginPage() {
   const [, setLocation] = useLocation()
@@ -17,6 +19,19 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  // Device limit handling
+  const [deviceLimitHit, setDeviceLimitHit] = useState<{ count: number } | null>(null)
+  const [signingOutOthers, setSigningOutOthers] = useState(false)
+
+  // Forgot password info dialog
+  const [showForgotInfo, setShowForgotInfo] = useState(false)
+
+  // Set new password flow (entered after login with blank password during reset window)
+  const [resetContext, setResetContext] = useState<{ resetToken: string; user: StoredAuth['user'] } | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [savingNewPassword, setSavingNewPassword] = useState(false)
 
   // Validation helpers
   const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
@@ -34,34 +49,98 @@ export default function LoginPage() {
     return strength
   }, [password])
 
+  // Login allows blank password (so users can sign in with the reset window after
+  // an admin has initiated a password reset). Signup still requires full credentials.
   const canSubmit = mode === 'login'
-    ? email && isValidEmail(email) && password
-    : name && isNameValid(name) && email && isValidEmail(email) && isPasswordValid(password)
+    ? !!email && isValidEmail(email)
+    : !!name && isNameValid(name) && !!email && isValidEmail(email) && isPasswordValid(password)
+
+  function redirectAfterAuth(user: StoredAuth['user']) {
+    if (user.role === 'SUPER_ADMIN') return setLocation('/admin/superadmin')
+    if (user.role === 'ADMIN') return setLocation('/admin/academy')
+    if (!user.onboardingCompleted) return setLocation('/onboarding')
+    setLocation('/dashboard')
+  }
+
+  async function attemptLogin(opts: { forceLogoutOthers?: boolean } = {}) {
+    const result = await login(email, password, opts)
+
+    // If the user was given a reset token (logged in with blank password during reset),
+    // hold them at the "set new password" form before sending them on.
+    if (result.resetToken) {
+      setResetContext({ resetToken: result.resetToken, user: result.user })
+      return
+    }
+    redirectAfterAuth(result.user)
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     try {
       setSubmitting(true)
       setError(null)
+      setDeviceLimitHit(null)
       if (mode === 'login') {
-        const result = await login(email, password)
-        if (result.user.role === 'SUPER_ADMIN') {
-          setLocation('/admin/superadmin')
-        } else if (result.user.role === 'ADMIN') {
-          setLocation('/admin/academy')
-        } else if (!result.user.onboardingCompleted) {
-          setLocation('/onboarding')
-        } else {
-          setLocation('/dashboard')
-        }
+        await attemptLogin()
       } else {
-        await signup(name, email, password)
-        setLocation('/onboarding')
+        const result = await signup(name, email, password)
+        redirectAfterAuth(result.user)
       }
     } catch (err) {
+      // Detect device-limit error by error code on the API response
+      if (err instanceof ApiError && (err.errors as any)?.code === 'DEVICE_LIMIT') {
+        setDeviceLimitHit({ count: (err.errors as any).activeSessions ?? 5 })
+      }
       setError(err instanceof Error ? err.message : 'Unable to authenticate.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleSignOutOthers() {
+    try {
+      setSigningOutOthers(true)
+      setError(null)
+      await attemptLogin({ forceLogoutOthers: true })
+      setDeviceLimitHit(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to sign out other devices.')
+    } finally {
+      setSigningOutOthers(false)
+    }
+  }
+
+  async function handleSetNewPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!resetContext) return
+    if (!isPasswordValid(newPassword)) {
+      setError('New password must be at least 8 characters')
+      return
+    }
+    if (newPassword !== confirmNewPassword) {
+      setError('Passwords do not match')
+      return
+    }
+    try {
+      setSavingNewPassword(true)
+      setError(null)
+      await apiRequest('/auth/confirm-reset-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          resetToken: resetContext.resetToken,
+          newPassword,
+        }),
+      })
+      // Keep the existing token but ensure the stored user record is fresh
+      const existing = getStoredAuth()
+      if (existing) {
+        setStoredAuth({ token: existing.token, user: resetContext.user })
+      }
+      redirectAfterAuth(resetContext.user)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to set new password.')
+    } finally {
+      setSavingNewPassword(false)
     }
   }
 
@@ -199,6 +278,17 @@ export default function LoginPage() {
               {error && (
                 <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
                   {error}
+                  {deviceLimitHit && (
+                    <button
+                      type="button"
+                      onClick={handleSignOutOthers}
+                      disabled={signingOutOthers}
+                      className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-full border border-red-300/40 bg-red-500/20 px-4 py-2 text-xs font-semibold text-red-100 hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                    >
+                      {signingOutOthers ? <Loader2 size={12} className="animate-spin" /> : <ShieldAlert size={12} />}
+                      Sign out other devices and log in here
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -224,10 +314,122 @@ export default function LoginPage() {
               >
                 {submitting ? 'Please wait...' : mode === 'login' ? 'Log in' : 'Create account'}
               </button>
+
+              {mode === 'login' && (
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotInfo(true)}
+                    className="text-xs text-white/50 hover:text-[#F5C518] transition-colors inline-flex items-center gap-1"
+                  >
+                    <KeyRound size={11} />
+                    Forgot password?
+                  </button>
+                </div>
+              )}
             </form>
           </section>
         </div>
       </main>
+
+      {/* ─── Forgot password info dialog ───────────────────────────────── */}
+      {showForgotInfo && (
+        <div
+          onClick={() => setShowForgotInfo(false)}
+          className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#0F0F11] p-6 space-y-4"
+          >
+            <div className="flex items-center gap-2 text-[#F5C518]">
+              <KeyRound size={18} />
+              <h3 className="text-lg font-semibold text-white">Forgot your password?</h3>
+            </div>
+            <div className="text-sm text-white/70 space-y-3 leading-relaxed">
+              <p>
+                Email a super admin at{' '}
+                <a href="mailto:support@rubikconnexus.com" className="text-[#F5C518] hover:text-[#E8B800] underline">
+                  support@rubikconnexus.com
+                </a>{' '}
+                from the email address tied to your account.
+              </p>
+              <ol className="list-decimal ml-5 space-y-1.5 text-white/65">
+                <li>A super admin will initiate a password reset on your account.</li>
+                <li>
+                  Within 10 minutes of the reset, come back to this page, enter your email, and <strong className="text-white">leave the password field blank</strong>.
+                </li>
+                <li>Click <strong className="text-white">Log in</strong>.</li>
+                <li>You'll then be prompted to set a new password.</li>
+              </ol>
+              <p className="text-xs text-white/40">
+                Tip: keep this page open while emailing the admin so you can sign in immediately after they confirm.
+              </p>
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowForgotInfo(false)}
+                className="rounded-full bg-[#F5C518] px-4 py-2 text-xs font-semibold text-black hover:bg-[#E8B800] transition-colors"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Set new password (post-reset login) ────────────────────────── */}
+      {resetContext && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[24px] border border-[#F5C518]/30 bg-[#0F0F11] p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <KeyRound size={18} className="text-[#F5C518]" />
+              <h3 className="text-lg font-semibold text-white">Set a new password</h3>
+            </div>
+            <p className="text-sm text-white/60 leading-relaxed">
+              You signed in using a password reset. Choose a new password before continuing.
+            </p>
+            <form onSubmit={handleSetNewPassword} className="space-y-3">
+              <div>
+                <label className="block text-xs text-white/50 mb-1">New password (min 8 chars)</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  autoFocus
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-white/50 mb-1">Confirm new password</label>
+                <input
+                  type="password"
+                  value={confirmNewPassword}
+                  onChange={e => setConfirmNewPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40 transition-colors"
+                />
+              </div>
+              {error && (
+                <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-100">
+                  {error}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={savingNewPassword || newPassword.length < 8 || newPassword !== confirmNewPassword}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#F5C518] px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-40 hover:bg-[#E8B800] transition-colors"
+              >
+                {savingNewPassword ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                Set new password & continue
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
