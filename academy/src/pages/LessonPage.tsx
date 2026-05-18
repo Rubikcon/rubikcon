@@ -15,6 +15,7 @@ import {
   Loader2,
   Mail,
   Play,
+  Presentation,
   Search,
   X,
 } from 'lucide-react'
@@ -24,7 +25,7 @@ import VideoEmbed, { getEmbedUrl } from '../components/VideoEmbed'
 import SlideViewer from '../components/SlideViewer'
 import type { CourseSummary, CourseWeekSummary, ReadingType, WeekDetail } from '../types/academy'
 
-type LessonTab = 'overview' | 'resources' | 'quiz' | 'assignment'
+type LessonTab = 'overview' | 'slides' | 'resources' | 'quiz' | 'assignment'
 
 const RESOURCE_TAGS: ReadingType[] = ['ARTICLE', 'COURSE', 'DOCUMENTATION', 'WHITEPAPER', 'VIDEO', 'INTERACTIVE']
 
@@ -318,8 +319,9 @@ export default function LessonPage() {
 
   const TABS: Array<{ id: LessonTab; label: string; icon: typeof BookOpen; hidden?: boolean }> = [
     { id: 'overview',    label: 'Overview',    icon: BookOpen },
-    { id: 'resources',   label: 'Resources',   icon: ExternalLink,  hidden: !week.resources.slideDecks?.length && !week.resources.readings.length && !week.resources.glossary.length },
-    { id: 'quiz',        label: 'Quiz',        icon: HelpCircle,    hidden: !week.assignment.quiz },
+    { id: 'slides',      label: 'Slides',      icon: Presentation,   hidden: !week.resources.slideDecks?.length },
+    { id: 'resources',   label: 'Resources',   icon: ExternalLink,   hidden: !week.resources.readings.length && !week.resources.glossary.length },
+    { id: 'quiz',        label: 'Quiz',        icon: HelpCircle,     hidden: !week.assignment.quiz },
     { id: 'assignment',  label: 'Assignment',  icon: ClipboardCheck, hidden: week.assignment.tasks.length === 0 },
   ]
 
@@ -437,56 +439,60 @@ export default function LessonPage() {
         {/* Scrollable area */}
         <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
 
-          {/* ── Video Player ── */}
+          {/* ── Video Player + side playlist (when lesson has multiple videos) ── */}
           {week.videos.length > 0 && (
-            <div className="bg-black">
+            <div className="bg-black flex flex-col lg:flex-row">
               {/* Primary player */}
-              {activeVideo && (
-                embedSrc ? (
-                  <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
-                    <iframe
-                      key={activeVideo.id}
-                      src={embedSrc}
-                      title={activeVideo.title}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                      allowFullScreen
-                      className="absolute inset-0 w-full h-full"
-                      style={{ border: 0 }}
-                    />
-                  </div>
-                ) : (
-                  /* Direct video file — HTML5 player */
-                  <div className="relative w-full bg-black" style={{ paddingTop: '56.25%' }}>
-                    <video
-                      key={activeVideo.id}
-                      src={activeVideo.url}
-                      controls
-                      controlsList="nodownload"
-                      className="absolute inset-0 w-full h-full"
-                      style={{ background: '#000' }}
-                    >
-                      Your browser does not support embedded video.{' '}
-                      <a href={activeVideo.url} target="_blank" rel="noreferrer" className="text-[#F5C518] underline">
-                        Open video
-                      </a>
-                    </video>
-                  </div>
-                )
-              )}
-
-              {/* Video playlist (if multiple) — VERTICAL list, prominent header */}
-              {week.videos.length > 1 && (
-                <div className="border-t border-white/[0.07] bg-black/40 px-4 py-3">
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <div className="w-6 h-6 rounded-full bg-[#F5C518] text-[#0A0A0A] flex items-center justify-center text-[10px] font-bold">
-                      {week.videos.length}
+              <div className="flex-1 min-w-0">
+                {activeVideo && (
+                  embedSrc ? (
+                    <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
+                      <iframe
+                        key={activeVideo.id}
+                        src={embedSrc}
+                        title={activeVideo.title}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                        allowFullScreen
+                        className="absolute inset-0 w-full h-full"
+                        style={{ border: 0 }}
+                      />
                     </div>
-                    <p className="text-sm font-semibold text-white">
-                      Videos in this lesson
-                    </p>
-                    <p className="text-xs text-white/40 ml-1">— click to switch</p>
+                  ) : (
+                    /* Direct video file — HTML5 player */
+                    <div className="relative w-full bg-black" style={{ paddingTop: '56.25%' }}>
+                      <video
+                        key={activeVideo.id}
+                        src={activeVideo.url}
+                        controls
+                        controlsList="nodownload"
+                        className="absolute inset-0 w-full h-full"
+                        style={{ background: '#000' }}
+                      >
+                        Your browser does not support embedded video.{' '}
+                        <a href={activeVideo.url} target="_blank" rel="noreferrer" className="text-[#F5C518] underline">
+                          Open video
+                        </a>
+                      </video>
+                    </div>
+                  )
+                )}
+              </div>
+
+              {/* Video playlist sidebar — sits BESIDE the player on lg+ screens, stacks below on smaller */}
+              {week.videos.length > 1 && (
+                <aside className="lg:w-[320px] lg:flex-shrink-0 lg:border-l border-t lg:border-t-0 border-white/[0.07] bg-black/60 lg:max-h-[56.25vw] lg:overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                  <div className="sticky top-0 z-10 bg-black/95 backdrop-blur-sm px-4 py-3 border-b border-white/[0.07]">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-[#F5C518] text-[#0A0A0A] flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                        {week.videos.length}
+                      </div>
+                      <p className="text-sm font-semibold text-white">
+                        Videos in this lesson
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-white/40 mt-0.5 ml-8">Click any video to play</p>
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="p-3 space-y-1.5">
                     {week.videos.map((v, i) => (
                       <button
                         key={v.id}
@@ -506,16 +512,16 @@ export default function LessonPage() {
                             <span className="text-[11px] font-semibold">{i + 1}</span>
                           )}
                         </div>
-                        <span className="flex-1 truncate">{v.title}</span>
+                        <span className="flex-1 truncate text-xs leading-snug">{v.title}</span>
                         {i === activeVideoIdx && (
-                          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#F5C518] flex-shrink-0">
-                            Now playing
+                          <span className="text-[9px] font-semibold uppercase tracking-wider text-[#F5C518] flex-shrink-0">
+                            Playing
                           </span>
                         )}
                       </button>
                     ))}
                   </div>
-                </div>
+                </aside>
               )}
             </div>
           )}
@@ -667,83 +673,88 @@ export default function LessonPage() {
               </div>
             )}
 
+            {/* ── Slides tab — dedicated view for slide decks ── */}
+            {activeTab === 'slides' && week.resources.slideDecks && week.resources.slideDecks.length > 0 && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-[11px] font-mono uppercase tracking-widest text-white/30 mb-1">
+                    Slide deck{week.resources.slideDecks.length !== 1 ? 's' : ''}
+                  </p>
+                  <h3 className="font-display text-2xl font-extrabold text-white">
+                    {week.resources.slideDecks.length} slide deck{week.resources.slideDecks.length !== 1 ? 's' : ''} for this lesson
+                  </h3>
+                </div>
+                {week.resources.slideDecks.map(deck => (
+                  <div key={deck.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-5">
+                    {/* Inline embedded preview for at-a-glance view */}
+                    <div className="rounded-xl overflow-hidden border border-white/10 bg-black aspect-video mb-4">
+                      <iframe
+                        src={deck.url}
+                        title={deck.title}
+                        allow="fullscreen"
+                        allowFullScreen
+                        loading="lazy"
+                        className="w-full h-full"
+                        style={{ border: 0 }}
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <h4 className="font-semibold text-white mb-1 truncate">{deck.title}</h4>
+                        <div className="flex flex-wrap gap-3 text-xs text-white/35 mb-2">
+                          <span>{deck.slideCount} slide{deck.slideCount !== 1 ? 's' : ''}</span>
+                          <span>Updated {new Date(deck.lastUpdatedAt).toLocaleDateString()}</span>
+                        </div>
+                        {deck.sections.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {deck.sections.map(section => (
+                              <span key={section} className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-white/50">{section}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2 flex-wrap flex-shrink-0">
+                        {deck.viewerType === 'MODAL' && (
+                          <button
+                            onClick={() => setActiveSlideDeckId(deck.id)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-[#F5C518] px-4 py-2.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#FFD020] transition-colors"
+                          >
+                            View Slides
+                          </button>
+                        )}
+                        <a
+                          href={deck.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition-colors"
+                        >
+                          Open <ExternalLink size={13} />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {/* Modal viewer (only mounted when MODAL-type deck is active) */}
+                {(() => {
+                  const active = week.resources.slideDecks.find(d => d.id === activeSlideDeckId)
+                  if (!active) return null
+                  return (
+                    <SlideViewer
+                      url={active.url}
+                      title={active.title}
+                      slideCount={active.slideCount}
+                      sections={active.sections}
+                      viewerType={active.viewerType}
+                      onClose={() => setActiveSlideDeckId(null)}
+                    />
+                  )
+                })()}
+              </div>
+            )}
+
             {/* ── Resources tab ── */}
             {activeTab === 'resources' && (
               <div className="space-y-6">
-                {/* Slide decks — multiple per lesson supported */}
-                {week.resources.slideDecks && week.resources.slideDecks.length > 0 && (
-                  <div className="space-y-3">
-                    <p className="text-[11px] font-mono uppercase tracking-widest text-white/30">
-                      Slide deck{week.resources.slideDecks.length !== 1 ? 's' : ''} ({week.resources.slideDecks.length})
-                    </p>
-                    {week.resources.slideDecks.map(deck => (
-                      <div key={deck.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-5">
-                        {/* Inline embedded preview for at-a-glance view */}
-                        <div className="rounded-xl overflow-hidden border border-white/10 bg-black aspect-video mb-4">
-                          <iframe
-                            src={deck.url}
-                            title={deck.title}
-                            allow="fullscreen"
-                            allowFullScreen
-                            loading="lazy"
-                            className="w-full h-full"
-                            style={{ border: 0 }}
-                          />
-                        </div>
-                        <div className="flex flex-wrap items-start justify-between gap-4">
-                          <div className="min-w-0">
-                            <h4 className="font-semibold text-white mb-1 truncate">{deck.title}</h4>
-                            <div className="flex flex-wrap gap-3 text-xs text-white/35 mb-2">
-                              <span>{deck.slideCount} slide{deck.slideCount !== 1 ? 's' : ''}</span>
-                              <span>Updated {new Date(deck.lastUpdatedAt).toLocaleDateString()}</span>
-                            </div>
-                            {deck.sections.length > 0 && (
-                              <div className="flex flex-wrap gap-1.5">
-                                {deck.sections.map(section => (
-                                  <span key={section} className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-white/50">{section}</span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex gap-2 flex-wrap flex-shrink-0">
-                            {deck.viewerType === 'MODAL' && (
-                              <button
-                                onClick={() => setActiveSlideDeckId(deck.id)}
-                                className="inline-flex items-center gap-2 rounded-xl bg-[#F5C518] px-4 py-2.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#FFD020] transition-colors"
-                              >
-                                View Slides
-                              </button>
-                            )}
-                            <a
-                              href={deck.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition-colors"
-                            >
-                              Open <ExternalLink size={13} />
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {/* Modal viewer (only mounted when MODAL-type deck is active) */}
-                    {(() => {
-                      const active = week.resources.slideDecks.find(d => d.id === activeSlideDeckId)
-                      if (!active) return null
-                      return (
-                        <SlideViewer
-                          url={active.url}
-                          title={active.title}
-                          slideCount={active.slideCount}
-                          sections={active.sections}
-                          viewerType={active.viewerType}
-                          onClose={() => setActiveSlideDeckId(null)}
-                        />
-                      )
-                    })()}
-                  </div>
-                )}
-
                 {/* Readings */}
                 {week.resources.readings.length > 0 && (
                   <div>

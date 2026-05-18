@@ -546,86 +546,120 @@ export default function CoursePage() {
               </div>
             </div>
 
-            {/* Weekly roadmap */}
-            <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 md:p-8">
-              <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-                <div>
-                  <p className="text-xs font-mono uppercase tracking-[0.18em] text-white/30 mb-1">{unit} roadmap</p>
-                  <h3 className="font-display text-2xl font-extrabold text-white">{course.totalWeeks} {units}</h3>
+            {/* Modules roadmap — pictorial flow of the modules in this course */}
+            {weekGroups.filter(g => !!g.module).length > 0 && (
+              <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 md:p-8">
+                <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
+                  <div>
+                    <p className="text-xs font-mono uppercase tracking-[0.18em] text-white/30 mb-1">Modules roadmap</p>
+                    <h3 className="font-display text-2xl font-extrabold text-white">Your journey through {weekGroups.filter(g => !!g.module).length} module{weekGroups.filter(g => !!g.module).length !== 1 ? 's' : ''}</h3>
+                  </div>
+                  {continueWeek && (
+                    <a href={`/course/${course.slug}/week/${continueWeek.slug}`} className="text-sm text-[#F5C518] hover:text-[#FFE070] transition-colors">
+                      Jump back in →
+                    </a>
+                  )}
                 </div>
-                {continueWeek && (
-                  <a href={`/course/${course.slug}/week/${continueWeek.slug}`} className="text-sm text-[#F5C518] hover:text-[#FFE070] transition-colors">
-                    Jump back in
-                  </a>
-                )}
-              </div>
 
-              <div className="space-y-6">
-                {weekGroups.map((group, gi) => {
-                  let weekOffset = 0
-                  for (let g = 0; g < gi; g++) weekOffset += weekGroups[g].weeks.length
-                  return (
-                    <div key={group.module?.id ?? 'unassigned'}>
-                      {group.module && (
-                        <div className="mb-3">
-                          <p className="text-[11px] font-mono uppercase tracking-widest text-white/30 leading-none">
-                            {group.module.title}
-                          </p>
-                        </div>
-                      )}
-                      <div className="space-y-3">
-                        {group.weeks.map((week, i) => {
-                          const isComplete = week.progress.status === 'COMPLETE'
-                          const isInProgress = week.progress.status === 'IN_PROGRESS'
-                          const index = weekOffset + i
-                          return (
-                            <motion.a
-                              key={week.id}
-                              href={`/course/${course.slug}/week/${week.slug}`}
-                              initial={{ opacity: 0, y: 12 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: index * 0.05 }}
-                              className={`grid md:grid-cols-[72px_minmax(0,1fr)_auto] gap-4 items-center rounded-2xl border px-5 py-4 hover:border-white/25 transition-colors ${
-                                isComplete
-                                  ? 'border-[#F5C518]/20 bg-[#F5C518]/5'
-                                  : isInProgress
-                                    ? 'border-teal-400/20 bg-teal-400/5'
-                                    : 'border-white/8 bg-black/20'
-                              }`}
-                            >
-                              <div>
-                                <div className="text-[10px] font-mono tracking-widest uppercase text-white/30 mb-0.5">{unit}</div>
-                                <div className={`font-display text-2xl font-extrabold ${isComplete ? 'text-[#F5C518]' : 'text-white/25'}`}>
-                                  {String(week.number).padStart(2, '0')}
-                                </div>
-                              </div>
+                {/* Pictorial: numbered nodes connected by a vertical "track" on the left */}
+                <div className="relative pl-2">
+                  {/* The connecting track */}
+                  <div className="absolute top-6 bottom-6 left-[31px] w-[2px] bg-gradient-to-b from-[#F5C518]/40 via-white/10 to-white/5" />
 
+                  <div className="space-y-5">
+                    {weekGroups.filter(g => !!g.module).map((group, gi) => {
+                      const moduleWeeks = group.weeks
+                      const completedCount = moduleWeeks.filter(w => w.progress.status === 'COMPLETE').length
+                      const inProgressCount = moduleWeeks.filter(w => w.progress.status === 'IN_PROGRESS').length
+                      const totalMin = moduleWeeks.reduce((s, w) => s + w.estimatedCompletionMinutes, 0)
+                      const allDone = completedCount === moduleWeeks.length && moduleWeeks.length > 0
+                      const started = completedCount > 0 || inProgressCount > 0
+                      const firstUnfinished = moduleWeeks.find(w => w.progress.status !== 'COMPLETE')
+                      const ctaWeek = firstUnfinished ?? moduleWeeks[0]
+                      return (
+                        <motion.div
+                          key={group.module!.id}
+                          initial={{ opacity: 0, x: -8 }}
+                          whileInView={{ opacity: 1, x: 0 }}
+                          viewport={{ once: true }}
+                          transition={{ delay: gi * 0.08 }}
+                          className="relative flex items-stretch gap-5"
+                        >
+                          {/* Numbered node */}
+                          <div className="relative flex-shrink-0">
+                            <div className={`relative z-10 w-16 h-16 rounded-full flex items-center justify-center font-display text-xl font-extrabold border-4 ${
+                              allDone
+                                ? 'bg-[#F5C518] text-[#0A0A0A] border-[#F5C518]/30'
+                                : started
+                                  ? 'bg-teal-400 text-[#0A0A0A] border-teal-400/30'
+                                  : 'bg-[#0F0F11] text-white/60 border-white/15'
+                            }`}>
+                              {allDone ? <CheckCircle2 size={26} /> : gi + 1}
+                            </div>
+                          </div>
+
+                          {/* Module card */}
+                          <a
+                            href={ctaWeek ? `/course/${course.slug}/week/${ctaWeek.slug}` : undefined}
+                            className={`group flex-1 rounded-2xl border p-5 transition-colors ${
+                              allDone
+                                ? 'border-[#F5C518]/20 bg-[#F5C518]/[0.04] hover:border-[#F5C518]/40'
+                                : started
+                                  ? 'border-teal-400/20 bg-teal-400/[0.04] hover:border-teal-400/40'
+                                  : 'border-white/10 bg-black/20 hover:border-white/25'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3 mb-2">
                               <div className="min-w-0">
-                                <h4 className="text-base font-semibold text-white mb-1">{week.title}</h4>
-                                <div className="flex flex-wrap items-center gap-3 text-xs text-white/35">
-                                  <span className="inline-flex items-center gap-1"><Clock3 size={11} />{week.durationLabel}</span>
-                                  <span>{week.estimatedCompletionMinutes} min</span>
-                                  <span className={`capitalize ${isComplete ? 'text-[#F5C518]' : isInProgress ? 'text-teal-400' : ''}`}>
-                                    {week.progress.status.replace(/_/g, ' ').toLowerCase()}
-                                  </span>
-                                </div>
+                                <p className={`text-[10px] font-mono uppercase tracking-[0.18em] mb-1 ${
+                                  allDone ? 'text-[#F5C518]' : started ? 'text-teal-400' : 'text-white/40'
+                                }`}>
+                                  Module {gi + 1}
+                                </p>
+                                <h4 className="text-base font-semibold text-white leading-snug">{group.module!.title}</h4>
                               </div>
-
-                              <div className="justify-self-start md:justify-self-end flex items-center gap-2">
-                                {isComplete && <CheckCircle2 size={15} className="text-[#F5C518]" />}
-                                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/12 px-4 py-2 text-sm text-white/60">
-                                  {isComplete ? 'Review' : isInProgress ? 'Continue' : 'Open'} <ArrowRight size={13} />
+                              {(allDone || started) && (
+                                <span className={`text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${
+                                  allDone ? 'text-[#F5C518]' : 'text-teal-400'
+                                }`}>
+                                  {allDone ? 'Complete' : 'In progress'}
                                 </span>
+                              )}
+                            </div>
+                            {group.module!.description && (
+                              <p className="text-xs text-white/45 leading-relaxed mb-3 line-clamp-2">
+                                {group.module!.description}
+                              </p>
+                            )}
+                            {/* Progress bar */}
+                            <div className="mb-3">
+                              <div className="h-1 rounded-full bg-white/8 overflow-hidden">
+                                <div
+                                  className={`h-full transition-all ${allDone ? 'bg-[#F5C518]' : 'bg-teal-400'}`}
+                                  style={{ width: `${moduleWeeks.length === 0 ? 0 : (completedCount / moduleWeeks.length) * 100}%` }}
+                                />
                               </div>
-                            </motion.a>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
+                            </div>
+                            <div className="flex items-center justify-between gap-3 text-xs text-white/45">
+                              <div className="flex items-center gap-3">
+                                <span className="inline-flex items-center gap-1"><BookOpen size={11} />{moduleWeeks.length} {unit.toLowerCase()}{moduleWeeks.length !== 1 ? 's' : ''}</span>
+                                <span className="inline-flex items-center gap-1"><Clock3 size={11} />{totalMin >= 60 ? `${Math.round(totalMin / 60)}h` : `${totalMin}m`}</span>
+                                <span>{completedCount}/{moduleWeeks.length} done</span>
+                              </div>
+                              {ctaWeek && (
+                                <span className="inline-flex items-center gap-1 text-white/60 group-hover:text-white transition-colors">
+                                  {allDone ? 'Review' : started ? 'Continue' : 'Start'} <ArrowRight size={11} />
+                                </span>
+                              )}
+                            </div>
+                          </a>
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </section>
         </div>
       </main>

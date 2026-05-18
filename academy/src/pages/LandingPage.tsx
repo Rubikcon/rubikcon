@@ -92,9 +92,9 @@ export default function LandingPage() {
           <motion.h1 variants={fadeUp} initial="hidden" animate="visible" custom={1}
             className="font-display font-extrabold text-white leading-[1.06] tracking-[-0.025em] mb-7"
             style={{ fontSize: 'clamp(36px, 5vw, 68px)' }}>
-            Learn and build in{' '}
-            <span className="inline-block bg-[#F5C518] text-[#0A0A0A] px-5 py-1 rounded-full align-middle leading-snug">Web3</span>{' '}
-            with confidence
+            Learn{' '}
+            <span className="inline-block bg-[#F5C518] text-[#0A0A0A] px-5 py-1 rounded-full align-middle leading-snug">Digital skills</span>{' '}
+            to build in today's world
           </motion.h1>
 
           {/* Subtitle */}
@@ -134,41 +134,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── CURRICULUM OVERVIEW ─── */}
-      <section className="bg-[#F2EDE2] py-24 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-12">
-            <p className="text-xs font-mono text-[#1C1C1C]/50 tracking-widest uppercase mb-3">Curriculum Overview</p>
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-              <h2 className="font-display text-4xl md:text-5xl font-extrabold text-[#1C1C1C] leading-tight">
-                What you'll learn
-              </h2>
-              <p className="text-[#1C1C1C]/60 text-sm max-w-sm leading-relaxed md:text-right">
-                A grounded path from fundamentals to shipping. Every course is built around a real artifact you'll publish on-chain or to GitHub.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {CURRICULUM_TOPICS.map((topic, i) => (
-              <motion.div key={topic.num}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.07 }}
-                className="bg-white rounded-2xl p-7 hover:shadow-md transition-shadow"
-              >
-                <span className="inline-block bg-[#F2EDE2] text-[#1C1C1C] text-xs font-mono font-bold px-2.5 py-1 rounded-lg mb-4">{topic.num}</span>
-                <h3 className="font-display font-extrabold text-[#1C1C1C] text-lg mb-2 leading-snug">{topic.title}</h3>
-                <p className="text-[#1C1C1C]/55 text-sm leading-relaxed">{topic.body}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── COURSES CTA ─── */}
-      <section id="courses" className="bg-[#F2EDE2] py-24 px-6 border-t border-black/5">
+      {/* ─── COURSES CTA ─── (moved above the curriculum section so learners see real courses first) */}
+      <section id="courses" className="bg-[#F2EDE2] py-24 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="mb-10">
             <p className="text-xs font-mono text-[#1C1C1C]/50 tracking-widest uppercase mb-3">Catalog</p>
@@ -242,6 +209,39 @@ export default function LandingPage() {
             >
               <BookOpen size={14} /> Browse all courses →
             </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── CURRICULUM OVERVIEW ─── (moved below courses so it acts as a deeper-dive on what's covered) */}
+      <section className="bg-[#F2EDE2] py-24 px-6 border-t border-black/5">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-12">
+            <p className="text-xs font-mono text-[#1C1C1C]/50 tracking-widest uppercase mb-3">Curriculum Overview</p>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <h2 className="font-display text-4xl md:text-5xl font-extrabold text-[#1C1C1C] leading-tight">
+                What you'll learn
+              </h2>
+              <p className="text-[#1C1C1C]/60 text-sm max-w-sm leading-relaxed md:text-right">
+                A grounded path from fundamentals to shipping. Every course is built around a real artifact you'll publish on-chain or to GitHub.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {CURRICULUM_TOPICS.map((topic, i) => (
+              <motion.div key={topic.num}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.07 }}
+                className="bg-white rounded-2xl p-7 hover:shadow-md transition-shadow"
+              >
+                <span className="inline-block bg-[#F2EDE2] text-[#1C1C1C] text-xs font-mono font-bold px-2.5 py-1 rounded-lg mb-4">{topic.num}</span>
+                <h3 className="font-display font-extrabold text-[#1C1C1C] text-lg mb-2 leading-snug">{topic.title}</h3>
+                <p className="text-[#1C1C1C]/55 text-sm leading-relaxed">{topic.body}</p>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
