@@ -3,6 +3,7 @@ import {
   BookOpen,
   CheckCircle2,
   ChevronDown,
+  ClipboardList,
   Clock,
   Eye,
   Key,
@@ -18,7 +19,7 @@ import {
 import AcademyNavbar from '../components/AcademyNavbar'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
-import type { CourseStatus } from '../types/academy'
+import type { AdminSubmission, CourseStatus } from '../types/academy'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -89,7 +90,7 @@ const STATUS_FILTERS = [
   { value: 'DRAFT', label: 'Draft' },
 ]
 
-type Tab = 'overview' | 'courses' | 'users'
+type Tab = 'overview' | 'courses' | 'users' | 'submissions'
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
@@ -147,6 +148,13 @@ export default function SuperAdminPage() {
   const [resetPasswordData, setResetPasswordData] = useState<{ userId: string; userName: string; resetToken: string; expiresAt: string } | null>(null)
   const [resettingPassword, setResettingPassword] = useState(false)
 
+  // Submissions
+  const [submissions, setSubmissions] = useState<AdminSubmission>([])
+  const [submissionsLoading, setSubmissionsLoading] = useState(false)
+  const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({})
+  const [savingFeedbackId, setSavingFeedbackId] = useState<string | null>(null)
+  const [submissionStatusFilter, setSubmissionStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'REVIEWED'>('ALL')
+
   const [error, setError] = useState<string | null>(null)
 
   const currentAuth = getStoredAuth()
@@ -164,6 +172,10 @@ export default function SuperAdminPage() {
   useEffect(() => {
     if (activeTab === 'users') void loadUsers()
   }, [activeTab, userSearch, userRoleFilter])
+
+  useEffect(() => {
+    if (activeTab === 'submissions') void loadSubmissions()
+  }, [activeTab])
 
   async function loadOverview() {
     try {
@@ -205,6 +217,38 @@ export default function SuperAdminPage() {
       setError(err instanceof Error ? err.message : 'Unable to load users.')
     } finally {
       setUsersLoading(false)
+    }
+  }
+
+  async function loadSubmissions() {
+    try {
+      setSubmissionsLoading(true)
+      setError(null)
+      const data = await apiRequest<AdminSubmission>('/academy/admin/assignments/submissions')
+      setSubmissions(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load submissions.')
+    } finally {
+      setSubmissionsLoading(false)
+    }
+  }
+
+  async function submitFeedback(event: FormEvent<HTMLFormElement>, submissionId: string) {
+    event.preventDefault()
+    const feedback = feedbackDrafts[submissionId]?.trim()
+    if (!feedback) return
+    try {
+      setSavingFeedbackId(submissionId)
+      await apiRequest(`/academy/admin/assignments/submissions/${submissionId}/feedback`, {
+        method: 'POST',
+        body: JSON.stringify({ feedback }),
+      })
+      setFeedbackDrafts(current => ({ ...current, [submissionId]: '' }))
+      await loadSubmissions()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save feedback.')
+    } finally {
+      setSavingFeedbackId(null)
     }
   }
 
@@ -342,9 +386,10 @@ export default function SuperAdminPage() {
   const actionCourse = courses.find(c => c.id === actionCourseId)
 
   const TABS: Array<{ id: Tab; label: string; icon: typeof ShieldCheck }> = [
-    { id: 'overview', label: 'Overview', icon: ShieldCheck },
-    { id: 'courses',  label: 'Courses',  icon: BookOpen },
-    { id: 'users',    label: 'Users',    icon: Users },
+    { id: 'overview',    label: 'Overview',    icon: ShieldCheck },
+    { id: 'courses',     label: 'Courses',     icon: BookOpen },
+    { id: 'submissions', label: 'Submissions', icon: ClipboardList },
+    { id: 'users',       label: 'Users',       icon: Users },
   ]
 
   return (
@@ -489,6 +534,15 @@ export default function SuperAdminPage() {
                     <Clock size={14} />
                     Review pending courses ({overview.coursesByStatus['PENDING_REVIEW'] ?? 0})
                   </button>
+                  {overview.pendingSubmissions > 0 && (
+                    <button
+                      onClick={() => { setActiveTab('submissions'); setSubmissionStatusFilter('SUBMITTED') }}
+                      className="inline-flex items-center gap-2 rounded-full border border-teal-400/25 bg-teal-400/10 px-5 py-3 text-sm text-teal-300 hover:bg-teal-400/20 transition-colors"
+                    >
+                      <ClipboardList size={14} />
+                      Review pending submissions ({overview.pendingSubmissions})
+                    </button>
+                  )}
                   <button
                     onClick={() => { setActiveTab('users'); setShowCreateAdmin(true) }}
                     className="inline-flex items-center gap-2 rounded-full bg-[#F5C518] px-5 py-3 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors"
@@ -605,6 +659,132 @@ export default function SuperAdminPage() {
                     )
                   })}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Submissions Tab ──────────────────────────────────────────────── */}
+          {activeTab === 'submissions' && (
+            <div>
+              {/* Status filter */}
+              <div className="flex flex-wrap items-center gap-3 mb-5">
+                <div className="flex gap-1.5">
+                  {(['ALL', 'SUBMITTED', 'REVIEWED'] as const).map(s => {
+                    const count = s === 'ALL'
+                      ? submissions.length
+                      : submissions.filter(x => x.status === s).length
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => setSubmissionStatusFilter(s)}
+                        className={`rounded-full px-4 py-1.5 text-sm transition-colors border ${
+                          submissionStatusFilter === s
+                            ? 'border-[#F5C518] bg-[#F5C518]/10 text-[#F5C518]'
+                            : 'border-white/15 text-white/60 hover:border-white/30'
+                        }`}
+                      >
+                        {s === 'ALL' ? 'All' : s === 'SUBMITTED' ? 'Pending review' : 'Reviewed'}
+                        <span className="ml-1.5 text-xs opacity-60">{count}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {submissionsLoading ? (
+                <div className="rounded-[24px] border border-white/8 bg-white/[0.02] p-12 text-center">
+                  <Loader2 className="animate-spin text-[#F5C518] mx-auto mb-3" size={24} />
+                  <p className="text-white/40">Loading submissions…</p>
+                </div>
+              ) : submissions.length === 0 ? (
+                <div className="rounded-[24px] border border-white/8 bg-white/[0.02] p-12 text-center">
+                  <ClipboardList size={28} className="text-white/20 mx-auto mb-3" />
+                  <p className="text-white/40">No submissions yet across the platform.</p>
+                </div>
+              ) : (
+                (() => {
+                  const filtered = submissionStatusFilter === 'ALL'
+                    ? submissions
+                    : submissions.filter(s => s.status === submissionStatusFilter)
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="rounded-[24px] border border-white/8 bg-white/[0.02] p-12 text-center">
+                        <ClipboardList size={28} className="text-white/20 mx-auto mb-3" />
+                        <p className="text-white/40">No {submissionStatusFilter.toLowerCase()} submissions.</p>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div className="space-y-5">
+                      {filtered.map(submission => (
+                        <div key={submission.id} className="rounded-[24px] border border-white/10 bg-white/[0.04] p-6">
+                          <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                            <div>
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-mono text-white/30">Week {submission.assignment.week.number}</span>
+                                <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-mono ${
+                                  submission.status === 'SUBMITTED'
+                                    ? 'border-amber-400/30 text-amber-300 bg-amber-400/8'
+                                    : submission.status === 'REVIEWED'
+                                      ? 'border-emerald-400/30 text-emerald-300'
+                                      : 'border-white/15 text-white/40'
+                                }`}>
+                                  {submission.status}
+                                </span>
+                              </div>
+                              <h3 className="text-lg font-semibold text-white mb-0.5">{submission.assignment.title}</h3>
+                              <p className="text-sm text-white/40">
+                                {submission.user.name || submission.user.email} · {submission.assignment.week.title}
+                              </p>
+                            </div>
+                            <p className="text-xs text-white/30">
+                              {new Date(submission.submittedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+
+                          {submission.choice && (
+                            <div className="mb-3 rounded-xl border border-[#F5C518]/15 bg-[#F5C518]/8 px-4 py-2.5">
+                              <p className="text-xs text-[#F5C518]/60 mb-0.5">Selected option</p>
+                              <p className="text-sm font-medium text-[#F5C518]">{submission.choice.title}</p>
+                            </div>
+                          )}
+
+                          {submission.textResponse && (
+                            <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm leading-relaxed text-white/65 mb-4 whitespace-pre-line">
+                              {submission.textResponse}
+                            </div>
+                          )}
+
+                          {submission.feedback.length > 0 && (
+                            <div className="rounded-2xl border border-teal-400/15 bg-teal-400/10 p-4 mb-4">
+                              <p className="text-xs font-mono uppercase tracking-[0.16em] text-teal-100/60 mb-2">
+                                Feedback{submission.feedback[0].reviewer ? ` — ${submission.feedback[0].reviewer.name || submission.feedback[0].reviewer.email}` : ''}
+                              </p>
+                              <p className="text-sm text-white/75 whitespace-pre-line">{submission.feedback[0].feedback}</p>
+                            </div>
+                          )}
+
+                          <form onSubmit={e => void submitFeedback(e, submission.id)} className="space-y-3">
+                            <textarea
+                              value={feedbackDrafts[submission.id] ?? ''}
+                              onChange={e => setFeedbackDrafts(cur => ({ ...cur, [submission.id]: e.target.value }))}
+                              rows={3}
+                              placeholder={submission.feedback.length > 0 ? 'Add additional feedback…' : 'Leave feedback for this learner…'}
+                              className="w-full rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#F5C518]/40"
+                            />
+                            <button
+                              type="submit"
+                              disabled={savingFeedbackId === submission.id || !feedbackDrafts[submission.id]?.trim()}
+                              className="rounded-full bg-[#F5C518] px-5 py-2.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors disabled:opacity-40"
+                            >
+                              {savingFeedbackId === submission.id ? 'Saving…' : 'Save feedback'}
+                            </button>
+                          </form>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()
               )}
             </div>
           )}
