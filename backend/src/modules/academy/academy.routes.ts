@@ -4,6 +4,8 @@ import prisma from '../../config/database'
 import { sendSuccess, sendError, sendPaginated } from '../../utils/response'
 import { optionalAuth, requireAdmin, requireAuth, requireSuperAdmin } from '../../middleware/auth.middleware'
 import { AssignmentSubmissionStatus, CourseStatus, Prisma, QuizAttemptStatus, WeekProgressStatus } from '@prisma/client'
+import { sendEmailInBackground } from '../../utils/mailer'
+import { assignmentFeedbackEmail, lessonDeepLink } from '../../utils/emailTemplates'
 
 const router = Router()
 
@@ -1299,9 +1301,15 @@ router.get('/admin/learners/progress', requireAuth, requireAdmin, async (req: Re
       return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
     }
 
-    const where: Prisma.WeekProgressWhereInput = parsed.data.weekSlug
+    // Scope: SUPER_ADMIN sees all progress; regular ADMIN sees only their courses' learners.
+    const isSuperAdmin = req.user!.role === 'SUPER_ADMIN'
+    const ownership: Prisma.WeekProgressWhereInput = isSuperAdmin
+      ? {}
+      : { week: { course: { createdById: req.user!.userId } } }
+    const slugFilter: Prisma.WeekProgressWhereInput = parsed.data.weekSlug
       ? { week: { slug: parsed.data.weekSlug } }
       : {}
+    const where: Prisma.WeekProgressWhereInput = { AND: [ownership, slugFilter] }
 
     const progress = await prisma.weekProgress.findMany({
       where,
@@ -1333,7 +1341,22 @@ router.get('/admin/learners/progress', requireAuth, requireAdmin, async (req: Re
 
 router.get('/admin/assignments/submissions', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // SUPER_ADMIN sees every submission on the platform.
+    // Regular ADMIN (facilitator) only sees submissions for courses they created
+    // — without this scope, facilitators were drowning in other facilitators' submissions.
+    const isSuperAdmin = req.user!.role === 'SUPER_ADMIN'
+    const where = isSuperAdmin
+      ? {}
+      : {
+          assignment: {
+            week: {
+              course: { createdById: req.user!.userId },
+            },
+          },
+        }
+
     const submissions = await prisma.assignmentSubmission.findMany({
+      where,
       include: {
         user: {
           select: {
@@ -1350,6 +1373,7 @@ router.get('/admin/assignments/submissions', requireAuth, requireAdmin, async (r
                 slug: true,
                 number: true,
                 title: true,
+                course: { select: { id: true, title: true, slug: true } },
               },
             },
           },
@@ -1386,8 +1410,26 @@ router.post('/admin/assignments/submissions/:submissionId/feedback', requireAuth
 
     const submission = await prisma.assignmentSubmission.findUnique({
       where: { id: req.params.submissionId },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        assignment: {
+          include: {
+            week: {
+              include: {
+                course: { select: { createdById: true, title: true, slug: true } },
+              },
+            },
+          },
+        },
+      },
     })
     if (!submission) return sendError(res, 'Submission not found.', 404)
+
+    // Scope: regular admins can only leave feedback on their own courses' submissions.
+    const isSuperAdmin = req.user!.role === 'SUPER_ADMIN'
+    if (!isSuperAdmin && submission.assignment.week.course.createdById !== req.user!.userId) {
+      return sendError(res, 'You can only leave feedback on submissions from courses you created.', 403)
+    }
 
     const feedback = await prisma.assignmentFeedback.create({
       data: {
@@ -1405,6 +1447,29 @@ router.post('/admin/assignments/submissions/:submissionId/feedback', requireAuth
         reviewedAt: new Date(),
       },
     })
+
+    // Notify the learner by email (best-effort, non-blocking — never fails the request)
+    if (submission.user.email) {
+      const reviewer = await prisma.user.findUnique({
+        where: { id: req.user!.userId },
+        select: { name: true },
+      })
+      const email = assignmentFeedbackEmail({
+        learnerName: submission.user.name,
+        assignmentTitle: submission.assignment.title,
+        lessonTitle: submission.assignment.week.title,
+        courseTitle: submission.assignment.week.course.title,
+        feedbackText: parsed.data.feedback,
+        reviewerName: reviewer?.name ?? null,
+        lessonUrl: lessonDeepLink(submission.assignment.week.course.slug, submission.assignment.week.slug),
+      })
+      sendEmailInBackground({
+        to: submission.user.email,
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+      })
+    }
 
     return sendSuccess(res, feedback, 'Feedback saved.', 201)
   } catch (err) {

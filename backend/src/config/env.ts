@@ -24,4 +24,11 @@ export const config = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN?.trim() || '7d',
   allowedOrigins: [...new Set([...defaultAllowedOrigins, ...configuredAllowedOrigins])],
   isDev: process.env.NODE_ENV !== 'production',
+
+  // Email (Resend). If RESEND_API_KEY is unset, the mailer no-ops and just logs,
+  // so the app keeps running locally / before email is configured.
+  resendApiKey: process.env.RESEND_API_KEY?.trim() || '',
+  emailFrom: process.env.EMAIL_FROM?.trim() || 'Rubikcon Academy <noreply@rubikconacademy.xyz>',
+  // Public academy URL used to build deep links in emails
+  academyUrl: process.env.ACADEMY_URL?.trim() || 'https://www.rubikconacademy.xyz',
 }
