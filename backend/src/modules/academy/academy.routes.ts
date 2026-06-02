@@ -5,7 +5,7 @@ import { sendSuccess, sendError, sendPaginated } from '../../utils/response'
 import { optionalAuth, requireAdmin, requireAuth, requireSuperAdmin } from '../../middleware/auth.middleware'
 import { AssignmentSubmissionStatus, CourseStatus, Prisma, QuizAttemptStatus, WeekProgressStatus } from '@prisma/client'
 import { sendEmailInBackground } from '../../utils/mailer'
-import { assignmentFeedbackEmail, lessonDeepLink } from '../../utils/emailTemplates'
+import { assignmentFeedbackEmail, lessonDeepLink, newSubmissionEmail } from '../../utils/emailTemplates'
 
 const router = Router()
 
@@ -1235,6 +1235,20 @@ router.post('/assignments/:assignmentId/submissions', requireAuth, async (req: R
       where: { id: req.params.assignmentId },
       include: {
         choices: true,
+        week: {
+          include: {
+            course: {
+              include: {
+                createdBy: { select: { id: true, name: true, email: true } },
+                courseFacilitators: {
+                  select: {
+                    facilitator: { select: { name: true, email: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     })
     if (!assignment) return sendError(res, 'Assignment not found.', 404)
@@ -1258,6 +1272,49 @@ router.post('/assignments/:assignmentId/submissions', requireAuth, async (req: R
     })
 
     await syncWeekProgress(req.user!.userId, assignment.weekId)
+
+    // Notify every facilitator linked to this course — best-effort, non-blocking.
+    // Recipients include:
+    //   - the course creator (User)
+    //   - every Facilitator added to the course (linked by email)
+    // Deduplicated case-insensitively so people don't get the same email twice
+    // if they're both creator and facilitator on the same course.
+    const learner = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { name: true, email: true },
+    })
+    const creator = assignment.week.course.createdBy
+    const recipients: Array<{ name: string | null; email: string }> = []
+    if (creator?.email) recipients.push({ name: creator.name, email: creator.email })
+    for (const cf of assignment.week.course.courseFacilitators) {
+      if (cf.facilitator.email) recipients.push({ name: cf.facilitator.name, email: cf.facilitator.email })
+    }
+    const seen = new Set<string>()
+    const uniqueRecipients = recipients.filter(r => {
+      const key = r.email.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+
+    for (const recipient of uniqueRecipients) {
+      const email = newSubmissionEmail({
+        facilitatorName: recipient.name,
+        learnerName: learner?.name ?? null,
+        learnerEmail: learner?.email ?? '',
+        assignmentTitle: assignment.title,
+        lessonTitle: assignment.week.title,
+        courseTitle: assignment.week.course.title,
+        submissionPreview: parsed.data.textResponse ?? null,
+        submittedAt: submission.submittedAt,
+      })
+      sendEmailInBackground({
+        to: recipient.email,
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+      })
+    }
 
     return sendSuccess(res, submission, 'Assignment submitted successfully.', 201)
   } catch (err) {
@@ -1301,11 +1358,11 @@ router.get('/admin/learners/progress', requireAuth, requireAdmin, async (req: Re
       return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
     }
 
-    // Scope: SUPER_ADMIN sees all progress; regular ADMIN sees only their courses' learners.
-    const isSuperAdmin = req.user!.role === 'SUPER_ADMIN'
-    const ownership: Prisma.WeekProgressWhereInput = isSuperAdmin
-      ? {}
-      : { week: { course: { createdById: req.user!.userId } } }
+    // Scope: SUPER_ADMIN sees all; regular ADMIN sees progress for courses
+    // they created OR are added as a facilitator on.
+    const courseScope = facilitatorAccessibleCourseWhere(req.user!)
+    const ownership: Prisma.WeekProgressWhereInput =
+      Object.keys(courseScope).length === 0 ? {} : { week: { course: courseScope } }
     const slugFilter: Prisma.WeekProgressWhereInput = parsed.data.weekSlug
       ? { week: { slug: parsed.data.weekSlug } }
       : {}
@@ -1342,18 +1399,13 @@ router.get('/admin/learners/progress', requireAuth, requireAdmin, async (req: Re
 router.get('/admin/assignments/submissions', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     // SUPER_ADMIN sees every submission on the platform.
-    // Regular ADMIN (facilitator) only sees submissions for courses they created
-    // — without this scope, facilitators were drowning in other facilitators' submissions.
-    const isSuperAdmin = req.user!.role === 'SUPER_ADMIN'
-    const where = isSuperAdmin
-      ? {}
-      : {
-          assignment: {
-            week: {
-              course: { createdById: req.user!.userId },
-            },
-          },
-        }
+    // Regular ADMIN (facilitator) sees submissions from courses they own AND
+    // from courses where they've been added as a facilitator.
+    const courseScope = facilitatorAccessibleCourseWhere(req.user!)
+    const where: Prisma.AssignmentSubmissionWhereInput =
+      Object.keys(courseScope).length === 0
+        ? {}
+        : { assignment: { week: { course: courseScope } } }
 
     const submissions = await prisma.assignmentSubmission.findMany({
       where,
@@ -1416,7 +1468,16 @@ router.post('/admin/assignments/submissions/:submissionId/feedback', requireAuth
           include: {
             week: {
               include: {
-                course: { select: { createdById: true, title: true, slug: true } },
+                course: {
+                  select: {
+                    createdById: true,
+                    title: true,
+                    slug: true,
+                    courseFacilitators: {
+                      select: { facilitator: { select: { email: true } } },
+                    },
+                  },
+                },
               },
             },
           },
@@ -1425,10 +1486,16 @@ router.post('/admin/assignments/submissions/:submissionId/feedback', requireAuth
     })
     if (!submission) return sendError(res, 'Submission not found.', 404)
 
-    // Scope: regular admins can only leave feedback on their own courses' submissions.
+    // Scope: regular admins can leave feedback on submissions from courses they
+    // created OR courses where they're added as a facilitator (email match).
     const isSuperAdmin = req.user!.role === 'SUPER_ADMIN'
-    if (!isSuperAdmin && submission.assignment.week.course.createdById !== req.user!.userId) {
-      return sendError(res, 'You can only leave feedback on submissions from courses you created.', 403)
+    const userEmail = req.user!.email.toLowerCase()
+    const isCreator = submission.assignment.week.course.createdById === req.user!.userId
+    const isAddedFacilitator = submission.assignment.week.course.courseFacilitators.some(
+      cf => cf.facilitator.email.toLowerCase() === userEmail
+    )
+    if (!isSuperAdmin && !isCreator && !isAddedFacilitator) {
+      return sendError(res, 'You can only leave feedback on submissions from courses you facilitate.', 403)
     }
 
     const feedback = await prisma.assignmentFeedback.create({
@@ -1472,6 +1539,59 @@ router.post('/admin/assignments/submissions/:submissionId/feedback', requireAuth
     }
 
     return sendSuccess(res, feedback, 'Feedback saved.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
+ * Delete a feedback entry on a submission.
+ *
+ * Rules:
+ *   - The reviewer who left the feedback can always delete their own.
+ *   - SUPER_ADMIN can delete any feedback.
+ *   - Other facilitators on the same course CANNOT delete a colleague's feedback —
+ *     deletion is treated as a personal "I want to retract my own remark" action.
+ *
+ * After deletion, if no feedback remains on the submission, the submission's
+ * status flips back from REVIEWED → SUBMITTED so the work re-appears in the
+ * "Pending review" queue.
+ */
+router.delete('/admin/assignments/submissions/:submissionId/feedback/:feedbackId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const feedback = await prisma.assignmentFeedback.findUnique({
+      where: { id: req.params.feedbackId },
+      include: { submission: { select: { id: true } } },
+    })
+    if (!feedback) return sendError(res, 'Feedback not found.', 404)
+    if (feedback.submission.id !== req.params.submissionId) {
+      return sendError(res, 'Feedback does not belong to this submission.', 400)
+    }
+
+    const isSuperAdmin = req.user!.role === 'SUPER_ADMIN'
+    const isAuthor = feedback.reviewerId === req.user!.userId
+    if (!isSuperAdmin && !isAuthor) {
+      return sendError(res, 'You can only delete feedback you wrote yourself.', 403)
+    }
+
+    await prisma.assignmentFeedback.delete({ where: { id: feedback.id } })
+
+    // If this was the last piece of feedback, move the submission back to
+    // SUBMITTED so it shows up in the pending-review queue again.
+    const remaining = await prisma.assignmentFeedback.count({
+      where: { submissionId: feedback.submission.id },
+    })
+    if (remaining === 0) {
+      await prisma.assignmentSubmission.update({
+        where: { id: feedback.submission.id },
+        data: {
+          status: AssignmentSubmissionStatus.SUBMITTED,
+          reviewedAt: null,
+        },
+      })
+    }
+
+    return sendSuccess(res, { id: feedback.id, statusReverted: remaining === 0 }, 'Feedback deleted.')
   } catch (err) {
     next(err)
   }
@@ -1821,6 +1941,29 @@ async function markCourseDirtyIfNeeded(courseId: string, role: string, currentSt
   })
 }
 
+/**
+ * Build a Prisma `where` fragment that constrains a query to courses the user
+ * has facilitator-level access to.
+ *
+ * - SUPER_ADMIN: returns `{}` (no constraint, sees everything).
+ * - Regular ADMIN: returns a clause matching courses where they're either the
+ *   creator OR added as a facilitator. Facilitator linkage is by email
+ *   (User.email <-> Facilitator.email, case-insensitive — admins entering a
+ *   facilitator's email may use any casing).
+ *
+ * Use by composing into the surrounding `where` clause, e.g.
+ *   { week: { course: facilitatorAccessibleCourseWhere(req.user) } }
+ */
+function facilitatorAccessibleCourseWhere(user: { userId: string; email: string; role: string }): Prisma.CourseWhereInput {
+  if (user.role === 'SUPER_ADMIN') return {}
+  return {
+    OR: [
+      { createdById: user.userId },
+      { courseFacilitators: { some: { facilitator: { email: { equals: user.email, mode: 'insensitive' } } } } },
+    ],
+  }
+}
+
 async function getCourseOrFail(courseId: string, userId: string, role: string, res: Response) {
   const course = await prisma.course.findUnique({ where: { id: courseId } })
   if (!course) {
@@ -1853,10 +1996,15 @@ router.post('/admin/facilitators', requireAuth, requireAdmin, async (req: Reques
     const parsed = createFacilitatorSchema.safeParse(req.body)
     if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
 
-    const existing = await prisma.facilitator.findUnique({ where: { email: parsed.data.email } })
+    // Normalize email to lowercase so future linkage to User accounts is reliable
+    // (User.email is always stored lowercase).
+    const normalizedEmail = parsed.data.email.trim().toLowerCase()
+    const existing = await prisma.facilitator.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+    })
     if (existing) return sendError(res, 'A facilitator with this email already exists.', 409)
 
-    const facilitator = await prisma.facilitator.create({ data: parsed.data })
+    const facilitator = await prisma.facilitator.create({ data: { ...parsed.data, email: normalizedEmail } })
     return sendSuccess(res, facilitator, 'Facilitator created.', 201)
   } catch (err) {
     next(err)
