@@ -71,6 +71,9 @@ export default function AdminAcademyPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({})
+  const [submissionStatusFilter, setSubmissionStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'REVIEWED'>('ALL')
+  const [submissionCourseFilter, setSubmissionCourseFilter] = useState<string>('ALL')
+  const [deletingFeedbackId, setDeletingFeedbackId] = useState<string | null>(null)
   const [savingFeedbackId, setSavingFeedbackId] = useState<string | null>(null)
 
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -155,6 +158,22 @@ export default function AdminAcademyPage() {
       setError(err instanceof Error ? err.message : 'Unable to save feedback.')
     } finally {
       setSavingFeedbackId(null)
+    }
+  }
+
+  async function deleteFeedback(submissionId: string, feedbackId: string) {
+    if (!confirm('Delete this feedback? The learner will no longer see it. If this was the only feedback, the submission will move back to "Pending review".')) return
+    try {
+      setDeletingFeedbackId(feedbackId)
+      setError(null)
+      await apiRequest(`/academy/admin/assignments/submissions/${submissionId}/feedback/${feedbackId}`, {
+        method: 'DELETE',
+      })
+      await loadAdminData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to delete feedback.')
+    } finally {
+      setDeletingFeedbackId(null)
     }
   }
 
@@ -258,10 +277,10 @@ export default function AdminAcademyPage() {
     )
   }
 
-  const TABS: Array<{ id: Tab; label: string; icon: typeof BookOpen; count: number }> = [
+  const TABS: Array<{ id: Tab; label: string; icon: typeof BookOpen; count: number; highlight?: boolean }> = [
     { id: 'courses',     label: 'My Courses',      icon: BookOpen,       count: courses.length },
     { id: 'enrollments', label: 'Enrollments',     icon: Users,          count: selectedCourseId && enrollments[selectedCourseId] ? enrollments[selectedCourseId].length : 0 },
-    { id: 'submissions', label: 'Submissions',      icon: ClipboardList,  count: submissions.length },
+    { id: 'submissions', label: 'Submissions',      icon: ClipboardList,  count: submissions.length, highlight: pendingSubmissions.length > 0 },
     { id: 'progress',    label: 'Learner Progress', icon: Users,          count: progress.length },
   ]
 
@@ -314,21 +333,32 @@ export default function AdminAcademyPage() {
           <div className="flex gap-1 mb-6 border-b border-white/10 overflow-x-auto">
             {TABS.map(tab => {
               const Icon = tab.icon
+              const isActive = activeTab === tab.id
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex-shrink-0 inline-flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === tab.id
+                  className={`flex-shrink-0 inline-flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors relative ${
+                    isActive
                       ? 'border-[#F5C518] text-[#F5C518]'
                       : 'border-transparent text-white/40 hover:text-white/70'
                   }`}
                 >
                   <Icon size={14} />
                   {tab.label}
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${activeTab === tab.id ? 'bg-[#F5C518]/20' : 'bg-white/8'}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${
+                    isActive
+                      ? 'bg-[#F5C518]/20'
+                      : tab.highlight
+                        ? 'bg-amber-400/20 text-amber-300'
+                        : 'bg-white/8'
+                  }`}>
                     {tab.count}
                   </span>
+                  {/* Pulsing dot when there's something needing attention */}
+                  {tab.highlight && !isActive && (
+                    <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  )}
                 </button>
               )
             })}
@@ -562,85 +592,203 @@ export default function AdminAcademyPage() {
           )}
 
           {/* ── Submissions tab ──────────────────────────────────────────────── */}
-          {activeTab === 'submissions' && (
-            <div className="space-y-5">
-              {pendingSubmissions.length > 0 && (
-                <div className="rounded-2xl border border-amber-400/15 bg-amber-400/5 px-5 py-3 text-sm text-amber-300">
-                  {pendingSubmissions.length} submission{pendingSubmissions.length !== 1 ? 's' : ''} waiting for your feedback
-                </div>
-              )}
+          {activeTab === 'submissions' && (() => {
+            // Build the unique course list from the loaded submissions (only the courses
+            // this facilitator actually has student work in show up as filter chips).
+            const courseSet = new Map<string, string>()
+            for (const s of submissions) {
+              const c = s.assignment.week.course
+              if (c) courseSet.set(c.id, c.title)
+            }
+            const courseOptions = Array.from(courseSet.entries()).map(([id, title]) => ({ id, title }))
 
-              {submissions.length === 0 ? (
-                <div className="rounded-[24px] border border-white/8 bg-white/[0.02] p-12 text-center">
-                  <ClipboardList size={28} className="text-white/20 mx-auto mb-3" />
-                  <p className="text-white/40">No submissions yet.</p>
-                </div>
-              ) : submissions.map(submission => (
-                <div key={submission.id} className="rounded-[24px] border border-white/10 bg-white/[0.04] p-6">
-                  <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-mono text-white/30">Week {submission.assignment.week.number}</span>
-                        <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-mono ${
-                          submission.status === 'SUBMITTED'
-                            ? 'border-amber-400/30 text-amber-300 bg-amber-400/8'
-                            : submission.status === 'REVIEWED'
-                              ? 'border-emerald-400/30 text-emerald-300'
-                              : 'border-white/15 text-white/40'
-                        }`}>
-                          {submission.status}
-                        </span>
-                      </div>
-                      <h3 className="text-lg font-semibold text-white mb-0.5">{submission.assignment.title}</h3>
-                      <p className="text-sm text-white/40">
-                        {submission.user.name || submission.user.email} · {submission.assignment.week.title}
-                      </p>
-                    </div>
-                    <p className="text-xs text-white/30">
-                      {new Date(submission.submittedAt).toLocaleDateString()}
-                    </p>
+            const filtered = submissions.filter(s => {
+              if (submissionStatusFilter !== 'ALL' && s.status !== submissionStatusFilter) return false
+              if (submissionCourseFilter !== 'ALL' && s.assignment.week.course?.id !== submissionCourseFilter) return false
+              return true
+            })
+
+            return (
+              <div className="space-y-5">
+                {/* Filters */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex gap-1.5">
+                    {(['ALL', 'SUBMITTED', 'REVIEWED'] as const).map(s => {
+                      const count = s === 'ALL'
+                        ? submissions.length
+                        : submissions.filter(x => x.status === s).length
+                      return (
+                        <button
+                          key={s}
+                          onClick={() => setSubmissionStatusFilter(s)}
+                          className={`rounded-full px-4 py-1.5 text-sm transition-colors border ${
+                            submissionStatusFilter === s
+                              ? 'border-[#F5C518] bg-[#F5C518]/10 text-[#F5C518]'
+                              : 'border-white/15 text-white/60 hover:border-white/30'
+                          }`}
+                        >
+                          {s === 'ALL' ? 'All' : s === 'SUBMITTED' ? 'Pending' : 'Reviewed'}
+                          <span className="ml-1.5 text-xs opacity-60">{count}</span>
+                        </button>
+                      )
+                    })}
                   </div>
 
-                  {submission.choice && (
-                    <div className="mb-3 rounded-xl border border-[#F5C518]/15 bg-[#F5C518]/8 px-4 py-2.5">
-                      <p className="text-xs text-[#F5C518]/60 mb-0.5">Selected option</p>
-                      <p className="text-sm font-medium text-[#F5C518]">{submission.choice.title}</p>
-                    </div>
-                  )}
-
-                  {submission.textResponse && (
-                    <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm leading-relaxed text-white/65 mb-4">
-                      {submission.textResponse}
-                    </div>
-                  )}
-
-                  {submission.feedback.length > 0 && (
-                    <div className="rounded-2xl border border-teal-400/15 bg-teal-400/10 p-4 mb-4">
-                      <p className="text-xs font-mono uppercase tracking-[0.16em] text-teal-100/60 mb-2">Your feedback</p>
-                      <p className="text-sm text-white/75">{submission.feedback[0].feedback}</p>
-                    </div>
-                  )}
-
-                  <form onSubmit={e => void submitFeedback(e, submission.id)} className="space-y-3">
-                    <textarea
-                      value={feedbackDrafts[submission.id] ?? ''}
-                      onChange={e => setFeedbackDrafts(cur => ({ ...cur, [submission.id]: e.target.value }))}
-                      rows={3}
-                      placeholder="Leave feedback for this learner…"
-                      className="w-full rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#F5C518]/40"
-                    />
-                    <button
-                      type="submit"
-                      disabled={savingFeedbackId === submission.id}
-                      className="rounded-full bg-[#F5C518] px-5 py-2.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors disabled:opacity-60"
+                  {courseOptions.length > 1 && (
+                    <select
+                      value={submissionCourseFilter}
+                      onChange={e => setSubmissionCourseFilter(e.target.value)}
+                      className="rounded-full border border-white/15 bg-black/30 px-4 py-1.5 text-sm text-white/70 focus:outline-none focus:border-white/30 [color-scheme:dark]"
                     >
-                      {savingFeedbackId === submission.id ? 'Saving…' : 'Save feedback'}
-                    </button>
-                  </form>
+                      <option value="ALL">All courses</option>
+                      {courseOptions.map(c => (
+                        <option key={c.id} value={c.id}>{c.title}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
+
+                {pendingSubmissions.length > 0 && submissionStatusFilter !== 'SUBMITTED' && (
+                  <div className="rounded-2xl border border-amber-400/15 bg-amber-400/5 px-5 py-3 text-sm text-amber-300 flex items-center justify-between gap-3">
+                    <span>
+                      {pendingSubmissions.length} submission{pendingSubmissions.length !== 1 ? 's' : ''} waiting for your feedback
+                    </span>
+                    <button
+                      onClick={() => setSubmissionStatusFilter('SUBMITTED')}
+                      className="text-xs underline hover:text-amber-200"
+                    >
+                      Show pending only
+                    </button>
+                  </div>
+                )}
+
+                {submissions.length === 0 ? (
+                  <div className="rounded-[24px] border border-white/8 bg-white/[0.02] p-12 text-center">
+                    <ClipboardList size={28} className="text-white/20 mx-auto mb-3" />
+                    <p className="text-white/40 mb-1">No submissions for your courses yet.</p>
+                    <p className="text-xs text-white/30">When a learner submits an assignment in one of your courses, it'll appear here.</p>
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="rounded-[24px] border border-white/8 bg-white/[0.02] p-12 text-center">
+                    <ClipboardList size={28} className="text-white/20 mx-auto mb-3" />
+                    <p className="text-white/40">No submissions match the current filters.</p>
+                    <button
+                      onClick={() => { setSubmissionStatusFilter('ALL'); setSubmissionCourseFilter('ALL') }}
+                      className="mt-3 text-xs text-[#F5C518] hover:text-[#E8B800] underline"
+                    >
+                      Clear filters
+                    </button>
+                  </div>
+                ) : filtered.map(submission => (
+                  <div key={submission.id} className="rounded-[24px] border border-white/10 bg-white/[0.04] p-6">
+                    <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          {submission.assignment.week.course && (
+                            <span className="text-[10px] font-mono uppercase tracking-wider text-[#F5C518]/80 rounded-full bg-[#F5C518]/8 border border-[#F5C518]/15 px-2 py-0.5">
+                              {submission.assignment.week.course.title}
+                            </span>
+                          )}
+                          <span className="text-xs font-mono text-white/30">Week {submission.assignment.week.number}</span>
+                          <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-mono ${
+                            submission.status === 'SUBMITTED'
+                              ? 'border-amber-400/30 text-amber-300 bg-amber-400/8'
+                              : submission.status === 'REVIEWED'
+                                ? 'border-emerald-400/30 text-emerald-300'
+                                : 'border-white/15 text-white/40'
+                          }`}>
+                            {submission.status}
+                          </span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-white mb-0.5">{submission.assignment.title}</h3>
+                        <p className="text-sm text-white/40">
+                          {submission.user.name || submission.user.email} · {submission.assignment.week.title}
+                        </p>
+                      </div>
+                      <p className="text-xs text-white/30 whitespace-nowrap">
+                        {new Date(submission.submittedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+
+                    {submission.choice && (
+                      <div className="mb-3 rounded-xl border border-[#F5C518]/15 bg-[#F5C518]/8 px-4 py-2.5">
+                        <p className="text-xs text-[#F5C518]/60 mb-0.5">Selected option</p>
+                        <p className="text-sm font-medium text-[#F5C518]">{submission.choice.title}</p>
+                      </div>
+                    )}
+
+                    {submission.textResponse && (
+                      <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm leading-relaxed text-white/65 mb-4 whitespace-pre-line">
+                        {submission.textResponse}
+                      </div>
+                    )}
+
+                    {submission.attachmentUrl && (
+                      <a
+                        href={submission.attachmentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 mb-4 rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-xs text-white/70 hover:text-white hover:border-white/25 transition-colors"
+                      >
+                        📎 {submission.attachmentName || 'Attachment'}
+                      </a>
+                    )}
+
+                    {submission.feedback.length > 0 && (
+                      <div className="space-y-2 mb-4">
+                        {submission.feedback.map(fb => {
+                          const isMine = fb.reviewer.id === auth?.user.id
+                          const canDelete = isMine || auth?.user.role === 'SUPER_ADMIN'
+                          return (
+                            <div key={fb.id} className="rounded-2xl border border-teal-400/15 bg-teal-400/10 p-4">
+                              <div className="flex items-start justify-between gap-3 mb-2">
+                                <div className="min-w-0">
+                                  <p className="text-xs font-mono uppercase tracking-[0.16em] text-teal-100/60">
+                                    {isMine ? 'Your feedback' : `Feedback by ${fb.reviewer.name || fb.reviewer.email}`}
+                                  </p>
+                                  <p className="text-[10px] text-teal-100/40 mt-0.5">
+                                    {new Date(fb.createdAt).toLocaleString()}
+                                  </p>
+                                </div>
+                                {canDelete && (
+                                  <button
+                                    onClick={() => void deleteFeedback(submission.id, fb.id)}
+                                    disabled={deletingFeedbackId === fb.id}
+                                    title="Delete this feedback"
+                                    className="p-1.5 text-teal-100/40 hover:text-red-400 transition-colors disabled:opacity-40 flex-shrink-0"
+                                  >
+                                    {deletingFeedbackId === fb.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                  </button>
+                                )}
+                              </div>
+                              <p className="text-sm text-white/75 whitespace-pre-line">{fb.feedback}</p>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    <form onSubmit={e => void submitFeedback(e, submission.id)} className="space-y-3">
+                      <textarea
+                        value={feedbackDrafts[submission.id] ?? ''}
+                        onChange={e => setFeedbackDrafts(cur => ({ ...cur, [submission.id]: e.target.value }))}
+                        rows={3}
+                        placeholder={submission.feedback.length > 0 ? 'Add additional feedback…' : 'Leave feedback for this learner…'}
+                        className="w-full rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#F5C518]/40"
+                      />
+                      <button
+                        type="submit"
+                        disabled={savingFeedbackId === submission.id || !feedbackDrafts[submission.id]?.trim()}
+                        className="rounded-full bg-[#F5C518] px-5 py-2.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors disabled:opacity-40"
+                      >
+                        {savingFeedbackId === submission.id ? 'Saving…' : 'Save feedback'}
+                      </button>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
 
           {/* ── Learner Progress tab ─────────────────────────────────────────── */}
           {activeTab === 'progress' && (

@@ -153,6 +153,7 @@ export default function SuperAdminPage() {
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({})
   const [savingFeedbackId, setSavingFeedbackId] = useState<string | null>(null)
+  const [deletingFeedbackId, setDeletingFeedbackId] = useState<string | null>(null)
   const [submissionStatusFilter, setSubmissionStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'REVIEWED'>('ALL')
 
   const [error, setError] = useState<string | null>(null)
@@ -249,6 +250,22 @@ export default function SuperAdminPage() {
       setError(err instanceof Error ? err.message : 'Unable to save feedback.')
     } finally {
       setSavingFeedbackId(null)
+    }
+  }
+
+  async function deleteFeedback(submissionId: string, feedbackId: string) {
+    if (!confirm('Delete this feedback? The learner will no longer see it. If this was the only feedback, the submission will move back to "Pending review".')) return
+    try {
+      setDeletingFeedbackId(feedbackId)
+      setError(null)
+      await apiRequest(`/academy/admin/assignments/submissions/${submissionId}/feedback/${feedbackId}`, {
+        method: 'DELETE',
+      })
+      await loadSubmissions()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to delete feedback.')
+    } finally {
+      setDeletingFeedbackId(null)
     }
   }
 
@@ -756,11 +773,35 @@ export default function SuperAdminPage() {
                           )}
 
                           {submission.feedback.length > 0 && (
-                            <div className="rounded-2xl border border-teal-400/15 bg-teal-400/10 p-4 mb-4">
-                              <p className="text-xs font-mono uppercase tracking-[0.16em] text-teal-100/60 mb-2">
-                                Feedback{submission.feedback[0].reviewer ? ` — ${submission.feedback[0].reviewer.name || submission.feedback[0].reviewer.email}` : ''}
-                              </p>
-                              <p className="text-sm text-white/75 whitespace-pre-line">{submission.feedback[0].feedback}</p>
+                            <div className="space-y-2 mb-4">
+                              {submission.feedback.map(fb => {
+                                const isMine = fb.reviewer.id === currentAuth?.user.id
+                                // Super admin can always delete; regular admin only deletes their own.
+                                // (We're on the SuperAdmin page so the user IS super admin — they can delete any.)
+                                return (
+                                  <div key={fb.id} className="rounded-2xl border border-teal-400/15 bg-teal-400/10 p-4">
+                                    <div className="flex items-start justify-between gap-3 mb-2">
+                                      <div className="min-w-0">
+                                        <p className="text-xs font-mono uppercase tracking-[0.16em] text-teal-100/60">
+                                          {isMine ? 'Your feedback' : `Feedback by ${fb.reviewer.name || fb.reviewer.email}`}
+                                        </p>
+                                        <p className="text-[10px] text-teal-100/40 mt-0.5">
+                                          {new Date(fb.createdAt).toLocaleString()}
+                                        </p>
+                                      </div>
+                                      <button
+                                        onClick={() => void deleteFeedback(submission.id, fb.id)}
+                                        disabled={deletingFeedbackId === fb.id}
+                                        title="Delete this feedback"
+                                        className="p-1.5 text-teal-100/40 hover:text-red-400 transition-colors disabled:opacity-40 flex-shrink-0"
+                                      >
+                                        {deletingFeedbackId === fb.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                      </button>
+                                    </div>
+                                    <p className="text-sm text-white/75 whitespace-pre-line">{fb.feedback}</p>
+                                  </div>
+                                )
+                              })}
                             </div>
                           )}
 
