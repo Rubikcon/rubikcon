@@ -2011,6 +2011,90 @@ router.post('/admin/facilitators', requireAuth, requireAdmin, async (req: Reques
   }
 })
 
+// ─── Facilitator self-service profile updates ─────────────────────────────
+//
+// Lets an admin update their own Facilitator record — currently just the
+// photo, but the schema is extensible. The facilitator is identified by
+// matching their User.email (case-insensitive) against Facilitator.email.
+
+const PHOTO_MAX_KB_ENCODED = 150 // leaves comfortable headroom over the
+                                  // client-side 100KB target after compression
+
+const updateOwnFacilitatorSchema = z.object({
+  // Accept either a `data:image/...;base64,...` URL, an https URL, or null to clear.
+  photoUrl: z
+    .string()
+    .nullable()
+    .refine(
+      val => {
+        if (val === null) return true
+        if (val.startsWith('https://') || val.startsWith('http://')) return true
+        return /^data:image\/(jpeg|jpg|png|webp);base64,[a-zA-Z0-9+/=]+$/.test(val)
+      },
+      { message: 'photoUrl must be a base64 data URL (jpeg, png, or webp) or an https URL.' }
+    )
+    .refine(
+      val => val === null || val.length <= PHOTO_MAX_KB_ENCODED * 1024,
+      { message: `Image too large — keep it under ${PHOTO_MAX_KB_ENCODED} KB after encoding.` }
+    )
+    .optional(),
+  bio: z.string().trim().max(2000).optional().nullable(),
+})
+
+router.patch('/admin/facilitators/me', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = updateOwnFacilitatorSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const userEmail = req.user!.email.toLowerCase()
+    const facilitator = await prisma.facilitator.findFirst({
+      where: { email: { equals: userEmail, mode: 'insensitive' } },
+    })
+    if (!facilitator) {
+      return sendError(
+        res,
+        'You\'re not registered as a facilitator yet. A super admin needs to add you under Admin → Facilitators first.',
+        404
+      )
+    }
+
+    const data: { photoUrl?: string | null; bio?: string | null } = {}
+    if (parsed.data.photoUrl !== undefined) data.photoUrl = parsed.data.photoUrl
+    if (parsed.data.bio !== undefined) data.bio = parsed.data.bio
+
+    const updated = await prisma.facilitator.update({
+      where: { id: facilitator.id },
+      data,
+    })
+    return sendSuccess(res, updated, 'Profile updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/admin/facilitators/me', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userEmail = req.user!.email.toLowerCase()
+    const facilitator = await prisma.facilitator.findFirst({
+      where: { email: { equals: userEmail, mode: 'insensitive' } },
+      select: {
+        id: true, name: true, title: true, organization: true, email: true,
+        linkedinUrl: true, photoUrl: true, bio: true,
+      },
+    })
+    if (!facilitator) {
+      return sendError(
+        res,
+        'You\'re not registered as a facilitator yet.',
+        404
+      )
+    }
+    return sendSuccess(res, facilitator)
+  } catch (err) {
+    next(err)
+  }
+})
+
 // Create a new course (draft)
 router.post('/admin/courses', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {

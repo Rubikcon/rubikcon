@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BookOpen,
+  Camera,
   CheckCircle2,
   ClipboardList,
   Key,
@@ -9,8 +10,10 @@ import {
   Plus,
   ShieldCheck,
   Trash2,
+  UserCircle,
   Users,
 } from 'lucide-react'
+import { compressImageToBase64 } from '../lib/imageCompress'
 import AcademyNavbar from '../components/AcademyNavbar'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
@@ -74,6 +77,15 @@ export default function AdminAcademyPage() {
   const [submissionStatusFilter, setSubmissionStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'REVIEWED'>('ALL')
   const [submissionCourseFilter, setSubmissionCourseFilter] = useState<string>('ALL')
   const [deletingFeedbackId, setDeletingFeedbackId] = useState<string | null>(null)
+
+  // Profile (own Facilitator record)
+  const [showProfile, setShowProfile] = useState(false)
+  const [myFacilitator, setMyFacilitator] = useState<{ id: string; name: string; title: string; organization: string; email: string; photoUrl: string | null; bio: string | null } | null>(null)
+  const [loadingMyFacilitator, setLoadingMyFacilitator] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [profileError, setProfileError] = useState<string | null>(null)
+  const [profileMessage, setProfileMessage] = useState<string | null>(null)
+  const profileFileInputRef = useRef<HTMLInputElement | null>(null)
   const [savingFeedbackId, setSavingFeedbackId] = useState<string | null>(null)
 
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -174,6 +186,80 @@ export default function AdminAcademyPage() {
       setError(err instanceof Error ? err.message : 'Unable to delete feedback.')
     } finally {
       setDeletingFeedbackId(null)
+    }
+  }
+
+  // ─── Profile (Facilitator self-service) ─────────────────────────────────
+
+  async function openProfile() {
+    setShowProfile(true)
+    setProfileError(null)
+    setProfileMessage(null)
+    if (!myFacilitator) {
+      setLoadingMyFacilitator(true)
+      try {
+        const data = await apiRequest<typeof myFacilitator>('/academy/admin/facilitators/me')
+        setMyFacilitator(data)
+      } catch (err) {
+        // 404 here means "you're not registered as a facilitator yet" — surface that gently.
+        setProfileError(err instanceof Error ? err.message : 'Unable to load your profile.')
+      } finally {
+        setLoadingMyFacilitator(false)
+      }
+    }
+  }
+
+  function closeProfile() {
+    setShowProfile(false)
+    // Defer the cleanup so the close animation finishes first.
+    setTimeout(() => {
+      setProfileError(null)
+      setProfileMessage(null)
+    }, 250)
+  }
+
+  async function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    // Always clear the input so picking the same file twice still triggers change.
+    event.target.value = ''
+    if (!file || !myFacilitator) return
+
+    setUploadingPhoto(true)
+    setProfileError(null)
+    setProfileMessage(null)
+    try {
+      // Compress to <100KB base64 client-side so we never round-trip a huge blob.
+      const dataUrl = await compressImageToBase64(file, { maxBase64KB: 100 })
+      const updated = await apiRequest<typeof myFacilitator>('/academy/admin/facilitators/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ photoUrl: dataUrl }),
+      })
+      setMyFacilitator(updated)
+      setProfileMessage('Profile photo updated.')
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : 'Unable to update photo.')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  async function removePhoto() {
+    if (!myFacilitator) return
+    if (!confirm('Remove your profile photo? Course pages will fall back to your initials.')) return
+    setUploadingPhoto(true)
+    setProfileError(null)
+    setProfileMessage(null)
+    try {
+      const updated = await apiRequest<typeof myFacilitator>('/academy/admin/facilitators/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ photoUrl: null }),
+      })
+      setMyFacilitator(updated)
+      setProfileMessage('Profile photo removed.')
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : 'Unable to remove photo.')
+    } finally {
+      setUploadingPhoto(false)
     }
   }
 
@@ -305,13 +391,22 @@ export default function AdminAcademyPage() {
                 Build courses, review submissions, and track your learners' progress.
               </p>
             </div>
-            <button
-              onClick={() => setShowPasswordChange(true)}
-              className="shrink-0 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white/60 hover:border-white/30 hover:text-white transition-colors"
-            >
-              <Key size={14} />
-              Change password
-            </button>
+            <div className="shrink-0 flex flex-wrap gap-2">
+              <button
+                onClick={openProfile}
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white/60 hover:border-white/30 hover:text-white transition-colors"
+              >
+                <UserCircle size={14} />
+                My profile
+              </button>
+              <button
+                onClick={() => setShowPasswordChange(true)}
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white/60 hover:border-white/30 hover:text-white transition-colors"
+              >
+                <Key size={14} />
+                Change password
+              </button>
+            </div>
           </div>
 
           {/* Stats row */}
@@ -866,6 +961,116 @@ export default function AdminAcademyPage() {
 
         </div>
       </main>
+
+      {/* Profile modal — own Facilitator record (photo, bio) */}
+      {showProfile && (
+        <div
+          onClick={closeProfile}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#111] p-6 space-y-5"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-display text-xl font-extrabold text-white mb-1">My profile</h2>
+                <p className="text-sm text-white/50">How learners see you on course pages</p>
+              </div>
+              <button
+                onClick={closeProfile}
+                className="text-white/40 hover:text-white text-2xl leading-none"
+              >×</button>
+            </div>
+
+            {loadingMyFacilitator ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <Loader2 size={24} className="animate-spin text-[#F5C518] mb-2" />
+                <p className="text-sm text-white/40">Loading profile…</p>
+              </div>
+            ) : !myFacilitator ? (
+              <div className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100 leading-relaxed">
+                {profileError || 'You\'re not registered as a facilitator yet.'}
+                <p className="text-xs text-amber-100/60 mt-2">
+                  Ask a super admin to add you under <strong>Admin → Facilitators</strong>. Once they do, your photo and bio will be editable here.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Photo */}
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    {myFacilitator.photoUrl ? (
+                      <img
+                        src={myFacilitator.photoUrl}
+                        alt={myFacilitator.name}
+                        className="w-20 h-20 rounded-full object-cover border-2 border-[#F5C518]/30"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-full bg-[#F5C518]/15 border-2 border-[#F5C518]/30 flex items-center justify-center text-[#F5C518] font-display font-extrabold text-xl">
+                        {myFacilitator.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    {uploadingPhoto && (
+                      <div className="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center">
+                        <Loader2 size={22} className="animate-spin text-[#F5C518]" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-white truncate">{myFacilitator.name}</p>
+                    <p className="text-sm text-white/45 truncate">{myFacilitator.title}</p>
+                    <p className="text-xs text-white/30 truncate">{myFacilitator.organization}</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    ref={profileFileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => profileFileInputRef.current?.click()}
+                    disabled={uploadingPhoto}
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-[#F5C518] px-4 py-2.5 text-sm font-semibold text-black hover:bg-[#E8B800] transition-colors disabled:opacity-40"
+                  >
+                    <Camera size={14} />
+                    {myFacilitator.photoUrl ? 'Change photo' : 'Upload photo'}
+                  </button>
+                  {myFacilitator.photoUrl && (
+                    <button
+                      onClick={removePhoto}
+                      disabled={uploadingPhoto}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 px-4 py-2.5 text-sm text-white/60 hover:text-red-400 hover:border-red-400/30 transition-colors disabled:opacity-40"
+                    >
+                      <Trash2 size={14} />
+                      Remove
+                    </button>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-white/40 leading-relaxed">
+                  JPEG, PNG, or WebP. We'll resize and compress your image to <strong className="text-white/60">under 100 KB</strong> in the browser before sending it — you can upload a much bigger original and we'll handle the rest.
+                </p>
+
+                {profileError && (
+                  <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+                    {profileError}
+                  </div>
+                )}
+                {profileMessage && (
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100 flex items-center gap-2">
+                    <CheckCircle2 size={14} /> {profileMessage}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Password change modal */}
       {showPasswordChange && (
