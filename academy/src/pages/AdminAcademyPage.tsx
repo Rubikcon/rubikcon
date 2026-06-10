@@ -805,6 +805,48 @@ export default function AdminAcademyPage() {
                       </p>
                     </div>
 
+                    {/* Assignment prompt — the actual question/instructions the learner was answering.
+                        Collapsed by default so submissions stay scannable; expand for context. */}
+                    {submission.assignment.instructions && (
+                      <details className="mb-3 rounded-2xl border border-white/10 bg-white/[0.03]">
+                        <summary className="cursor-pointer px-4 py-2.5 text-xs font-mono uppercase tracking-[0.16em] text-white/45 hover:text-white/70 transition-colors flex items-center gap-2">
+                          <MessageSquare size={11} />
+                          View assignment prompt
+                          {submission.assignment.deadline && (
+                            <span className="ml-auto text-[10px] text-white/30">
+                              Due {new Date(submission.assignment.deadline).toLocaleDateString()}
+                            </span>
+                          )}
+                        </summary>
+                        <div className="px-4 pb-3 pt-1 text-sm text-white/70 leading-relaxed whitespace-pre-line border-t border-white/10">
+                          {submission.assignment.instructions}
+                          {submission.assignment.choices && submission.assignment.choices.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-white/10">
+                              <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-white/40 mb-2">
+                                Choices the learner could pick from
+                              </p>
+                              <ul className="space-y-1.5">
+                                {submission.assignment.choices.map(c => (
+                                  <li key={c.id} className="text-xs text-white/55">
+                                    <strong className="text-white/75">{c.title}</strong>
+                                    {c.description && <span className="text-white/40"> — {c.description}</span>}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          <div className="mt-3 pt-3 border-t border-white/10 flex flex-wrap gap-2 text-[10px]">
+                            {submission.assignment.allowTextSubmission && (
+                              <span className="rounded-full bg-blue-400/10 border border-blue-400/30 px-2 py-0.5 text-blue-300">Text response allowed</span>
+                            )}
+                            {submission.assignment.allowFileUpload && (
+                              <span className="rounded-full bg-purple-400/10 border border-purple-400/30 px-2 py-0.5 text-purple-300">File upload allowed</span>
+                            )}
+                          </div>
+                        </div>
+                      </details>
+                    )}
+
                     {submission.choice && (
                       <div className="mb-3 rounded-xl border border-[#F5C518]/15 bg-[#F5C518]/8 px-4 py-2.5">
                         <p className="text-xs text-[#F5C518]/60 mb-0.5">Selected option</p>
@@ -812,9 +854,18 @@ export default function AdminAcademyPage() {
                       </div>
                     )}
 
-                    {submission.textResponse && (
-                      <div className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm leading-relaxed text-white/65 mb-4 whitespace-pre-line">
-                        {submission.textResponse}
+                    {submission.textResponse ? (
+                      <div className="rounded-2xl border border-white/8 bg-black/20 p-4 mb-4">
+                        <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-white/35 mb-2">
+                          Learner's response
+                        </p>
+                        <p className="text-sm leading-relaxed text-white/75 whitespace-pre-line">
+                          {submission.textResponse}
+                        </p>
+                      </div>
+                    ) : !submission.attachmentUrl && !submission.choice && (
+                      <div className="rounded-2xl border border-amber-400/20 bg-amber-400/5 px-4 py-3 mb-4 text-xs text-amber-200">
+                        ⚠️ This submission has no text response, no attachment, and no selected choice — the learner may have submitted an empty form.
                       </div>
                     )}
 

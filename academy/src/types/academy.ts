@@ -425,11 +425,20 @@ export type AdminSubmission = Array<{
   assignment: {
     id: string
     title: string
+    // Full assignment context — what the learner was asked to do. Older backends
+    // may not return these fields, so they're optional for forward-compat.
+    instructions?: string
+    deadline?: string | null
+    allowTextSubmission?: boolean
+    allowFileUpload?: boolean
+    choices?: Array<{ id: string; title: string; description: string; position: number }>
     week: {
       id: string
       slug: string
       number: number
       title: string
+      // Course context — null when running against an older backend that didn't include it
+      course?: { id: string; title: string; slug: string } | null
     }
   }
   choice: {

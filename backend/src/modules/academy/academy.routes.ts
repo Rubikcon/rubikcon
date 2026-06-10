@@ -1519,7 +1519,8 @@ router.get('/admin/assignments/submissions', requireAuth, requireAdmin, async (r
   try {
     // SUPER_ADMIN sees every submission on the platform.
     // Regular ADMIN (facilitator) sees submissions from courses they own AND
-    // from courses where they've been added as a facilitator.
+    // from courses where they've been added as a facilitator (at course, week,
+    // or lesson level).
     const courseScope = facilitatorAccessibleCourseWhere(req.user!)
     const where: Prisma.AssignmentSubmissionWhereInput =
       Object.keys(courseScope).length === 0
@@ -1537,6 +1538,9 @@ router.get('/admin/assignments/submissions', requireAuth, requireAdmin, async (r
           },
         },
         assignment: {
+          // Include the full assignment context — instructions, deadline,
+          // submission types, and the choices the learner could pick from.
+          // Without these, facilitators were grading submissions blind.
           include: {
             week: {
               select: {
@@ -1547,6 +1551,7 @@ router.get('/admin/assignments/submissions', requireAuth, requireAdmin, async (r
                 course: { select: { id: true, title: true, slug: true } },
               },
             },
+            choices: { orderBy: { position: 'asc' } },
           },
         },
         choice: true,
@@ -1588,14 +1593,7 @@ router.post('/admin/assignments/submissions/:submissionId/feedback', requireAuth
             week: {
               include: {
                 course: {
-                  select: {
-                    createdById: true,
-                    title: true,
-                    slug: true,
-                    courseFacilitators: {
-                      select: { facilitator: { select: { email: true } } },
-                    },
-                  },
+                  select: { id: true, createdById: true, title: true, slug: true },
                 },
               },
             },
@@ -1605,16 +1603,22 @@ router.post('/admin/assignments/submissions/:submissionId/feedback', requireAuth
     })
     if (!submission) return sendError(res, 'Submission not found.', 404)
 
-    // Scope: regular admins can leave feedback on submissions from courses they
-    // created OR courses where they're added as a facilitator (email match).
+    // Scope: regular admins can leave feedback on submissions from any course
+    // they facilitate at any level (course / week / lesson). Re-uses the same
+    // helper as the listing endpoint so the rules stay consistent.
     const isSuperAdmin = req.user!.role === 'SUPER_ADMIN'
-    const userEmail = req.user!.email.toLowerCase()
-    const isCreator = submission.assignment.week.course.createdById === req.user!.userId
-    const isAddedFacilitator = submission.assignment.week.course.courseFacilitators.some(
-      cf => cf.facilitator.email.toLowerCase() === userEmail
-    )
-    if (!isSuperAdmin && !isCreator && !isAddedFacilitator) {
-      return sendError(res, 'You can only leave feedback on submissions from courses you facilitate.', 403)
+    if (!isSuperAdmin) {
+      const accessibleCourseCount = await prisma.course.count({
+        where: {
+          AND: [
+            { id: submission.assignment.week.course.id },
+            facilitatorAccessibleCourseWhere(req.user!),
+          ],
+        },
+      })
+      if (accessibleCourseCount === 0) {
+        return sendError(res, 'You can only leave feedback on submissions from courses you facilitate.', 403)
+      }
     }
 
     const feedback = await prisma.assignmentFeedback.create({
@@ -2075,10 +2079,19 @@ async function markCourseDirtyIfNeeded(courseId: string, role: string, currentSt
  */
 function facilitatorAccessibleCourseWhere(user: { userId: string; email: string; role: string }): Prisma.CourseWhereInput {
   if (user.role === 'SUPER_ADMIN') return {}
+  // Match the user as a facilitator at ANY of the three pinning levels — course,
+  // week, or lesson. Previously we only checked CourseFacilitator, which missed
+  // tutors who'd been pinned only at the week/lesson level. The email match is
+  // case-insensitive (User.email is lowercase; Facilitator.email might be mixed).
+  const emailMatch: Prisma.FacilitatorWhereInput = {
+    email: { equals: user.email, mode: 'insensitive' },
+  }
   return {
     OR: [
       { createdById: user.userId },
-      { courseFacilitators: { some: { facilitator: { email: { equals: user.email, mode: 'insensitive' } } } } },
+      { courseFacilitators: { some: { facilitator: emailMatch } } },
+      { weeks: { some: { facilitators: { some: { facilitator: emailMatch } } } } },
+      { modules: { some: { lessons: { some: { facilitators: { some: { facilitator: emailMatch } } } } } } },
     ],
   }
 }
