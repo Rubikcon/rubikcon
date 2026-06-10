@@ -22,6 +22,8 @@ import {
 import { apiRequest, ApiError } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
 import VideoEmbed, { getEmbedUrl } from '../components/VideoEmbed'
+import EmbedFrame from '../components/EmbedFrame'
+import HtmlVideoPlayer from '../components/HtmlVideoPlayer'
 import SlideViewer from '../components/SlideViewer'
 import type { CourseSummary, CourseWeekSummary, ReadingType, WeekDetail } from '../types/academy'
 
@@ -226,6 +228,32 @@ export default function LessonPage() {
     }
   }
 
+  const [marking, setMarking] = useState(false)
+  async function markLessonComplete() {
+    if (!auth) { window.location.href = '/login'; return }
+    if (!week) return
+    try {
+      setMarking(true)
+      const result = await apiRequest<{ status: string; completedAt: string | null }>(
+        `/academy/weeks/${week.slug}/complete`,
+        { method: 'POST' }
+      )
+      // Reflect locally so the UI flips immediately without a full reload.
+      setWeek(cur => cur ? {
+        ...cur,
+        progress: {
+          ...cur.progress,
+          status: result.status as any,
+          completedAt: result.completedAt,
+        },
+      } : cur)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to mark lesson complete.')
+    } finally {
+      setMarking(false)
+    }
+  }
+
   async function toggleReading(resourceId: string, read: boolean) {
     if (!auth) { window.location.href = '/login'; return }
     try {
@@ -414,8 +442,30 @@ export default function LessonPage() {
             <span className="text-white/70">{week.title}</span>
           </p>
 
-          {/* Prev / Next */}
+          {/* Mark complete / completed indicator */}
           <div className="ml-auto flex items-center gap-2 shrink-0">
+            {week.progress.status === 'COMPLETE' ? (
+              <span
+                title={week.progress.completedAt ? `Completed ${new Date(week.progress.completedAt).toLocaleDateString()}` : 'Completed'}
+                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-300"
+              >
+                <CheckCircle2 size={12} /> Completed
+              </span>
+            ) : (
+              <button
+                onClick={markLessonComplete}
+                disabled={marking}
+                title="Mark this lesson complete"
+                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-400/20 hover:border-emerald-400/50 transition-colors disabled:opacity-50"
+              >
+                {marking
+                  ? <Loader2 size={12} className="animate-spin" />
+                  : <CheckCircle2 size={12} />}
+                {marking ? 'Saving…' : 'Mark complete'}
+              </button>
+            )}
+
+            {/* Prev / Next */}
             {week.navigation.previous ? (
               <a
                 href={`/course/${course.slug}/week/${week.navigation.previous.slug}`}
@@ -446,34 +496,19 @@ export default function LessonPage() {
               <div className="flex-1 min-w-0">
                 {activeVideo && (
                   embedSrc ? (
-                    <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
-                      <iframe
-                        key={activeVideo.id}
-                        src={embedSrc}
-                        title={activeVideo.title}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                        allowFullScreen
-                        className="absolute inset-0 w-full h-full"
-                        style={{ border: 0 }}
-                      />
-                    </div>
+                    <EmbedFrame
+                      key={activeVideo.id}
+                      src={embedSrc}
+                      title={activeVideo.title}
+                      fallbackUrl={activeVideo.url}
+                      className="rounded-none"
+                    />
                   ) : (
-                    /* Direct video file — HTML5 player */
-                    <div className="relative w-full bg-black" style={{ paddingTop: '56.25%' }}>
-                      <video
-                        key={activeVideo.id}
-                        src={activeVideo.url}
-                        controls
-                        controlsList="nodownload"
-                        className="absolute inset-0 w-full h-full"
-                        style={{ background: '#000' }}
-                      >
-                        Your browser does not support embedded video.{' '}
-                        <a href={activeVideo.url} target="_blank" rel="noreferrer" className="text-[#F5C518] underline">
-                          Open video
-                        </a>
-                      </video>
-                    </div>
+                    <HtmlVideoPlayer
+                      key={activeVideo.id}
+                      src={activeVideo.url}
+                      title={activeVideo.title}
+                    />
                   )
                 )}
               </div>
@@ -686,16 +721,12 @@ export default function LessonPage() {
                 </div>
                 {week.resources.slideDecks.map(deck => (
                   <div key={deck.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-5">
-                    {/* Inline embedded preview for at-a-glance view */}
-                    <div className="rounded-xl overflow-hidden border border-white/10 bg-black aspect-video mb-4">
-                      <iframe
+                    {/* Inline embedded preview with skeleton loader + fallback if the embed fails */}
+                    <div className="mb-4">
+                      <EmbedFrame
                         src={deck.url}
+                        fallbackUrl={deck.url}
                         title={deck.title}
-                        allow="fullscreen"
-                        allowFullScreen
-                        loading="lazy"
-                        className="w-full h-full"
-                        style={{ border: 0 }}
                       />
                     </div>
                     <div className="flex flex-wrap items-start justify-between gap-4">

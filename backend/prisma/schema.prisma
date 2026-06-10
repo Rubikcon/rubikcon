@@ -665,6 +665,12 @@ model WeekProgress {
   status              WeekProgressStatus @default(NOT_STARTED)
   quizSubmitted       Boolean            @default(false)
   assignmentSubmitted Boolean            @default(false)
+  // True when the learner explicitly clicked "Mark complete" — overrides the
+  // derived status so lessons without a quiz/assignment can still reach COMPLETE.
+  manuallyCompleted   Boolean            @default(false)
+  // Stamped the first time the learner opens the lesson. Used to flip status
+  // from NOT_STARTED → IN_PROGRESS even before any submission.
+  firstOpenedAt       DateTime?
   completedAt         DateTime?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt

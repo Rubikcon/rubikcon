@@ -62,27 +62,98 @@ function maskEmail(email: string) {
   return `${local.slice(0, 2)}***@${domain}`
 }
 
-function deriveWeekProgressStatus(quizSubmitted: boolean, assignmentSubmitted: boolean): WeekProgressStatus {
-  if (quizSubmitted && assignmentSubmitted) return WeekProgressStatus.COMPLETE
-  if (quizSubmitted || assignmentSubmitted) return WeekProgressStatus.IN_PROGRESS
+type ProgressSignals = {
+  hasQuiz: boolean
+  quizSubmitted: boolean
+  assignmentCount: number
+  assignmentSubmitted: boolean
+  manuallyCompleted: boolean
+  firstOpenedAt: Date | null
+}
+
+/**
+ * Derive the WeekProgress status from the lesson's structure + the learner's
+ * actions. The rules:
+ *
+ *   - If the learner explicitly clicked "Mark complete" → COMPLETE
+ *   - If the lesson has structured requirements (quiz and/or assignment) and
+ *     ALL of them are satisfied → COMPLETE
+ *   - If any submission has been made, OR the learner has opened the lesson
+ *     at least once → IN_PROGRESS
+ *   - Otherwise → NOT_STARTED
+ *
+ * Side note: lessons with no quiz AND no assignment can only reach COMPLETE
+ * via the manual "Mark complete" button. That's intentional — there's no other
+ * objective signal to derive completion from.
+ */
+function deriveWeekProgressStatus(s: ProgressSignals): WeekProgressStatus {
+  if (s.manuallyCompleted) return WeekProgressStatus.COMPLETE
+
+  const hasStructured = s.hasQuiz || s.assignmentCount > 0
+  if (hasStructured) {
+    const quizOk = !s.hasQuiz || s.quizSubmitted
+    const assignmentOk = s.assignmentCount === 0 || s.assignmentSubmitted
+    if (quizOk && assignmentOk) return WeekProgressStatus.COMPLETE
+  }
+
+  if (s.quizSubmitted || s.assignmentSubmitted || s.firstOpenedAt) {
+    return WeekProgressStatus.IN_PROGRESS
+  }
+
   return WeekProgressStatus.NOT_STARTED
 }
 
-async function syncWeekProgress(userId: string, weekId: string) {
-  const [quizAttempt, assignmentSubmission] = await Promise.all([
-    prisma.quizAttempt.findFirst({
-      where: { userId, quiz: { weekId } },
-      select: { id: true },
-    }),
-    prisma.assignmentSubmission.findFirst({
-      where: { userId, assignment: { weekId } },
-      select: { id: true },
-    }),
+/**
+ * Recompute and persist a learner's progress for a lesson. Honors existing
+ * `manuallyCompleted` and `firstOpenedAt` markers (we don't clobber them).
+ * Pass `touchOpened: true` to stamp `firstOpenedAt` if it's null (used when
+ * the learner visits the lesson page).
+ */
+async function syncWeekProgress(userId: string, weekId: string, opts: { touchOpened?: boolean; manuallyComplete?: boolean } = {}) {
+  // Pull current row (if any) so we preserve manuallyCompleted / firstOpenedAt
+  // AND so we can implement the "never demote COMPLETE" guarantee — once a
+  // learner has passed a lesson, their progress is permanent.
+  const existing = await prisma.weekProgress.findUnique({
+    where: { userId_weekId: { userId, weekId } },
+    select: { status: true, manuallyCompleted: true, firstOpenedAt: true, completedAt: true },
+  })
+
+  // Pull the lesson's structure (does it have a quiz, how many assignments).
+  // Cheap counts/find on indexed columns.
+  const [quizExists, assignmentCount, quizAttempt, assignmentSubmission] = await Promise.all([
+    prisma.quiz.findFirst({ where: { weekId }, select: { id: true } }),
+    prisma.assignment.count({ where: { weekId } }),
+    prisma.quizAttempt.findFirst({ where: { userId, quiz: { weekId } }, select: { id: true } }),
+    prisma.assignmentSubmission.findFirst({ where: { userId, assignment: { weekId } }, select: { id: true } }),
   ])
 
+  // Hard guarantee: a learner who has already passed a lesson stays passed,
+  // regardless of what happens to the underlying signals (quiz deletion,
+  // facilitator restructuring, etc.). We achieve this by treating any
+  // pre-existing COMPLETE row as manually-completed from here on.
+  const wasAlreadyComplete = existing?.status === WeekProgressStatus.COMPLETE
+  const manuallyCompleted = opts.manuallyComplete === true
+    || existing?.manuallyCompleted === true
+    || wasAlreadyComplete
+
+  const firstOpenedAt = existing?.firstOpenedAt ?? (opts.touchOpened ? new Date() : null)
   const quizSubmitted = Boolean(quizAttempt)
   const assignmentSubmitted = Boolean(assignmentSubmission)
-  const status = deriveWeekProgressStatus(quizSubmitted, assignmentSubmitted)
+
+  const status = deriveWeekProgressStatus({
+    hasQuiz: Boolean(quizExists),
+    quizSubmitted,
+    assignmentCount,
+    assignmentSubmitted,
+    manuallyCompleted,
+    firstOpenedAt,
+  })
+
+  // Preserve the original completion timestamp — if the learner already
+  // completed this lesson before, that date shouldn't change.
+  const completedAt = status === WeekProgressStatus.COMPLETE
+    ? (existing?.completedAt ?? new Date())
+    : null
 
   return prisma.weekProgress.upsert({
     where: { userId_weekId: { userId, weekId } },
@@ -91,14 +162,18 @@ async function syncWeekProgress(userId: string, weekId: string) {
       weekId,
       quizSubmitted,
       assignmentSubmitted,
+      manuallyCompleted,
+      firstOpenedAt,
       status,
-      completedAt: status === WeekProgressStatus.COMPLETE ? new Date() : null,
+      completedAt,
     },
     update: {
       quizSubmitted,
       assignmentSubmitted,
+      manuallyCompleted,
+      firstOpenedAt,
       status,
-      completedAt: status === WeekProgressStatus.COMPLETE ? new Date() : null,
+      completedAt,
     },
   })
 }
@@ -644,6 +719,16 @@ router.get('/weeks/:weekSlug', optionalAuth, async (req: Request, res: Response,
       return sendError(res, 'Enrol in this course to access this lesson.', 403)
     }
 
+    // Touch progress on view — moves the lesson from NOT_STARTED → IN_PROGRESS
+    // the first time the learner opens it. Subsequent views are no-ops because
+    // firstOpenedAt is preserved. We don't await this — it's bookkeeping, not
+    // critical-path, so a failure here shouldn't block lesson loading.
+    if (req.user) {
+      syncWeekProgress(req.user.userId, week.id, { touchOpened: true }).catch(err => {
+        console.error('[progress] touch-on-view failed:', err)
+      })
+    }
+
     const courseWeeks = await prisma.week.findMany({
       where: { courseId: week.courseId, published: true },
       orderBy: { number: 'asc' },
@@ -799,6 +884,40 @@ router.get('/weeks/:weekSlug', optionalAuth, async (req: Request, res: Response,
             completedAt: null,
           },
     })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── POST /weeks/:weekSlug/complete ───────────────────────────────────────
+//
+// Manual "Mark lesson complete" action by the learner. Used for lessons that
+// have no quiz/assignment to derive completion from. Idempotent — calling it
+// repeatedly is a no-op after the first success.
+
+router.post('/weeks/:weekSlug/complete', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const week = await prisma.week.findUnique({
+      where: { slug: req.params.weekSlug },
+      select: { id: true, courseId: true, published: true },
+    })
+    if (!week || !week.published) return sendError(res, 'Week not found.', 404)
+
+    // Require enrolment — non-enrolled users shouldn't be able to mark
+    // lessons complete in someone else's course.
+    const enrollment = await prisma.courseEnrollment.findUnique({
+      where: { userId_courseId: { userId: req.user!.userId, courseId: week.courseId } },
+    })
+    if (!enrollment) return sendError(res, 'Enrol in this course to track progress.', 403)
+
+    const progress = await syncWeekProgress(req.user!.userId, week.id, {
+      manuallyComplete: true,
+      touchOpened: true,
+    })
+    return sendSuccess(res, {
+      status: progress.status,
+      completedAt: progress.completedAt,
+    }, 'Lesson marked complete.')
   } catch (err) {
     next(err)
   }
