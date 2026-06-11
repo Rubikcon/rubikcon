@@ -15,6 +15,7 @@ import {
   Users,
 } from 'lucide-react'
 import { compressImageToBase64 } from '../lib/imageCompress'
+import LearnerProfileModal from '../components/LearnerProfileModal'
 import AcademyNavbar from '../components/AcademyNavbar'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
@@ -78,6 +79,8 @@ export default function AdminAcademyPage() {
   const [submissionStatusFilter, setSubmissionStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'REVIEWED'>('ALL')
   const [submissionCourseFilter, setSubmissionCourseFilter] = useState<string>('ALL')
   const [deletingFeedbackId, setDeletingFeedbackId] = useState<string | null>(null)
+  const [viewingLearnerId, setViewingLearnerId] = useState<string | null>(null)
+  const [collapsedAssignments, setCollapsedAssignments] = useState<Set<string>>(new Set())
 
   // Profile (own Facilitator record)
   const [showProfile, setShowProfile] = useState(false)
@@ -547,8 +550,12 @@ export default function AdminAcademyPage() {
                     return (
                       <div
                         key={course.id}
-                        className="relative rounded-[24px] border border-white/10 bg-white/[0.04] p-5 hover:border-white/25 transition-colors group flex flex-col gap-3"
+                        className="relative rounded-[24px] border border-white/10 bg-white/[0.04] p-5 hover:border-white/25 transition-colors group flex flex-col gap-3 overflow-hidden"
                       >
+                        {/* Thumbnail background */}
+                        {course.heroImage && (
+                          <div className="absolute inset-0 rounded-[24px] opacity-20 bg-cover bg-center" style={{ backgroundImage: `url(${course.heroImage})` }} />
+                        )}
                         <a
                           href={`/admin/courses/${course.id}`}
                           className="absolute inset-0 rounded-[24px]"
@@ -659,16 +666,24 @@ export default function AdminAcademyPage() {
                     </div>
                   ) : (
                     <div className="rounded-[24px] border border-white/10 bg-white/[0.03] overflow-hidden">
-                      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-3 border-b border-white/8 text-[10px] font-mono uppercase tracking-widest text-white/25">
+                      <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3 border-b border-white/8 text-[10px] font-mono uppercase tracking-widest text-white/25">
                         <span>Learner</span>
-                        <span>Experience</span>
+                        <span>Pending</span>
+                        <span>Reviewed</span>
                         <span>Enrolled</span>
                         <span>Joined</span>
                       </div>
                       {enrollments[selectedCourseId]?.map(enrollment => {
                         const initials = (enrollment.user.name || enrollment.user.email).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                        // Calculate pending (SUBMITTED) and reviewed (REVIEWED) assignments for this user in this course
+                        const userSubmissions = submissions.filter(s => 
+                          s.user.id === enrollment.user.id && 
+                          s.assignment.week.course?.id === selectedCourseId
+                        )
+                        const pendingCount = userSubmissions.filter(s => s.status === 'SUBMITTED').length
+                        const reviewedCount = userSubmissions.filter(s => s.status === 'REVIEWED').length
                         return (
-                          <div key={enrollment.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center px-5 py-3.5 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.02] transition-colors">
+                          <div key={enrollment.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 items-center px-5 py-3.5 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.02] transition-colors">
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="w-8 h-8 rounded-full bg-[#F5C518]/12 border border-[#F5C518]/20 flex items-center justify-center text-[#F5C518] text-xs font-extrabold shrink-0">
                                 {initials}
@@ -678,7 +693,12 @@ export default function AdminAcademyPage() {
                                 <p className="text-xs text-white/35 truncate">{enrollment.user.email}</p>
                               </div>
                             </div>
-                            <span className="text-xs text-white/40">{enrollment.user.profile?.experienceLevel || '—'}</span>
+                            <span className={`text-xs shrink-0 font-semibold ${pendingCount > 0 ? 'text-amber-300' : 'text-white/30'}`}>
+                              {pendingCount}
+                            </span>
+                            <span className={`text-xs shrink-0 font-semibold ${reviewedCount > 0 ? 'text-emerald-300' : 'text-white/30'}`}>
+                              {reviewedCount}
+                            </span>
                             <span className="text-xs text-white/30 shrink-0">
                               {new Date(enrollment.enrolledAt).toLocaleDateString()}
                             </span>
@@ -788,17 +808,133 @@ export default function AdminAcademyPage() {
                       Clear filters
                     </button>
                   </div>
-                ) : filtered.map(submission => (
-                  <div key={submission.id} className="rounded-[24px] border border-white/10 bg-white/[0.04] p-6">
+                ) : (() => {
+                  /* Group submissions hierarchically:
+                       Course → Lesson (Week) → Assignment → Submission rows.
+                     This makes it easy for a facilitator to see, at a glance,
+                     which lessons have outstanding work and review everything
+                     for a single assignment in one place. */
+                  type Group = {
+                    courseId: string
+                    courseTitle: string
+                    lessons: Map<string, {
+                      weekId: string
+                      weekNumber: number
+                      weekTitle: string
+                      assignments: Map<string, {
+                        assignmentId: string
+                        assignmentTitle: string
+                        submissions: typeof filtered
+                      }>
+                    }>
+                  }
+                  const courseGroups = new Map<string, Group>()
+                  for (const s of filtered) {
+                    const courseId = s.assignment.week.course?.id || 'unknown-course'
+                    const courseTitle = s.assignment.week.course?.title || 'Unknown course'
+                    let cg = courseGroups.get(courseId)
+                    if (!cg) {
+                      cg = { courseId, courseTitle, lessons: new Map() }
+                      courseGroups.set(courseId, cg)
+                    }
+                    let lg = cg.lessons.get(s.assignment.week.id)
+                    if (!lg) {
+                      lg = {
+                        weekId: s.assignment.week.id,
+                        weekNumber: s.assignment.week.number,
+                        weekTitle: s.assignment.week.title,
+                        assignments: new Map(),
+                      }
+                      cg.lessons.set(s.assignment.week.id, lg)
+                    }
+                    let ag = lg.assignments.get(s.assignment.id)
+                    if (!ag) {
+                      ag = { assignmentId: s.assignment.id, assignmentTitle: s.assignment.title, submissions: [] }
+                      lg.assignments.set(s.assignment.id, ag)
+                    }
+                    ag.submissions.push(s)
+                  }
+
+                  const sortedCourses = Array.from(courseGroups.values()).sort((a, b) => a.courseTitle.localeCompare(b.courseTitle))
+
+                  function toggleAssignment(assignmentId: string) {
+                    setCollapsedAssignments(prev => {
+                      const next = new Set(prev)
+                      if (next.has(assignmentId)) next.delete(assignmentId)
+                      else next.add(assignmentId)
+                      return next
+                    })
+                  }
+
+                  return (
+                    <div className="space-y-8">
+                      {sortedCourses.map(cg => (
+                        <div key={cg.courseId} className="space-y-4">
+                          {/* Course header — only show when multiple courses are present */}
+                          {sortedCourses.length > 1 && (
+                            <div className="flex items-center gap-2 pb-2 border-b border-white/10">
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F5C518]/10 border border-[#F5C518]/20 px-3 py-1 text-xs font-mono uppercase tracking-wider text-[#F5C518]">
+                                <BookOpen size={11} /> {cg.courseTitle}
+                              </span>
+                            </div>
+                          )}
+                          {Array.from(cg.lessons.values())
+                            .sort((a, b) => a.weekNumber - b.weekNumber)
+                            .map(lg => (
+                              <div key={lg.weekId} className="rounded-[24px] border border-white/10 bg-white/[0.02] p-4 md:p-5">
+                                {/* Lesson header */}
+                                <div className="flex items-baseline gap-3 mb-4 flex-wrap">
+                                  <span className="text-xs font-mono uppercase tracking-widest text-[#F5C518]/80">
+                                    Lesson {lg.weekNumber}
+                                  </span>
+                                  <h3 className="text-lg font-semibold text-white">{lg.weekTitle}</h3>
+                                  <span className="ml-auto text-xs text-white/35">
+                                    {Array.from(lg.assignments.values()).reduce((s, a) => s + a.submissions.length, 0)}
+                                    {' submission'}
+                                    {Array.from(lg.assignments.values()).reduce((s, a) => s + a.submissions.length, 0) !== 1 ? 's' : ''}
+                                    {' across '}
+                                    {lg.assignments.size}
+                                    {' assignment'}{lg.assignments.size !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                                <div className="space-y-3">
+                                  {Array.from(lg.assignments.values()).map((ag, ai) => {
+                                    const isCollapsed = collapsedAssignments.has(ag.assignmentId)
+                                    return (
+                                      <div key={ag.assignmentId} className="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden">
+                                        {/* Assignment header (clickable to collapse) */}
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleAssignment(ag.assignmentId)}
+                                          className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors text-left"
+                                        >
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <span className="text-[10px] font-mono uppercase tracking-wider text-white/35 shrink-0">
+                                              L{lg.weekNumber}·A{ai + 1}
+                                            </span>
+                                            <h4 className="text-sm font-semibold text-white truncate">{ag.assignmentTitle}</h4>
+                                          </div>
+                                          <div className="flex items-center gap-2 shrink-0">
+                                            <span className="text-xs text-white/45">{ag.submissions.length} submission{ag.submissions.length !== 1 ? 's' : ''}</span>
+                                            <span className={`text-white/40 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}>▶</span>
+                                          </div>
+                                        </button>
+
+                                        {!isCollapsed && (
+                                          <div className="space-y-3 p-4 pt-0 border-t border-white/[0.06]">
+                                            {ag.submissions.map(submission => (
+                  <div key={submission.id} className="rounded-2xl border border-white/10 bg-black/30 p-5">
                     <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
-                          {submission.assignment.week.course && (
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-[#F5C518]/80 rounded-full bg-[#F5C518]/8 border border-[#F5C518]/15 px-2 py-0.5">
-                              {submission.assignment.week.course.title}
-                            </span>
-                          )}
-                          <span className="text-xs font-mono text-white/30">Week {submission.assignment.week.number}</span>
+                          <button
+                            type="button"
+                            onClick={() => setViewingLearnerId(submission.user.id)}
+                            className="text-sm font-semibold text-white hover:text-[#F5C518] transition-colors underline-offset-2 hover:underline"
+                            title="View this learner's full profile"
+                          >
+                            {submission.user.name || submission.user.email}
+                          </button>
                           <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-mono ${
                             submission.status === 'SUBMITTED'
                               ? 'border-amber-400/30 text-amber-300 bg-amber-400/8'
@@ -809,10 +945,9 @@ export default function AdminAcademyPage() {
                             {submission.status}
                           </span>
                         </div>
-                        <h3 className="text-lg font-semibold text-white mb-0.5">{submission.assignment.title}</h3>
-                        <p className="text-sm text-white/40">
-                          {submission.user.name || submission.user.email} · {submission.assignment.week.title}
-                        </p>
+                        {submission.user.name && (
+                          <p className="text-xs text-white/35">{submission.user.email}</p>
+                        )}
                       </div>
                       <p className="text-xs text-white/30 whitespace-nowrap">
                         {new Date(submission.submittedAt).toLocaleDateString()}
@@ -945,7 +1080,20 @@ export default function AdminAcademyPage() {
                       </button>
                     </form>
                   </div>
-                ))}
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
               </div>
             )
           })()}
@@ -1135,6 +1283,15 @@ export default function AdminAcademyPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Learner profile modal — accessible from submission cards */}
+      {viewingLearnerId && (
+        <LearnerProfileModal
+          userId={viewingLearnerId}
+          endpoint="admin"
+          onClose={() => setViewingLearnerId(null)}
+        />
       )}
 
       {/* Password change modal */}

@@ -1504,6 +1504,150 @@ router.get('/progress', requireAuth, async (req: Request, res: Response, next: N
   }
 })
 
+// ── Admin (facilitator) view of one learner's activity ───────────────────────
+//
+// Scoped variant of /superadmin/learners/:userId — a facilitator can only see
+// data tied to courses they facilitate. Submissions and progress from other
+// facilitators' courses are filtered out.
+
+router.get('/admin/learners/:userId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const learnerId = req.params.userId
+    const courseScope = facilitatorAccessibleCourseWhere(req.user!)
+
+    const user = await prisma.user.findUnique({
+      where: { id: learnerId },
+      select: {
+        id: true, name: true, email: true, role: true, createdAt: true,
+        profile: {
+          select: {
+            country: true, experienceLevel: true, userRole: true,
+            motivation: true, learningInterests: true,
+            telegramHandle: true, twitterHandle: true,
+            onboardingCompleted: true, completedAt: true,
+          },
+        },
+      },
+    })
+    if (!user) return sendError(res, 'Learner not found.', 404)
+
+    // Only show enrollments where the requesting admin facilitates that course.
+    const enrollments = await prisma.courseEnrollment.findMany({
+      where: { userId: learnerId, course: courseScope },
+      orderBy: { enrolledAt: 'desc' },
+      include: {
+        course: {
+          select: {
+            id: true, slug: true, title: true, contentUnit: true,
+            weeks: {
+              where: { published: true },
+              orderBy: { number: 'asc' },
+              select: { id: true, slug: true, number: true, title: true },
+            },
+          },
+        },
+      },
+    })
+
+    const [submissions, quizAttempts] = await Promise.all([
+      prisma.assignmentSubmission.findMany({
+        where: {
+          userId: learnerId,
+          assignment: { week: { course: courseScope } },
+        },
+        orderBy: { submittedAt: 'desc' },
+        take: 50,
+        include: {
+          assignment: {
+            select: {
+              id: true, title: true,
+              week: {
+                select: {
+                  id: true, slug: true, number: true, title: true,
+                  course: { select: { id: true, slug: true, title: true } },
+                },
+              },
+            },
+          },
+          feedback: { select: { id: true } },
+        },
+      }),
+      prisma.quizAttempt.findMany({
+        where: {
+          userId: learnerId,
+          quiz: { week: { course: courseScope } },
+        },
+        orderBy: { submittedAt: 'desc' },
+        take: 50,
+        include: {
+          quiz: {
+            select: {
+              id: true, title: true, passMark: true,
+              week: {
+                select: {
+                  id: true, slug: true, number: true, title: true,
+                  course: { select: { id: true, slug: true, title: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ])
+
+    const weekIds = enrollments.flatMap(e => e.course.weeks.map(w => w.id))
+    const progressRows = weekIds.length > 0
+      ? await prisma.weekProgress.findMany({
+          where: { userId: learnerId, weekId: { in: weekIds } },
+          select: {
+            weekId: true, status: true, completedAt: true,
+            quizSubmitted: true, assignmentSubmitted: true,
+            manuallyCompleted: true, firstOpenedAt: true,
+          },
+        })
+      : []
+    const progressMap = new Map(progressRows.map(p => [p.weekId, p]))
+
+    const enrichedEnrollments = enrollments.map(e => {
+      const weeksWithProgress = e.course.weeks.map(w => ({
+        id: w.id, slug: w.slug, number: w.number, title: w.title,
+        ...(progressMap.get(w.id) ?? {
+          status: 'NOT_STARTED', completedAt: null,
+          quizSubmitted: false, assignmentSubmitted: false,
+          manuallyCompleted: false, firstOpenedAt: null,
+        }),
+      }))
+      const completedCount = weeksWithProgress.filter(w => w.status === 'COMPLETE').length
+      const totalCount = weeksWithProgress.length
+      return {
+        course: { id: e.course.id, slug: e.course.slug, title: e.course.title, contentUnit: e.course.contentUnit },
+        enrolledAt: e.enrolledAt,
+        progressPercent: totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0,
+        completedCount,
+        totalCount,
+        weeks: weeksWithProgress,
+      }
+    })
+
+    return sendSuccess(res, {
+      user,
+      enrollments: enrichedEnrollments,
+      submissions: submissions.map(s => ({
+        id: s.id, status: s.status, submittedAt: s.submittedAt, reviewedAt: s.reviewedAt,
+        hasFeedback: s.feedback.length > 0,
+        assignment: { id: s.assignment.id, title: s.assignment.title, week: s.assignment.week },
+      })),
+      quizAttempts: quizAttempts.map(a => ({
+        id: a.id, submittedAt: a.submittedAt, score: a.score, percentage: a.percentage,
+        passed: a.percentage >= a.quiz.passMark,
+        quiz: { id: a.quiz.id, title: a.quiz.title, passMark: a.quiz.passMark, week: a.quiz.week },
+      })),
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
 router.get('/admin/learners/progress', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = adminWeekFilterSchema.safeParse(req.query)

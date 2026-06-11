@@ -33,6 +33,7 @@ export type AdminCourse = {
   approvedAt: string | null
   createdAt: string
   updatedAt: string
+  heroImage?: string | null
 }
 
 export type AdminModule = {
