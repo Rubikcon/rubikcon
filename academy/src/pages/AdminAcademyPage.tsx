@@ -4,6 +4,7 @@ import {
   Camera,
   CheckCircle2,
   ClipboardList,
+  Eye,
   Key,
   Loader2,
   MessageSquare,
@@ -583,25 +584,38 @@ export default function AdminAcademyPage() {
                             Awaiting super admin review
                           </p>
                         )}
-                        {canDelete && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              deleteCourse(course.id, course.title)
-                            }}
-                            disabled={deletingId === course.id}
-                            title="Delete course"
-                            className="absolute top-3 right-3 z-10 inline-flex items-center justify-center w-8 h-8 rounded-full bg-black/40 border border-white/10 text-white/50 hover:text-red-400 hover:border-red-400/40 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                        {/* Floating action buttons on the card */}
+                        <div className="absolute top-3 right-3 z-10 flex gap-1.5">
+                          <a
+                            href={`/course/${course.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            title="Preview as learner (opens in new tab)"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-black/40 border border-white/10 text-white/50 hover:text-[#F5C518] hover:border-[#F5C518]/40 hover:bg-[#F5C518]/10 transition-colors"
                           >
-                            {deletingId === course.id ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <Trash2 size={14} />
-                            )}
-                          </button>
-                        )}
+                            <Eye size={14} />
+                          </a>
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                deleteCourse(course.id, course.title)
+                              }}
+                              disabled={deletingId === course.id}
+                              title="Delete course"
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-black/40 border border-white/10 text-white/50 hover:text-red-400 hover:border-red-400/40 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                            >
+                              {deletingId === course.id ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={14} />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )
                   })}

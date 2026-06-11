@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ShieldCheck } from 'lucide-react'
+import { Eye, ShieldCheck } from 'lucide-react'
 import { apiRequest } from '../../lib/api'
 import { getStoredAuth } from '../../lib/auth'
 import { useCourseWizardState } from './hooks/useCourseWizardState'
@@ -176,6 +176,24 @@ export default function CourseBuilderWizard({ params }: CourseBuilderWizardProps
       {/* Main content */}
       <div className="pt-24 pb-20 px-4">
         <div className="max-w-4xl mx-auto">
+          {/* Preview as learner — opens the public course page in a new tab.
+              Works even if the course is unpublished thanks to the
+              facilitator-preview bypass on the backend. */}
+          {wizard.courseData.slug && (
+            <div className="mb-4 flex justify-end">
+              <a
+                href={`/course/${wizard.courseData.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-[#F5C518]/40 bg-[#F5C518]/10 px-4 py-2 text-sm font-semibold text-[#F5C518] hover:bg-[#F5C518]/20 transition-colors"
+                title="Open the course as a learner sees it (in a new tab)"
+              >
+                <Eye size={14} />
+                Preview as learner
+              </a>
+            </div>
+          )}
+
           {/* Status / super admin banner */}
           {courseStatus && courseStatus !== 'DRAFT' && (
             <div className={`mb-6 rounded-2xl border px-4 py-3 text-sm flex items-center gap-3 ${

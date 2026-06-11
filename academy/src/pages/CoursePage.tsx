@@ -3,7 +3,9 @@ import { useParams } from 'wouter'
 import { motion } from 'framer-motion'
 import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, Clock3, Loader2, PlayCircle, Users } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
+import PreviewBanner from '../components/PreviewBanner'
 import VideoEmbed from '../components/VideoEmbed'
+import EmbedFrame from '../components/EmbedFrame'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
 import type { CourseSummary } from '../types/academy'
@@ -272,8 +274,17 @@ export default function CoursePage() {
   }
 
   // ── Enrolled: show full course with progress sidebar ──────────────────────
+  const isFacilitatorPreview = course.viewerMode === 'facilitator-preview'
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
+      {isFacilitatorPreview && (
+        <PreviewBanner
+          status={course.status}
+          published={course.published}
+          backToAdminUrl={`/admin/courses/${course.id}`}
+          contextMessage="You're seeing this course exactly as learners will. Unpublished weeks are included."
+        />
+      )}
       <AcademyNavbar showBack backHref="/courses" backLabel="All Courses" solid />
 
       <main className="pt-24 pb-16 px-6">
@@ -405,16 +416,12 @@ export default function CoursePage() {
                     Course overview slides
                   </h3>
                 </div>
-                {/* Embedded slide preview — most slide providers support iframe embed */}
-                <div className="rounded-xl overflow-hidden border border-white/10 bg-black aspect-video mb-3">
-                  <iframe
+                {/* Embedded slide preview with skeleton + error fallback */}
+                <div className="mb-3">
+                  <EmbedFrame
                     src={getSlideEmbedUrl(course.overviewSlideUrl)}
+                    fallbackUrl={course.overviewSlideUrl}
                     title="Course overview slides"
-                    allow="fullscreen"
-                    allowFullScreen
-                    loading="lazy"
-                    className="w-full h-full"
-                    style={{ border: 0 }}
                   />
                 </div>
                 <a

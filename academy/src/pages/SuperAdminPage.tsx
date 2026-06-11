@@ -646,7 +646,16 @@ export default function SuperAdminPage() {
                               href={`/admin/superadmin/courses/${course.id}`}
                               className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-white/60 hover:border-white/30 hover:text-white transition-colors"
                             >
-                              <Eye size={14} /> View
+                              <Eye size={14} /> Details
+                            </a>
+                            <a
+                              href={`/course/${course.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Preview as learner (new tab)"
+                              className="inline-flex items-center gap-1.5 rounded-full border border-[#F5C518]/40 bg-[#F5C518]/10 px-4 py-2 text-sm font-semibold text-[#F5C518] hover:bg-[#F5C518]/20 transition-colors"
+                            >
+                              <Eye size={14} /> Preview
                             </a>
                             {course.status === 'PENDING_REVIEW' && (
                               <>

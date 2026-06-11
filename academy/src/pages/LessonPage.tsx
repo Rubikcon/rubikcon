@@ -24,6 +24,7 @@ import { getStoredAuth } from '../lib/auth'
 import VideoEmbed, { getEmbedUrl } from '../components/VideoEmbed'
 import EmbedFrame from '../components/EmbedFrame'
 import HtmlVideoPlayer from '../components/HtmlVideoPlayer'
+import PreviewBanner from '../components/PreviewBanner'
 import SlideViewer from '../components/SlideViewer'
 import type { CourseSummary, CourseWeekSummary, ReadingType, WeekDetail } from '../types/academy'
 
@@ -353,8 +354,19 @@ export default function LessonPage() {
     { id: 'assignment',  label: 'Assignment',  icon: ClipboardCheck, hidden: week.assignment.tasks.length === 0 },
   ]
 
+  const isFacilitatorPreview = week.viewerMode === 'facilitator-preview' || course.viewerMode === 'facilitator-preview'
   return (
-    <div className="flex bg-[#0A0A0A]" style={{ height: '100dvh', overflow: 'hidden' }}>
+    <div className="flex flex-col bg-[#0A0A0A]" style={{ height: '100dvh', overflow: 'hidden' }}>
+      {isFacilitatorPreview && (
+        <PreviewBanner
+          status={course.status}
+          published={course.published}
+          backToAdminUrl={`/admin/courses/${course.id}`}
+          contextMessage={`Lesson preview — '${week.title}'. This is exactly what learners will see when they reach this lesson.`}
+        />
+      )}
+
+      <div className="flex flex-1 min-h-0">
 
       {/* ── Left Sidebar ──────────────────────────────────────────────────── */}
       <aside className="hidden xl:flex flex-col w-[320px] flex-shrink-0 bg-[#0F0F11] border-r border-white/[0.07] overflow-hidden">
@@ -1041,6 +1053,7 @@ export default function LessonPage() {
 
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

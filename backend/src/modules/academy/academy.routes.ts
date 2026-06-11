@@ -532,6 +532,9 @@ router.post('/courses/:slug/enroll', requireAuth, async (req: Request, res: Resp
 
 router.get('/courses/:slug', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Load the course WITHOUT the `published` filter — we decide visibility
+    // below based on the viewer's role. Facilitators get to preview unpublished
+    // courses and see all weeks (including drafts).
     const course = await prisma.course.findUnique({
       where: { slug: req.params.slug },
       include: {
@@ -540,7 +543,6 @@ router.get('/courses/:slug', optionalAuth, async (req: Request, res: Response, n
           select: { id: true, title: true, description: true, position: true },
         },
         weeks: {
-          where: { published: true },
           orderBy: { number: 'asc' },
           select: {
             id: true,
@@ -550,6 +552,7 @@ router.get('/courses/:slug', optionalAuth, async (req: Request, res: Response, n
             durationLabel: true,
             estimatedCompletionMinutes: true,
             moduleId: true,
+            published: true,
             module: { select: { id: true, title: true, description: true } },
           },
         },
@@ -567,17 +570,30 @@ router.get('/courses/:slug', optionalAuth, async (req: Request, res: Response, n
       },
     })
 
-    if (!course || !course.published) {
+    if (!course) return sendError(res, 'Course not found.', 404)
+
+    const isFacilitator = req.user
+      ? await userCanFacilitateCourse(req.user, course.id)
+      : false
+
+    // Non-facilitators can only see published courses (404 hides the existence
+    // of draft/pending courses from learners).
+    if (!isFacilitator && !course.published) {
       return sendError(res, 'Course not found.', 404)
     }
 
+    // Facilitators see ALL weeks (drafts included). Learners see only published.
+    const visibleWeeks = isFacilitator
+      ? course.weeks
+      : course.weeks.filter(w => w.published)
+
     const enrolled = req.user ? (course.enrollments as { id: string }[]).length > 0 : false
-    const weekIds = course.weeks.map(week => week.id)
+    const weekIds = visibleWeeks.map(week => week.id)
     const progressMap = (req.user && enrolled) ? await getCourseProgressMap(req.user.userId, weekIds) : new Map()
 
-    const completedCount = course.weeks.filter(week => progressMap.get(week.id)?.status === WeekProgressStatus.COMPLETE).length
-    const progressPercent = course.weeks.length
-      ? Math.round((completedCount / course.weeks.length) * 100)
+    const completedCount = visibleWeeks.filter(week => progressMap.get(week.id)?.status === WeekProgressStatus.COMPLETE).length
+    const progressPercent = visibleWeeks.length
+      ? Math.round((completedCount / visibleWeeks.length) * 100)
       : 0
 
     return sendSuccess(res, {
@@ -593,13 +609,20 @@ router.get('/courses/:slug', optionalAuth, async (req: Request, res: Response, n
       introVideoUrl: course.introVideoUrl,
       overviewSlideUrl: course.overviewSlideUrl,
       contentUnit: course.contentUnit,
-      enrolled,
+      // Facilitators in preview mode get "enrolled: true" so the UI doesn't
+      // pester them with enrol prompts. The viewerMode field tells the
+      // frontend to render a preview banner instead.
+      enrolled: enrolled || isFacilitator,
       facilitators: course.courseFacilitators.map(cf => cf.facilitator),
       progressPercent,
       completedCount,
-      totalWeeks: course.weeks.length,
+      totalWeeks: visibleWeeks.length,
       modules: course.modules,
-      weeks: course.weeks.map(week => serializeWeekSummary(week, progressMap.get(week.id))),
+      weeks: visibleWeeks.map(week => serializeWeekSummary(week, progressMap.get(week.id))),
+      viewerMode: isFacilitator ? 'facilitator-preview' : 'learner',
+      // Course status surfaced so the preview banner can say "DRAFT" / "PENDING"
+      status: course.status,
+      published: course.published,
     })
   } catch (err) {
     next(err)
@@ -702,28 +725,37 @@ router.get('/weeks/:weekSlug', optionalAuth, async (req: Request, res: Response,
       },
     })
 
-    if (!week || !week.published || !week.course.published) {
+    if (!week) {
       return sendError(res, 'Week not found.', 404)
     }
 
-    // Require enrollment to access week content
     if (!req.user) {
       return sendError(res, 'Log in to access this lesson.', 401)
     }
 
-    const enrollment = await prisma.courseEnrollment.findUnique({
-      where: { userId_courseId: { userId: req.user.userId, courseId: week.courseId } },
-    })
+    // Facilitators get a "preview as learner" pass: they can view any week
+    // (including unpublished ones, in unpublished courses) without enrolment.
+    // Their view doesn't touch progress tracking (they're not learning).
+    const isFacilitator = await userCanFacilitateCourse(req.user, week.courseId)
 
-    if (!enrollment) {
-      return sendError(res, 'Enrol in this course to access this lesson.', 403)
+    if (!isFacilitator) {
+      if (!week.published || !week.course.published) {
+        return sendError(res, 'Week not found.', 404)
+      }
+      const enrollment = await prisma.courseEnrollment.findUnique({
+        where: { userId_courseId: { userId: req.user.userId, courseId: week.courseId } },
+      })
+      if (!enrollment) {
+        return sendError(res, 'Enrol in this course to access this lesson.', 403)
+      }
     }
 
     // Touch progress on view — moves the lesson from NOT_STARTED → IN_PROGRESS
     // the first time the learner opens it. Subsequent views are no-ops because
     // firstOpenedAt is preserved. We don't await this — it's bookkeeping, not
     // critical-path, so a failure here shouldn't block lesson loading.
-    if (req.user) {
+    // Skipped for facilitator previews — they're not learning, just reviewing.
+    if (req.user && !isFacilitator) {
       syncWeekProgress(req.user.userId, week.id, { touchOpened: true }).catch(err => {
         console.error('[progress] touch-on-view failed:', err)
       })
@@ -883,6 +915,8 @@ router.get('/weeks/:weekSlug', optionalAuth, async (req: Request, res: Response,
             assignmentSubmitted: false,
             completedAt: null,
           },
+      // Tells the frontend whether to render a "Facilitator preview" banner.
+      viewerMode: isFacilitator ? 'facilitator-preview' : 'learner',
     })
   } catch (err) {
     next(err)
@@ -2077,6 +2111,25 @@ async function markCourseDirtyIfNeeded(courseId: string, role: string, currentSt
  * Use by composing into the surrounding `where` clause, e.g.
  *   { week: { course: facilitatorAccessibleCourseWhere(req.user) } }
  */
+/**
+ * Boolean variant of facilitatorAccessibleCourseWhere — checks whether the
+ * given user can facilitate the specific course. Used for the "preview as
+ * learner" flow so facilitators can view their courses (even unpublished)
+ * without needing to enrol.
+ */
+async function userCanFacilitateCourse(
+  user: { userId: string; email: string; role: string },
+  courseId: string,
+): Promise<boolean> {
+  if (user.role === 'SUPER_ADMIN') return true
+  const count = await prisma.course.count({
+    where: {
+      AND: [{ id: courseId }, facilitatorAccessibleCourseWhere(user)],
+    },
+  })
+  return count > 0
+}
+
 function facilitatorAccessibleCourseWhere(user: { userId: string; email: string; role: string }): Prisma.CourseWhereInput {
   if (user.role === 'SUPER_ADMIN') return {}
   // Match the user as a facilitator at ANY of the three pinning levels — course,

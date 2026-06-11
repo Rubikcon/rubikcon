@@ -182,6 +182,11 @@ export type CourseSummary = {
   totalWeeks: number
   modules: Array<{ id: string; title: string; description: string | null; position: number }>
   weeks: CourseWeekSummary[]
+  // 'facilitator-preview' when a facilitator/super admin is viewing one of their own courses
+  // (used to render a "preview mode" banner and unlock unpublished/draft content).
+  viewerMode?: 'learner' | 'facilitator-preview'
+  status?: CourseStatus
+  published?: boolean
 }
 
 export type WeekVideo = {
@@ -368,6 +373,9 @@ export type WeekDetail = {
     assignmentSubmitted: boolean
     completedAt: string | null
   }
+  // 'facilitator-preview' when a facilitator is viewing the lesson without being enrolled —
+  // used to render a preview-mode banner. Defaults to 'learner' on older backends.
+  viewerMode?: 'learner' | 'facilitator-preview'
 }
 
 export type DashboardData = {
