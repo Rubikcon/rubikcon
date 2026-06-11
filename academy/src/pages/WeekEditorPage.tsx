@@ -15,7 +15,24 @@
 
 import { FormEvent, useEffect, useState } from 'react'
 import { useParams } from 'wouter'
-import { ArrowLeft, Loader2, Plus, Save, Trash2, Video as VideoIcon, ListChecks, Target, FileQuestion, ClipboardList } from 'lucide-react'
+import { ArrowLeft, GripVertical, Loader2, Plus, Save, Trash2, Video as VideoIcon, ListChecks, Target, FileQuestion, ClipboardList } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import AcademyNavbar from '../components/AcademyNavbar'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
@@ -57,6 +74,14 @@ export default function WeekEditorPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [savingSection, setSavingSection] = useState<string | null>(null)
+
+  // Sensors for the video drag-and-drop reorder.
+  // PointerSensor with a small distance threshold prevents accidental drags
+  // when the admin really wanted to click the delete button.
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   // Form drafts for each section
   const [basicForm, setBasicForm] = useState({
@@ -206,6 +231,31 @@ export default function WeekEditorPage() {
       await loadWeek()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete video')
+    } finally {
+      setSavingSection(null)
+    }
+  }
+
+  /**
+   * Persist a new video order. We optimistically reorder the local `week` state
+   * so the UI feels instant, then call the backend. On failure we roll back by
+   * reloading from the source of truth.
+   */
+  async function reorderVideos(newOrder: WeekDetail['videos']) {
+    if (!week) return
+    const previous = week.videos
+    setWeek({ ...week, videos: newOrder })
+    setSavingSection('reorder-videos')
+    setError(null)
+    try {
+      await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/videos/order`, {
+        method: 'PATCH',
+        body: JSON.stringify({ videoIds: newOrder.map(v => v.id) }),
+      })
+    } catch (err) {
+      // Roll back on failure so the UI matches the server.
+      setWeek({ ...week, videos: previous })
+      setError(err instanceof Error ? err.message : 'Failed to reorder videos')
     } finally {
       setSavingSection(null)
     }
@@ -375,24 +425,52 @@ export default function WeekEditorPage() {
           {/* Videos */}
           <Section title="Lesson Videos" icon={VideoIcon}>
             {week.videos.length > 0 && (
-              <div className="space-y-2 mb-4">
-                {week.videos.map(v => (
-                  <div key={v.id} className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-black/30 px-3 py-2.5">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{v.title}</p>
-                      <p className="text-xs text-white/40 truncate">{v.url}</p>
-                      {v.description && <p className="text-xs text-white/50 mt-1">{v.description}</p>}
+              <>
+                {week.videos.length > 1 && (
+                  <p className="text-xs text-white/40 mb-2 flex items-center gap-1.5">
+                    <GripVertical size={11} className="text-white/30" />
+                    Drag the handle to reorder — learners watch videos in this exact sequence.
+                    {savingSection === 'reorder-videos' && (
+                      <span className="ml-auto inline-flex items-center gap-1 text-[#F5C518]">
+                        <Loader2 size={11} className="animate-spin" /> Saving…
+                      </span>
+                    )}
+                  </p>
+                )}
+                <DndContext
+                  sensors={dndSensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event: DragEndEvent) => {
+                    const { active, over } = event
+                    if (!over || active.id === over.id) return
+                    const oldIndex = week.videos.findIndex(v => v.id === active.id)
+                    const newIndex = week.videos.findIndex(v => v.id === over.id)
+                    if (oldIndex < 0 || newIndex < 0) return
+                    void reorderVideos(arrayMove(week.videos, oldIndex, newIndex))
+                  }}
+                >
+                  <SortableContext
+                    items={week.videos.map(v => v.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-2 mb-4">
+                      {week.videos.map((v, i) => (
+                        <SortableVideoItem
+                          key={v.id}
+                          id={v.id}
+                          position={i + 1}
+                          title={v.title}
+                          url={v.url}
+                          description={v.description}
+                          onDelete={() => deleteVideo(v.id)}
+                          deleting={savingSection === `del-video-${v.id}`}
+                          reorderInFlight={savingSection === 'reorder-videos'}
+                        />
+                      ))}
                     </div>
-                    <button
-                      onClick={() => deleteVideo(v.id)}
-                      disabled={savingSection === `del-video-${v.id}`}
-                      className="p-1.5 text-white/40 hover:text-red-400 transition-colors disabled:opacity-40 flex-shrink-0"
-                    >
-                      {savingSection === `del-video-${v.id}` ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                    </button>
-                  </div>
-                ))}
-              </div>
+                  </SortableContext>
+                </DndContext>
+              </>
             )}
 
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-2">
@@ -525,5 +603,70 @@ function SaveButton({ saving, label, onClick }: { saving: boolean; label: string
       {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
       {label}
     </button>
+  )
+}
+
+/**
+ * Sortable row representing one video in the lesson's video list.
+ *
+ * The handle (the GripVertical icon on the far left) is the only element that
+ * triggers a drag — the rest of the row stays click-friendly so the delete
+ * button doesn't accidentally drag when you mean to click.
+ */
+function SortableVideoItem({
+  id, position, title, url, description, onDelete, deleting, reorderInFlight,
+}: {
+  id: string
+  position: number
+  title: string
+  url: string
+  description: string | null
+  onDelete: () => void
+  deleting: boolean
+  reorderInFlight: boolean
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.55 : 1,
+    zIndex: isDragging ? 10 : 'auto',
+  }
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-start gap-3 rounded-xl border bg-black/30 px-3 py-2.5 ${
+        isDragging ? 'border-[#F5C518]/60 shadow-lg shadow-black/40' : 'border-white/10'
+      }`}
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        title="Drag to reorder"
+        aria-label={`Drag video ${position} (${title}) to reorder`}
+        className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-white/40 hover:text-white/70 transition-colors touch-none"
+        disabled={reorderInFlight}
+      >
+        <GripVertical size={16} />
+      </button>
+      <div className="flex items-center gap-2 text-[10px] font-mono text-white/35 mt-1 shrink-0 w-6 text-center select-none">
+        #{position}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-white truncate">{title}</p>
+        <p className="text-xs text-white/40 truncate">{url}</p>
+        {description && <p className="text-xs text-white/50 mt-1">{description}</p>}
+      </div>
+      <button
+        onClick={onDelete}
+        disabled={deleting}
+        className="p-1.5 text-white/40 hover:text-red-400 transition-colors disabled:opacity-40 flex-shrink-0"
+        title="Delete video"
+      >
+        {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+      </button>
+    </div>
   )
 }

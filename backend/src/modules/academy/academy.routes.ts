@@ -2888,6 +2888,64 @@ router.patch('/admin/courses/:courseId/weeks/:weekId/videos/:videoId', requireAu
   }
 })
 
+// Reorder the videos for a lesson (sets every video's `position` to its new index).
+//
+// Two-phase update inside a transaction because the schema has
+// `@@unique([weekId, position])` — without phasing, the swap would briefly
+// produce two rows at the same position and hit the unique-constraint error.
+// Phase 1 shifts everything to negative positions; phase 2 sets the final
+// 1-based positions.
+router.patch('/admin/courses/:courseId/weeks/:weekId/videos/order', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+    if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
+
+    const parsed = z.object({
+      videoIds: z.array(z.string().uuid()).min(1).max(50),
+    }).safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const { videoIds } = parsed.data
+
+    // Confirm all videos belong to this week + course.
+    const existing = await prisma.weekVideo.findMany({
+      where: { weekId: req.params.weekId, week: { courseId: course.id } },
+      select: { id: true },
+    })
+    const existingIds = new Set(existing.map(v => v.id))
+    if (videoIds.length !== existing.length) {
+      return sendError(res, `Reorder list has ${videoIds.length} ids but this lesson has ${existing.length} videos. Refresh and try again.`, 400)
+    }
+    for (const id of videoIds) {
+      if (!existingIds.has(id)) return sendError(res, 'One or more videos do not belong to this lesson.', 400)
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Phase 1: park everything in negative space.
+      for (let i = 0; i < videoIds.length; i++) {
+        await tx.weekVideo.update({
+          where: { id: videoIds[i] },
+          data: { position: -(i + 1) },
+        })
+      }
+      // Phase 2: settle to the desired 1-based positions.
+      for (let i = 0; i < videoIds.length; i++) {
+        await tx.weekVideo.update({
+          where: { id: videoIds[i] },
+          data: { position: i + 1 },
+        })
+      }
+    })
+
+    await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
+    return sendSuccess(res, { reordered: videoIds.length }, 'Videos reordered.')
+  } catch (err) {
+    next(err)
+  }
+})
+
 // Delete a video
 router.delete('/admin/courses/:courseId/weeks/:weekId/videos/:videoId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
