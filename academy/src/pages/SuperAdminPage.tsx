@@ -148,6 +148,11 @@ export default function SuperAdminPage() {
   const [resetPasswordData, setResetPasswordData] = useState<{ userId: string; userName: string; resetToken: string; expiresAt: string } | null>(null)
   const [resettingPassword, setResettingPassword] = useState(false)
 
+  // Create course (super admin can author courses too)
+  const [showCreateCourse, setShowCreateCourse] = useState(false)
+  const [creatingCourse, setCreatingCourse] = useState(false)
+  const [createCourseForm, setCreateCourseForm] = useState({ title: '', slug: '', description: '' })
+
   // Submissions
   const [submissions, setSubmissions] = useState<AdminSubmission>([])
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
@@ -266,6 +271,26 @@ export default function SuperAdminPage() {
       setError(err instanceof Error ? err.message : 'Unable to delete feedback.')
     } finally {
       setDeletingFeedbackId(null)
+    }
+  }
+
+  async function createCourse(e: FormEvent) {
+    e.preventDefault()
+    setCreatingCourse(true)
+    setError(null)
+    try {
+      const course = await apiRequest<{ id: string; slug: string }>('/academy/admin/courses', {
+        method: 'POST',
+        body: JSON.stringify(createCourseForm),
+      })
+      setShowCreateCourse(false)
+      setCreateCourseForm({ title: '', slug: '', description: '' })
+      // Drop straight into the builder, same as the regular admin flow
+      window.location.href = `/admin/courses/${course.id}`
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create course.')
+    } finally {
+      setCreatingCourse(false)
     }
   }
 
@@ -561,8 +586,15 @@ export default function SuperAdminPage() {
                     </button>
                   )}
                   <button
-                    onClick={() => { setActiveTab('users'); setShowCreateAdmin(true) }}
+                    onClick={() => { setActiveTab('courses'); setShowCreateCourse(true) }}
                     className="inline-flex items-center gap-2 rounded-full bg-[#F5C518] px-5 py-3 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors"
+                  >
+                    <Plus size={14} />
+                    Create a new course
+                  </button>
+                  <button
+                    onClick={() => { setActiveTab('users'); setShowCreateAdmin(true) }}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white/70 hover:text-white hover:border-white/30 transition-colors"
                   >
                     <Plus size={14} />
                     Create admin account
@@ -575,21 +607,81 @@ export default function SuperAdminPage() {
           {/* ── Courses Tab ──────────────────────────────────────────────────── */}
           {activeTab === 'courses' && (
             <div>
-              <div className="flex gap-2 flex-wrap mb-6">
-                {STATUS_FILTERS.map(f => (
-                  <button
-                    key={f.value}
-                    onClick={() => setStatusFilter(f.value)}
-                    className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
-                      statusFilter === f.value
-                        ? 'border-[#F5C518]/50 bg-[#F5C518]/10 text-[#F5C518]'
-                        : 'border-white/10 text-white/50 hover:border-white/20'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+                <div className="flex gap-2 flex-wrap">
+                  {STATUS_FILTERS.map(f => (
+                    <button
+                      key={f.value}
+                      onClick={() => setStatusFilter(f.value)}
+                      className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
+                        statusFilter === f.value
+                          ? 'border-[#F5C518]/50 bg-[#F5C518]/10 text-[#F5C518]'
+                          : 'border-white/10 text-white/50 hover:border-white/20'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setShowCreateCourse(!showCreateCourse)}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#F5C518] px-5 py-2.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors"
+                >
+                  <Plus size={14} /> New course
+                </button>
               </div>
+
+              {/* Inline create form */}
+              {showCreateCourse && (
+                <form onSubmit={createCourse} className="mb-6 rounded-[24px] border border-[#F5C518]/20 bg-[#F5C518]/5 p-6 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-[#F5C518]">Create new course</h3>
+                    <p className="text-xs text-white/40 mt-1">Just the essentials — you'll fill in modules, lessons, intro video, etc. in the course builder.</p>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {[
+                      { key: 'title' as const, label: 'Title *', placeholder: 'Blockchain for Social Impact' },
+                      { key: 'slug' as const, label: 'Slug * (lowercase, hyphens only)', placeholder: 'blockchain-social-impact' },
+                    ].map(({ key, label, placeholder }) => (
+                      <div key={key}>
+                        <label className="block text-xs text-white/40 mb-1">{label}</label>
+                        <input
+                          value={createCourseForm[key]}
+                          onChange={e => {
+                            const val = key === 'slug'
+                              ? e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-')
+                              : e.target.value
+                            setCreateCourseForm(p => ({ ...p, [key]: val }))
+                          }}
+                          required
+                          placeholder={placeholder}
+                          className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/40 mb-1">Description * (min 10 characters)</label>
+                    <textarea
+                      value={createCourseForm.description}
+                      onChange={e => setCreateCourseForm(p => ({ ...p, description: e.target.value }))}
+                      required
+                      minLength={10}
+                      rows={3}
+                      placeholder="A short description of what learners will gain..."
+                      className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button type="submit" disabled={creatingCourse} className="rounded-full bg-[#F5C518] px-5 py-2.5 text-sm font-semibold text-[#0A0A0A] disabled:opacity-50">
+                      {creatingCourse ? 'Creating…' : 'Create & open builder'}
+                    </button>
+                    <button type="button" onClick={() => setShowCreateCourse(false)} className="rounded-full border border-white/10 px-5 py-2.5 text-sm text-white/50 hover:border-white/20">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
 
               {coursesLoading ? (
                 <div className="flex items-center justify-center py-20">
@@ -642,6 +734,13 @@ export default function SuperAdminPage() {
                             )}
                           </div>
                           <div className="flex gap-2 flex-shrink-0 flex-wrap">
+                            <a
+                              href={`/admin/courses/${course.id}`}
+                              title="Open in the course builder (full edit access)"
+                              className="inline-flex items-center gap-1.5 rounded-full bg-[#F5C518] px-4 py-2 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors"
+                            >
+                              <ShieldCheck size={14} /> Edit
+                            </a>
                             <a
                               href={`/admin/superadmin/courses/${course.id}`}
                               className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-white/60 hover:border-white/30 hover:text-white transition-colors"

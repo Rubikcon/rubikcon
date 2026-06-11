@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useParams } from 'wouter'
 import {
-  BookOpen, CheckCircle2, ChevronDown, ChevronUp, Clock, Image,
+  BookOpen, CheckCircle2, ChevronDown, ChevronUp, Clock, Eye, Image,
   Loader2, ShieldCheck, Users, Video, XCircle,
 } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
@@ -136,22 +136,41 @@ export default function SuperAdminCourseDetailPage() {
               )}
             </div>
 
-            {course.status === 'PENDING_REVIEW' && (
-              <div className="flex gap-3 flex-wrap">
-                <button
-                  onClick={() => { setActionType('approve'); setActionNotes('') }}
-                  className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-5 py-2.5 text-sm font-medium text-emerald-300 hover:bg-emerald-400/20 transition-colors"
-                >
-                  <CheckCircle2 size={15} /> Approve & publish
-                </button>
-                <button
-                  onClick={() => { setActionType('reject'); setActionNotes('') }}
-                  className="inline-flex items-center gap-2 rounded-full border border-red-400/30 bg-red-400/10 px-5 py-2.5 text-sm font-medium text-red-300 hover:bg-red-400/20 transition-colors"
-                >
-                  <XCircle size={15} /> Reject
-                </button>
-              </div>
-            )}
+            <div className="flex gap-3 flex-wrap">
+              {/* Super admin always has full edit + preview access, regardless of status. */}
+              <a
+                href={`/admin/courses/${course.id}`}
+                title="Open in the course builder (full edit access)"
+                className="inline-flex items-center gap-2 rounded-full bg-[#F5C518] px-5 py-2.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors"
+              >
+                <ShieldCheck size={15} /> Edit in builder
+              </a>
+              <a
+                href={`/course/${course.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Preview as learner (new tab)"
+                className="inline-flex items-center gap-2 rounded-full border border-[#F5C518]/40 bg-[#F5C518]/10 px-5 py-2.5 text-sm font-medium text-[#F5C518] hover:bg-[#F5C518]/20 transition-colors"
+              >
+                <Eye size={15} /> Preview
+              </a>
+              {course.status === 'PENDING_REVIEW' && (
+                <>
+                  <button
+                    onClick={() => { setActionType('approve'); setActionNotes('') }}
+                    className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-5 py-2.5 text-sm font-medium text-emerald-300 hover:bg-emerald-400/20 transition-colors"
+                  >
+                    <CheckCircle2 size={15} /> Approve & publish
+                  </button>
+                  <button
+                    onClick={() => { setActionType('reject'); setActionNotes('') }}
+                    className="inline-flex items-center gap-2 rounded-full border border-red-400/30 bg-red-400/10 px-5 py-2.5 text-sm font-medium text-red-300 hover:bg-red-400/20 transition-colors"
+                  >
+                    <XCircle size={15} /> Reject
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {error && (
