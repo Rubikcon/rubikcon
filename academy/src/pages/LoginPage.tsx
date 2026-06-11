@@ -24,8 +24,12 @@ export default function LoginPage() {
   const [deviceLimitHit, setDeviceLimitHit] = useState<{ count: number } | null>(null)
   const [signingOutOthers, setSigningOutOthers] = useState(false)
 
-  // Forgot password info dialog
+  // Forgot password — self-serve flow
   const [showForgotInfo, setShowForgotInfo] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [sendingForgot, setSendingForgot] = useState(false)
+  const [forgotSent, setForgotSent] = useState(false)
+  const [forgotError, setForgotError] = useState<string | null>(null)
 
   // Set new password flow (entered after login with blank password during reset window)
   const [resetContext, setResetContext] = useState<{ resetToken: string; user: StoredAuth['user'] } | null>(null)
@@ -108,6 +112,37 @@ export default function LoginPage() {
     } finally {
       setSigningOutOthers(false)
     }
+  }
+
+  async function handleForgotSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!isValidEmail(forgotEmail)) {
+      setForgotError('Please enter a valid email address')
+      return
+    }
+    try {
+      setSendingForgot(true)
+      setForgotError(null)
+      await apiRequest('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email: forgotEmail.trim() }),
+      })
+      setForgotSent(true)
+    } catch (err) {
+      setForgotError(err instanceof Error ? err.message : 'Unable to send reset email.')
+    } finally {
+      setSendingForgot(false)
+    }
+  }
+
+  function closeForgotDialog() {
+    setShowForgotInfo(false)
+    // Reset to clean state after close, so reopening starts fresh
+    setTimeout(() => {
+      setForgotSent(false)
+      setForgotEmail('')
+      setForgotError(null)
+    }, 300)
   }
 
   async function handleSetNewPassword(event: FormEvent<HTMLFormElement>) {
@@ -332,48 +367,95 @@ export default function LoginPage() {
         </div>
       </main>
 
-      {/* ─── Forgot password info dialog ───────────────────────────────── */}
+      {/* ─── Forgot password dialog ──────────────────────────────────────── */}
       {showForgotInfo && (
         <div
-          onClick={() => setShowForgotInfo(false)}
+          onClick={closeForgotDialog}
           className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
         >
           <div
             onClick={e => e.stopPropagation()}
             className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#0F0F11] p-6 space-y-4"
           >
-            <div className="flex items-center gap-2 text-[#F5C518]">
-              <KeyRound size={18} />
-              <h3 className="text-lg font-semibold text-white">Forgot your password?</h3>
-            </div>
-            <div className="text-sm text-white/70 space-y-3 leading-relaxed">
-              <p>
-                Email a super admin at{' '}
-                <a href="mailto:support@rubikconnexus.com" className="text-[#F5C518] hover:text-[#E8B800] underline">
-                  support@rubikconnexus.com
-                </a>{' '}
-                from the email address tied to your account.
-              </p>
-              <ol className="list-decimal ml-5 space-y-1.5 text-white/65">
-                <li>A super admin will initiate a password reset on your account.</li>
-                <li>
-                  Within 10 minutes of the reset, come back to this page, enter your email, and <strong className="text-white">leave the password field blank</strong>.
-                </li>
-                <li>Click <strong className="text-white">Log in</strong>.</li>
-                <li>You'll then be prompted to set a new password.</li>
-              </ol>
-              <p className="text-xs text-white/40">
-                Tip: keep this page open while emailing the admin so you can sign in immediately after they confirm.
-              </p>
-            </div>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setShowForgotInfo(false)}
-                className="rounded-full bg-[#F5C518] px-4 py-2 text-xs font-semibold text-black hover:bg-[#E8B800] transition-colors"
-              >
-                Got it
-              </button>
-            </div>
+            {!forgotSent ? (
+              <>
+                <div className="flex items-center gap-2 text-[#F5C518]">
+                  <KeyRound size={18} />
+                  <h3 className="text-lg font-semibold text-white">Reset your password</h3>
+                </div>
+                <p className="text-sm text-white/65 leading-relaxed">
+                  Enter the email address tied to your account. We'll send you a link with instructions to sign in and set a new password.
+                </p>
+                <form onSubmit={handleForgotSubmit} className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-white/50 mb-1">Email address</label>
+                    <input
+                      type="email"
+                      value={forgotEmail}
+                      onChange={e => setForgotEmail(e.target.value)}
+                      required
+                      autoFocus
+                      placeholder="you@example.com"
+                      className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#F5C518]/40 transition-colors"
+                    />
+                  </div>
+                  {forgotError && (
+                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-100">
+                      {forgotError}
+                    </div>
+                  )}
+                  <div className="flex gap-2 justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={closeForgotDialog}
+                      className="rounded-full border border-white/15 px-4 py-2 text-xs font-medium text-white/60 hover:text-white hover:border-white/30 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={sendingForgot || !isValidEmail(forgotEmail)}
+                      className="inline-flex items-center gap-2 rounded-full bg-[#F5C518] px-4 py-2 text-xs font-semibold text-black disabled:opacity-40 hover:bg-[#E8B800] transition-colors"
+                    >
+                      {sendingForgot ? <Loader2 size={12} className="animate-spin" /> : <KeyRound size={12} />}
+                      Send reset email
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <Check size={18} />
+                  <h3 className="text-lg font-semibold text-white">Check your inbox</h3>
+                </div>
+                <div className="text-sm text-white/70 space-y-3 leading-relaxed">
+                  <p>
+                    If an account exists for <strong className="text-white">{forgotEmail.trim()}</strong>, we just sent a password-reset email.
+                  </p>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                    <p className="text-[11px] font-mono uppercase tracking-widest text-white/40 mb-2">What to do next</p>
+                    <ol className="list-decimal ml-5 space-y-1.5 text-white/65 text-xs">
+                      <li>Open the email (check spam/junk if you don't see it within a minute).</li>
+                      <li>Click <strong className="text-white">Go to login page</strong> in the email.</li>
+                      <li>Enter your email, <strong className="text-white">leave password blank</strong>, click Log in.</li>
+                      <li>Set your new password.</li>
+                    </ol>
+                  </div>
+                  <p className="text-[11px] text-white/40">
+                    The reset window is open for 10 minutes. If it expires, request another one from here.
+                  </p>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={closeForgotDialog}
+                    className="rounded-full bg-[#F5C518] px-4 py-2 text-xs font-semibold text-black hover:bg-[#E8B800] transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -90,7 +90,65 @@ const STATUS_FILTERS = [
   { value: 'DRAFT', label: 'Draft' },
 ]
 
-type Tab = 'overview' | 'courses' | 'users' | 'submissions'
+type Tab = 'overview' | 'courses' | 'submissions' | 'learners' | 'users'
+
+// ─── Learner activity types (matches GET /superadmin/learners response) ───
+
+type LearnerSummary = {
+  id: string
+  name: string | null
+  email: string
+  createdAt: string
+  country: string | null
+  onboardingCompleted: boolean
+  enrollmentCount: number
+  completedLessons: number
+  inProgressLessons: number
+  totalSubmissions: number
+  quizAttempts: number
+  gigApplications: number
+  lastActivityAt: string | null
+}
+
+type LearnerDetail = {
+  user: {
+    id: string; name: string | null; email: string; role: string; createdAt: string
+    profile: {
+      country: string | null; experienceLevel: string | null; userRole: string | null
+      motivation: string | null; learningInterests: string[]
+      telegramHandle: string | null; twitterHandle: string | null
+      onboardingCompleted: boolean; completedAt: string | null
+    } | null
+  }
+  enrollments: Array<{
+    course: { id: string; slug: string; title: string; contentUnit: string }
+    enrolledAt: string
+    progressPercent: number
+    completedCount: number
+    totalCount: number
+    weeks: Array<{
+      id: string; slug: string; number: number; title: string
+      status: string; completedAt: string | null
+      quizSubmitted: boolean; assignmentSubmitted: boolean
+      manuallyCompleted: boolean; firstOpenedAt: string | null
+    }>
+  }>
+  submissions: Array<{
+    id: string; status: string; submittedAt: string; reviewedAt: string | null
+    hasFeedback: boolean
+    assignment: {
+      id: string; title: string
+      week: { id: string; slug: string; number: number; title: string; course: { id: string; slug: string; title: string } }
+    }
+  }>
+  quizAttempts: Array<{
+    id: string; submittedAt: string; score: number; percentage: number; passed: boolean
+    quiz: {
+      id: string; title: string; passMark: number
+      week: { id: string; slug: string; number: number; title: string; course: { id: string; slug: string; title: string } }
+    }
+  }>
+}
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
@@ -148,6 +206,15 @@ export default function SuperAdminPage() {
   const [resetPasswordData, setResetPasswordData] = useState<{ userId: string; userName: string; resetToken: string; expiresAt: string } | null>(null)
   const [resettingPassword, setResettingPassword] = useState(false)
 
+  // Learners
+  const [learners, setLearners] = useState<LearnerSummary[]>([])
+  const [learnersTotal, setLearnersTotal] = useState(0)
+  const [learnersLoading, setLearnersLoading] = useState(false)
+  const [learnerSearch, setLearnerSearch] = useState('')
+  const [learnerDetail, setLearnerDetail] = useState<LearnerDetail | null>(null)
+  const [learnerDetailLoading, setLearnerDetailLoading] = useState(false)
+  const [openLearnerId, setOpenLearnerId] = useState<string | null>(null)
+
   // Create course (super admin can author courses too)
   const [showCreateCourse, setShowCreateCourse] = useState(false)
   const [creatingCourse, setCreatingCourse] = useState(false)
@@ -182,6 +249,10 @@ export default function SuperAdminPage() {
   useEffect(() => {
     if (activeTab === 'submissions') void loadSubmissions()
   }, [activeTab])
+
+  useEffect(() => {
+    if (activeTab === 'learners') void loadLearners()
+  }, [activeTab, learnerSearch])
 
   async function loadOverview() {
     try {
@@ -272,6 +343,44 @@ export default function SuperAdminPage() {
     } finally {
       setDeletingFeedbackId(null)
     }
+  }
+
+  async function loadLearners() {
+    try {
+      setLearnersLoading(true)
+      setError(null)
+      const params = new URLSearchParams()
+      if (learnerSearch) params.set('search', learnerSearch)
+      const data = await apiRequest<{ learners: LearnerSummary[]; total: number }>(
+        `/academy/superadmin/learners?${params}`,
+      )
+      setLearners(data.learners)
+      setLearnersTotal(data.total)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load learners.')
+    } finally {
+      setLearnersLoading(false)
+    }
+  }
+
+  async function openLearner(learnerId: string) {
+    setOpenLearnerId(learnerId)
+    setLearnerDetail(null)
+    setLearnerDetailLoading(true)
+    try {
+      const data = await apiRequest<LearnerDetail>(`/academy/superadmin/learners/${learnerId}`)
+      setLearnerDetail(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load learner activity.')
+      setOpenLearnerId(null)
+    } finally {
+      setLearnerDetailLoading(false)
+    }
+  }
+
+  function closeLearner() {
+    setOpenLearnerId(null)
+    setTimeout(() => setLearnerDetail(null), 200)
   }
 
   async function createCourse(e: FormEvent) {
@@ -431,6 +540,7 @@ export default function SuperAdminPage() {
     { id: 'overview',    label: 'Overview',    icon: ShieldCheck },
     { id: 'courses',     label: 'Courses',     icon: BookOpen },
     { id: 'submissions', label: 'Submissions', icon: ClipboardList },
+    { id: 'learners',    label: 'Learners',    icon: Users },
     { id: 'users',       label: 'Users',       icon: Users },
   ]
 
@@ -980,6 +1090,71 @@ export default function SuperAdminPage() {
             </div>
           )}
 
+          {/* ── Learners Tab ─────────────────────────────────────────────────── */}
+          {activeTab === 'learners' && (
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="relative flex-1 max-w-md">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                  <input
+                    value={learnerSearch}
+                    onChange={e => setLearnerSearch(e.target.value)}
+                    placeholder="Search learners by name or email…"
+                    className="w-full rounded-full border border-white/12 bg-black/30 pl-9 pr-4 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/30"
+                  />
+                </div>
+                <div className="text-xs text-white/40">{learnersTotal} total</div>
+              </div>
+
+              {learnersLoading ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="animate-spin text-[#F5C518]" size={28} />
+                </div>
+              ) : learners.length === 0 ? (
+                <div className="rounded-[24px] border border-white/8 bg-white/[0.02] p-12 text-center">
+                  <p className="text-white/40">No learners found.</p>
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {learners.map(l => {
+                    const initials = (l.name || l.email).split(/\s+|@/).map(s => s[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
+                    const lastActive = l.lastActivityAt ? new Date(l.lastActivityAt) : null
+                    return (
+                      <button
+                        key={l.id}
+                        onClick={() => void openLearner(l.id)}
+                        className="text-left rounded-2xl border border-white/10 bg-white/[0.04] p-4 hover:border-white/20 hover:bg-white/[0.06] transition-colors"
+                      >
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-full bg-[#F5C518]/15 border border-[#F5C518]/30 flex items-center justify-center text-[#F5C518] font-display font-extrabold text-sm shrink-0">
+                            {initials}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-white truncate">{l.name || 'Unnamed learner'}</p>
+                            <p className="text-xs text-white/35 truncate">{l.email}</p>
+                            {l.country && <p className="text-[11px] text-white/30 mt-0.5">📍 {l.country}</p>}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <Mini label="Courses"        value={l.enrollmentCount} accent="text-white/70" />
+                          <Mini label="Lessons done"   value={l.completedLessons} accent="text-emerald-300" />
+                          <Mini label="In progress"    value={l.inProgressLessons} accent="text-teal-300" />
+                          <Mini label="Submissions"    value={l.totalSubmissions} accent="text-[#F5C518]" />
+                        </div>
+                        <p className="text-[10px] text-white/30 mt-2.5">
+                          {lastActive
+                            ? `Last active ${lastActive.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+                            : 'No activity yet'}
+                          {!l.onboardingCompleted && ' · Onboarding incomplete'}
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Users Tab ────────────────────────────────────────────────────── */}
           {activeTab === 'users' && (
             <div>
@@ -1387,6 +1562,173 @@ export default function SuperAdminPage() {
           </div>
         </div>
       )}
+
+      {/* ─── Learner Detail Modal ─────────────────────────────────────────── */}
+      {openLearnerId && (
+        <div
+          onClick={closeLearner}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-[24px] border border-white/10 bg-[#0F0F11] p-6"
+          >
+            {learnerDetailLoading || !learnerDetail ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <Loader2 size={28} className="animate-spin text-[#F5C518] mb-3" />
+                <p className="text-sm text-white/40">Loading learner activity…</p>
+              </div>
+            ) : (
+              <>
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3 mb-5">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="w-12 h-12 rounded-full bg-[#F5C518]/15 border border-[#F5C518]/30 flex items-center justify-center text-[#F5C518] font-display font-extrabold shrink-0">
+                      {(learnerDetail.user.name || learnerDetail.user.email).split(/\s+|@/).map(s => s[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="font-display text-xl font-extrabold text-white truncate">{learnerDetail.user.name || 'Unnamed learner'}</h2>
+                      <p className="text-sm text-white/45 truncate">{learnerDetail.user.email}</p>
+                      <p className="text-[11px] text-white/30 mt-0.5">
+                        Joined {new Date(learnerDetail.user.createdAt).toLocaleDateString()}
+                        {learnerDetail.user.profile?.country && ` · ${learnerDetail.user.profile.country}`}
+                        {learnerDetail.user.profile?.experienceLevel && ` · ${learnerDetail.user.profile.experienceLevel}`}
+                      </p>
+                    </div>
+                  </div>
+                  <button onClick={closeLearner} className="text-white/40 hover:text-white text-2xl leading-none">×</button>
+                </div>
+
+                {/* Enrollments + per-lesson progress */}
+                <Section title={`Course progress (${learnerDetail.enrollments.length} enrolled)`}>
+                  {learnerDetail.enrollments.length === 0 ? (
+                    <p className="text-sm text-white/40">Not enrolled in any course yet.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {learnerDetail.enrollments.map(e => (
+                        <div key={e.course.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                          <div className="flex items-start justify-between gap-3 mb-2">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-white truncate">{e.course.title}</p>
+                              <p className="text-xs text-white/40">{e.completedCount} / {e.totalCount} {e.course.contentUnit.toLowerCase()}{e.totalCount !== 1 ? 's' : ''} complete · {e.progressPercent}%</p>
+                            </div>
+                            <div className="text-xs text-white/30 whitespace-nowrap">Enrolled {new Date(e.enrolledAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-white/8 overflow-hidden mb-3">
+                            <div className="h-full bg-[#F5C518] transition-all" style={{ width: `${e.progressPercent}%` }} />
+                          </div>
+                          <details className="text-xs">
+                            <summary className="cursor-pointer text-white/50 hover:text-white/70">Show lesson-by-lesson</summary>
+                            <ul className="mt-2 space-y-1">
+                              {e.weeks.map(w => {
+                                const dotColor = w.status === 'COMPLETE'
+                                  ? 'bg-emerald-400'
+                                  : w.status === 'IN_PROGRESS' ? 'bg-teal-400' : 'bg-white/15'
+                                return (
+                                  <li key={w.id} className="flex items-center gap-2 py-1">
+                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor}`} />
+                                    <span className="font-mono text-white/35 w-6 text-right shrink-0">{w.number}</span>
+                                    <span className="text-white/70 truncate flex-1">{w.title}</span>
+                                    <span className="text-[10px] text-white/40 shrink-0">
+                                      {w.status === 'COMPLETE' && w.completedAt
+                                        ? `✓ ${new Date(w.completedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+                                        : w.status === 'IN_PROGRESS' ? 'In progress' : '—'}
+                                    </span>
+                                  </li>
+                                )
+                              })}
+                            </ul>
+                          </details>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Section>
+
+                {/* Submissions */}
+                <Section title={`Recent assignment submissions (${learnerDetail.submissions.length})`}>
+                  {learnerDetail.submissions.length === 0 ? (
+                    <p className="text-sm text-white/40">No submissions yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {learnerDetail.submissions.slice(0, 10).map(s => (
+                        <div key={s.id} className="rounded-xl border border-white/8 bg-black/30 p-3 text-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-white truncate">{s.assignment.title}</p>
+                              <p className="text-xs text-white/40 truncate">{s.assignment.week.course.title} · Lesson {s.assignment.week.number}</p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-mono ${
+                                s.status === 'REVIEWED' ? 'border-emerald-400/30 text-emerald-300' : 'border-amber-400/30 text-amber-300'
+                              }`}>{s.status}</span>
+                              <span className="text-[10px] text-white/30">{new Date(s.submittedAt).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                          {s.hasFeedback && (
+                            <p className="text-[10px] text-teal-300/70 mt-1.5 flex items-center gap-1">
+                              💬 Feedback given
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                      {learnerDetail.submissions.length > 10 && (
+                        <p className="text-xs text-white/30 text-center pt-1">
+                          + {learnerDetail.submissions.length - 10} older submission{learnerDetail.submissions.length - 10 !== 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </Section>
+
+                {/* Quiz attempts */}
+                <Section title={`Quiz attempts (${learnerDetail.quizAttempts.length})`}>
+                  {learnerDetail.quizAttempts.length === 0 ? (
+                    <p className="text-sm text-white/40">No quiz attempts yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {learnerDetail.quizAttempts.slice(0, 10).map(a => (
+                        <div key={a.id} className="rounded-xl border border-white/8 bg-black/30 p-3 text-sm flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-white truncate">{a.quiz.title}</p>
+                            <p className="text-xs text-white/40 truncate">{a.quiz.week.course.title} · Lesson {a.quiz.week.number}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-0.5 shrink-0">
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                              a.passed ? 'border-emerald-400/30 text-emerald-300 bg-emerald-400/8' : 'border-red-400/30 text-red-300 bg-red-400/8'
+                            }`}>
+                              {Math.round(a.percentage)}% · {a.passed ? 'Pass' : 'Fail'}
+                            </span>
+                            <span className="text-[10px] text-white/30">{new Date(a.submittedAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Section>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+function Mini({ label, value, accent }: { label: string; value: number; accent: string }) {
+  return (
+    <div>
+      <p className={`font-display text-xl font-extrabold ${accent} leading-none`}>{value}</p>
+      <p className="text-[10px] text-white/35 uppercase tracking-widest mt-0.5">{label}</p>
+    </div>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mb-6">
+      <h3 className="text-xs font-mono uppercase tracking-[0.18em] text-white/35 mb-3">{title}</h3>
+      {children}
+    </section>
   )
 }

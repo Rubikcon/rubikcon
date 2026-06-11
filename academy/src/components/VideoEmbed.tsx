@@ -1,4 +1,5 @@
 import { Film, Play } from 'lucide-react'
+import EmbedFrame from './EmbedFrame'
 
 export type SupportedVideoSource = 'youtube' | 'vimeo' | 'loom' | 'google-drive' | 'unknown'
 
@@ -59,7 +60,6 @@ type Props = {
 
 export default function VideoEmbed({ url, title, className = '' }: Props) {
   const embedUrl = getEmbedUrl(url)
-  const source = getVideoSource(url)
 
   if (!embedUrl) {
     return (
@@ -76,17 +76,12 @@ export default function VideoEmbed({ url, title, className = '' }: Props) {
   }
 
   return (
-    <div className={`relative w-full bg-black rounded-xl overflow-hidden ${className}`}>
-      <div className="relative pt-[56.25%]">
-        <iframe
-          src={embedUrl}
-          className="absolute inset-0 w-full h-full border-0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-          title={title || 'Video player'}
-        />
-      </div>
-    </div>
+    <EmbedFrame
+      src={embedUrl}
+      fallbackUrl={url}
+      title={title || 'Video player'}
+      className={className}
+    />
   )
 }
 

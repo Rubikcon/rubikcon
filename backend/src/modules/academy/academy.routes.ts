@@ -3740,6 +3740,258 @@ router.get('/superadmin/users', requireAuth, requireSuperAdmin, async (req: Requ
   }
 })
 
+// ── Super Admin: Learners list ────────────────────────────────────────────────
+//
+// Summary view of every learner (USER role) on the platform with the activity
+// numbers a super admin actually wants to see — how many courses they're in,
+// how many lessons they've completed, what they've submitted, last activity.
+//
+// Pagination + search by name/email.
+
+router.get('/superadmin/learners', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { search, page = '1', limit = '30' } = req.query as Record<string, string>
+    const skip = (parseInt(page) - 1) * parseInt(limit)
+    const take = parseInt(limit)
+
+    const where: Prisma.UserWhereInput = { role: 'USER' }
+    if (search) where.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } },
+    ]
+
+    const [learners, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          createdAt: true,
+          _count: {
+            select: {
+              courseEnrollments: true,
+              progress: true,
+              quizAttempts: true,
+              applications: true,
+            },
+          },
+          profile: { select: { country: true, onboardingCompleted: true } },
+        },
+      }),
+      prisma.user.count({ where }),
+    ])
+
+    // Per learner: how many lessons complete, how many in progress, last activity
+    const userIds = learners.map(l => l.id)
+    const [completedAgg, inProgressAgg, submissionAgg, lastActivities] = await Promise.all([
+      prisma.weekProgress.groupBy({
+        by: ['userId'],
+        where: { userId: { in: userIds }, status: 'COMPLETE' },
+        _count: { _all: true },
+      }),
+      prisma.weekProgress.groupBy({
+        by: ['userId'],
+        where: { userId: { in: userIds }, status: 'IN_PROGRESS' },
+        _count: { _all: true },
+      }),
+      prisma.assignmentSubmission.groupBy({
+        by: ['userId'],
+        where: { userId: { in: userIds } },
+        _count: { _all: true },
+      }),
+      // Last activity = max(weekProgress.updatedAt, assignmentSubmission.submittedAt, quizAttempt.completedAt).
+      // Approximated as the most recent weekProgress.updatedAt; it covers the
+      // common case (touch-on-view bumps it) and is cheap.
+      prisma.weekProgress.groupBy({
+        by: ['userId'],
+        where: { userId: { in: userIds } },
+        _max: { updatedAt: true },
+      }),
+    ])
+
+    const completedMap = new Map(completedAgg.map(r => [r.userId, r._count._all]))
+    const inProgressMap = new Map(inProgressAgg.map(r => [r.userId, r._count._all]))
+    const submissionMap = new Map(submissionAgg.map(r => [r.userId, r._count._all]))
+    const lastActivityMap = new Map(lastActivities.map(r => [r.userId, r._max.updatedAt]))
+
+    const result = learners.map(l => ({
+      id: l.id,
+      name: l.name,
+      email: l.email,
+      createdAt: l.createdAt,
+      country: l.profile?.country ?? null,
+      onboardingCompleted: l.profile?.onboardingCompleted ?? false,
+      enrollmentCount: l._count.courseEnrollments,
+      completedLessons: completedMap.get(l.id) ?? 0,
+      inProgressLessons: inProgressMap.get(l.id) ?? 0,
+      totalSubmissions: submissionMap.get(l.id) ?? 0,
+      quizAttempts: l._count.quizAttempts,
+      gigApplications: l._count.applications,
+      lastActivityAt: lastActivityMap.get(l.id) ?? null,
+    }))
+
+    return sendSuccess(res, { learners: result, total, page: parseInt(page), limit: take })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ── Super Admin: One learner's detailed activity ──────────────────────────────
+//
+// Deep view for the drill-down: every enrolment, the learner's progress per
+// lesson in each course, recent submissions with their status, recent quiz
+// attempts. Used by the "View learner" modal on the SuperAdmin page.
+
+router.get('/superadmin/learners/:userId', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.params.userId
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, name: true, email: true, role: true, createdAt: true,
+        profile: {
+          select: {
+            country: true, experienceLevel: true, userRole: true,
+            motivation: true, learningInterests: true,
+            telegramHandle: true, twitterHandle: true,
+            onboardingCompleted: true, completedAt: true,
+          },
+        },
+      },
+    })
+    if (!user) return sendError(res, 'Learner not found.', 404)
+
+    const [enrollments, submissions, quizAttempts] = await Promise.all([
+      prisma.courseEnrollment.findMany({
+        where: { userId },
+        orderBy: { enrolledAt: 'desc' },
+        include: {
+          course: {
+            select: {
+              id: true, slug: true, title: true, contentUnit: true,
+              weeks: {
+                where: { published: true },
+                orderBy: { number: 'asc' },
+                select: { id: true, slug: true, number: true, title: true },
+              },
+            },
+          },
+        },
+      }),
+      prisma.assignmentSubmission.findMany({
+        where: { userId },
+        orderBy: { submittedAt: 'desc' },
+        take: 50, // recent only — avoids a huge payload for power learners
+        include: {
+          assignment: {
+            select: {
+              id: true, title: true,
+              week: {
+                select: {
+                  id: true, slug: true, number: true, title: true,
+                  course: { select: { id: true, slug: true, title: true } },
+                },
+              },
+            },
+          },
+          feedback: { select: { id: true } },
+        },
+      }),
+      prisma.quizAttempt.findMany({
+        where: { userId },
+        orderBy: { submittedAt: 'desc' },
+        take: 50,
+        include: {
+          quiz: {
+            select: {
+              id: true, title: true, passMark: true,
+              week: {
+                select: {
+                  id: true, slug: true, number: true, title: true,
+                  course: { select: { id: true, slug: true, title: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ])
+
+    // For each enrolment, fetch the week-by-week progress.
+    const courseIds = enrollments.map(e => e.course.id)
+    const weekIds = enrollments.flatMap(e => e.course.weeks.map(w => w.id))
+    const progressRows = weekIds.length > 0
+      ? await prisma.weekProgress.findMany({
+          where: { userId, weekId: { in: weekIds } },
+          select: {
+            weekId: true, status: true, completedAt: true,
+            quizSubmitted: true, assignmentSubmitted: true,
+            manuallyCompleted: true, firstOpenedAt: true,
+          },
+        })
+      : []
+    const progressMap = new Map(progressRows.map(p => [p.weekId, p]))
+
+    const enrichedEnrollments = enrollments.map(e => {
+      const weeksWithProgress = e.course.weeks.map(w => ({
+        id: w.id, slug: w.slug, number: w.number, title: w.title,
+        ...(progressMap.get(w.id) ?? {
+          status: 'NOT_STARTED', completedAt: null,
+          quizSubmitted: false, assignmentSubmitted: false,
+          manuallyCompleted: false, firstOpenedAt: null,
+        }),
+      }))
+      const completedCount = weeksWithProgress.filter(w => w.status === 'COMPLETE').length
+      const totalCount = weeksWithProgress.length
+      return {
+        course: { id: e.course.id, slug: e.course.slug, title: e.course.title, contentUnit: e.course.contentUnit },
+        enrolledAt: e.enrolledAt,
+        progressPercent: totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0,
+        completedCount,
+        totalCount,
+        weeks: weeksWithProgress,
+      }
+    })
+
+    return sendSuccess(res, {
+      user,
+      enrollments: enrichedEnrollments,
+      submissions: submissions.map(s => ({
+        id: s.id,
+        status: s.status,
+        submittedAt: s.submittedAt,
+        reviewedAt: s.reviewedAt,
+        hasFeedback: s.feedback.length > 0,
+        assignment: {
+          id: s.assignment.id,
+          title: s.assignment.title,
+          week: s.assignment.week,
+        },
+      })),
+      quizAttempts: quizAttempts.map(a => ({
+        id: a.id,
+        submittedAt: a.submittedAt,
+        score: a.score,
+        percentage: a.percentage,
+        passed: a.percentage >= a.quiz.passMark,
+        quiz: {
+          id: a.quiz.id,
+          title: a.quiz.title,
+          passMark: a.quiz.passMark,
+          week: a.quiz.week,
+        },
+      })),
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
 // ── Super Admin: Create admin user ────────────────────────────────────────────
 router.post('/superadmin/users', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {

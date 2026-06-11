@@ -110,3 +110,113 @@ View it here: ${opts.lessonUrl}
 export function lessonDeepLink(courseSlug: string, weekSlug: string): string {
   return `${config.academyUrl}/course/${courseSlug}/week/${weekSlug}`
 }
+
+// ─── Facilitator: new submission notification ────────────────────────────
+
+export function newSubmissionEmail(opts: {
+  facilitatorName: string | null
+  learnerName: string | null
+  learnerEmail: string
+  assignmentTitle: string
+  lessonTitle: string
+  courseTitle: string
+  submissionPreview: string | null
+  submittedAt: Date
+}): { subject: string; html: string; text: string } {
+  const greeting = opts.facilitatorName ? `Hi ${escapeHtml(opts.facilitatorName.split(' ')[0])},` : 'Hi,'
+  const learner = opts.learnerName ? escapeHtml(opts.learnerName) : escapeHtml(opts.learnerEmail)
+  const submissionsUrl = `${config.academyUrl}/admin/academy`
+  const previewHtml = opts.submissionPreview
+    ? `<div style="margin:0 0 8px;padding:16px;background:#f5f5f7;border-radius:8px;">
+         <p style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:#71717a;font-weight:700;">Preview</p>
+         <p style="margin:8px 0 0;font-size:14px;line-height:1.6;color:#3f3f46;white-space:pre-line;">${escapeHtml(opts.submissionPreview.slice(0, 400))}${opts.submissionPreview.length > 400 ? '…' : ''}</p>
+       </div>`
+    : ''
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px;">${greeting}</p>
+    <p style="margin:0 0 16px;"><strong>${learner}</strong> just submitted
+      <strong>${escapeHtml(opts.assignmentTitle)}</strong>
+      in <strong>${escapeHtml(opts.courseTitle)}</strong>
+      (${escapeHtml(opts.lessonTitle)}).</p>
+    ${previewHtml}
+    <p style="margin:16px 0 0;font-size:13px;color:#71717a;">Submitted on ${opts.submittedAt.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+  `
+
+  const text = `${opts.facilitatorName ? `Hi ${opts.facilitatorName.split(' ')[0]},` : 'Hi,'}
+
+${opts.learnerName || opts.learnerEmail} just submitted "${opts.assignmentTitle}" in ${opts.courseTitle} (${opts.lessonTitle}).
+
+${opts.submissionPreview ? `Preview:\n${opts.submissionPreview.slice(0, 400)}\n\n` : ''}Review and leave feedback: ${submissionsUrl}
+
+— Rubikcon Academy`
+
+  return {
+    subject: `New submission from ${opts.learnerName || opts.learnerEmail} — ${opts.assignmentTitle}`,
+    html: layout({
+      title: 'New assignment submission',
+      bodyHtml,
+      ctaLabel: 'Review submission',
+      ctaUrl: submissionsUrl,
+    }),
+    text,
+  }
+}
+
+// ─── Learner: password reset ─────────────────────────────────────────────
+
+export function passwordResetEmail(opts: {
+  userName: string | null
+  expiresAt: Date
+}): { subject: string; html: string; text: string } {
+  const greeting = opts.userName ? `Hi ${escapeHtml(opts.userName.split(' ')[0])},` : 'Hi there,'
+  const loginUrl = `${config.academyUrl}/login`
+  const expiry = opts.expiresAt.toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit' })
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px;">${greeting}</p>
+    <p style="margin:0 0 16px;">We received a request to reset your password for Rubikcon Academy.</p>
+    <div style="margin:0 0 16px;padding:16px;background:#faf7ec;border-left:3px solid #F5C518;border-radius:8px;">
+      <p style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:#a16207;font-weight:700;">How to sign in</p>
+      <ol style="margin:8px 0 0;padding-left:18px;font-size:14px;line-height:1.7;color:#3f3f46;">
+        <li>Click the button below to open the login page.</li>
+        <li>Enter your email address.</li>
+        <li><strong>Leave the password field empty.</strong></li>
+        <li>Click <strong>Log in</strong> — you'll be prompted to set a new password.</li>
+      </ol>
+    </div>
+    <p style="margin:0 0 8px;font-size:13px;color:#71717a;">
+      This reset window expires at <strong>${expiry}</strong> (10 minutes from now).
+    </p>
+    <p style="margin:8px 0 0;font-size:13px;color:#71717a;">
+      Didn't request this? You can safely ignore this email — your password won't change unless you sign in within the window.
+    </p>
+  `
+
+  const text = `${opts.userName ? `Hi ${opts.userName.split(' ')[0]},` : 'Hi there,'}
+
+We received a request to reset your password for Rubikcon Academy.
+
+How to sign in:
+1. Go to ${loginUrl}
+2. Enter your email address
+3. Leave the password field empty
+4. Click "Log in" — you'll be prompted to set a new password
+
+This reset window expires at ${expiry} (10 minutes from now).
+
+Didn't request this? You can safely ignore this email — your password won't change unless you sign in within the window.
+
+— Rubikcon Academy`
+
+  return {
+    subject: 'Reset your Rubikcon Academy password',
+    html: layout({
+      title: 'Reset your password',
+      bodyHtml,
+      ctaLabel: 'Go to login page',
+      ctaUrl: loginUrl,
+    }),
+    text,
+  }
+}

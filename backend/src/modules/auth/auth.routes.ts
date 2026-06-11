@@ -1,9 +1,12 @@
+import crypto from 'crypto'
 import { Router, Request, Response, NextFunction } from 'express'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import prisma from '../../config/database'
 import { sendSuccess, sendError, signToken } from '../../utils/response'
 import { requireAuth } from '../../middleware/auth.middleware'
+import { sendEmailInBackground } from '../../utils/mailer'
+import { passwordResetEmail } from '../../utils/emailTemplates'
 
 const router = Router()
 
@@ -235,6 +238,69 @@ router.post('/onboarding', requireAuth, async (req: Request, res: Response, next
 
 // ─── POST /superadmin/users/:userId/reset-password ───────────────────────────
 
+// ─── POST /auth/forgot-password ───────────────────────────────────────────────
+// Public endpoint. User enters their email; if it matches an account we email
+// them a reset link with instructions and put their account into the
+// 10-minute "blank password" reset window.
+//
+// Security: always return success regardless of whether the email exists, so
+// the endpoint can't be used to enumerate registered emails.
+
+router.post('/forgot-password', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = z.object({
+      email: z.string().email('Invalid email address'),
+    }).safeParse(req.body)
+    if (!parsed.success) {
+      return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+    }
+
+    const email = parsed.data.email.trim().toLowerCase()
+    const user = await prisma.user.findUnique({ where: { email } })
+
+    // Always return the same response shape, regardless of whether the user
+    // exists, to prevent attackers from probing which emails are registered.
+    const genericResponse = sendSuccess(
+      res,
+      { sent: true },
+      'If an account exists for that email, you\'ll receive a password-reset email shortly.'
+    )
+
+    if (!user) return genericResponse
+
+    // Cryptographically-strong token (much better than Math.random for security-sensitive flows).
+    const resetToken = crypto.randomBytes(24).toString('hex')
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: resetToken,
+        passwordResetExpiresAt: expiresAt,
+      },
+    })
+
+    // Fire-and-forget email
+    const tpl = passwordResetEmail({ userName: user.name, expiresAt })
+    sendEmailInBackground({
+      to: user.email,
+      subject: tpl.subject,
+      html: tpl.html,
+      text: tpl.text,
+    })
+
+    return genericResponse
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── POST /auth/superadmin/users/:userId/reset-password ──────────────────────
+//
+// Admin-mediated reset path — kept for the case where a super admin wants to
+// reset on a user's behalf (and shows them the instructions to copy). The new
+// /forgot-password endpoint above is the preferred self-serve path.
+
 router.post('/superadmin/users/:userId/reset-password', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (req.user?.role !== 'SUPER_ADMIN') {
@@ -244,8 +310,8 @@ router.post('/superadmin/users/:userId/reset-password', requireAuth, async (req:
     const user = await prisma.user.findUnique({ where: { id: req.params.userId } })
     if (!user) return sendError(res, 'User not found.', 404)
 
-    // Generate a simple reset token (in production, use crypto.randomBytes)
-    const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+    // Cryptographically-strong token
+    const resetToken = crypto.randomBytes(24).toString('hex')
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
 
     await prisma.user.update({
@@ -256,7 +322,18 @@ router.post('/superadmin/users/:userId/reset-password', requireAuth, async (req:
       },
     })
 
-    return sendSuccess(res, { resetToken, expiresAt }, 'Password reset initiated. User can now login with a blank password.')
+    // Also send the reset email automatically so the super admin doesn't have
+    // to copy-paste instructions. They still see the token in the UI for
+    // out-of-band sharing if needed.
+    const tpl = passwordResetEmail({ userName: user.name, expiresAt })
+    sendEmailInBackground({
+      to: user.email,
+      subject: tpl.subject,
+      html: tpl.html,
+      text: tpl.text,
+    })
+
+    return sendSuccess(res, { resetToken, expiresAt }, 'Password reset initiated. User has been emailed and can now log in with a blank password.')
   } catch (err) {
     next(err)
   }
