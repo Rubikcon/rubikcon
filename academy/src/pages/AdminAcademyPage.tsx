@@ -554,7 +554,7 @@ export default function AdminAcademyPage() {
                       >
                         {/* Thumbnail background */}
                         {course.heroImage && (
-                          <div className="absolute inset-0 rounded-[24px] opacity-20 bg-cover bg-center" style={{ backgroundImage: `url(${course.heroImage})` }} />
+                          <div className="absolute inset-0 rounded-[24px] opacity-8 bg-cover bg-center" style={{ backgroundImage: `url(${course.heroImage})` }} />
                         )}
                         <a
                           href={`/admin/courses/${course.id}`}

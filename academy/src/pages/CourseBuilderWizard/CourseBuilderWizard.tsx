@@ -5,6 +5,7 @@ import { apiRequest } from '../../lib/api'
 import { getStoredAuth } from '../../lib/auth'
 import { useCourseWizardState } from './hooks/useCourseWizardState'
 import WizardProgressBar from './WizardProgressBar'
+import WizardGuidance from './WizardGuidance'
 import Step1_CourseInfo from './steps/Step1_CourseInfo'
 import Step2_ModuleManagement from './steps/Step2_ModuleManagement'
 import Step3_LessonManagement from './steps/Step3_LessonManagement'
@@ -245,57 +246,96 @@ export default function CourseBuilderWizard({ params }: CourseBuilderWizardProps
           )}
 
           {/* Step content with animations */}
-          <AnimatePresence mode="wait">
-            {wizard.currentStep === 1 && (
-              <motion.div
-                key="step-1"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.25 }}
-              >
-                <Step1_CourseInfo
-                  wizard={wizard}
-                  courseId={actualCourseId}
-                  onNext={() => handleStepChange(2)}
-                />
-              </motion.div>
-            )}
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Main step content */}
+            <div className="lg:col-span-2">
+              <AnimatePresence mode="wait">
+                {wizard.currentStep === 1 && (
+                  <motion.div
+                    key="step-1"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    <Step1_CourseInfo
+                      wizard={wizard}
+                      courseId={actualCourseId}
+                      onNext={() => handleStepChange(2)}
+                    />
+                  </motion.div>
+                )}
 
-            {wizard.currentStep === 2 && (
-              <motion.div
-                key="step-2"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.25 }}
-              >
-                <Step2_ModuleManagement
-                  wizard={wizard}
-                  courseId={actualCourseId}
-                  onBack={() => handleStepChange(1)}
-                  onNext={() => handleStepChange(3)}
-                />
-              </motion.div>
-            )}
+                {wizard.currentStep === 2 && (
+                  <motion.div
+                    key="step-2"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    <Step2_ModuleManagement
+                      wizard={wizard}
+                      courseId={actualCourseId}
+                      onBack={() => handleStepChange(1)}
+                      onNext={() => handleStepChange(3)}
+                    />
+                  </motion.div>
+                )}
 
-            {wizard.currentStep === 3 && (
-              <motion.div
-                key="step-3"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.25 }}
-              >
-                <Step3_LessonManagement
-                  wizard={wizard}
-                  courseId={actualCourseId}
-                  onBack={() => handleStepChange(2)}
-                  onFinish={handleFinish}
+                {wizard.currentStep === 3 && (
+                  <motion.div
+                    key="step-3"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    <Step3_LessonManagement
+                      wizard={wizard}
+                      courseId={actualCourseId}
+                      onBack={() => handleStepChange(2)}
+                      onFinish={handleFinish}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Sidebar guidance */}
+            <div className="hidden lg:block">
+              <div className="sticky top-24 space-y-4">
+                <WizardGuidance
+                  currentStep={wizard.currentStep}
+                  isCurrentStepValid={
+                    wizard.currentStep === 1 ? wizard.isStep1Valid() :
+                    wizard.currentStep === 2 ? wizard.isStep2Valid() :
+                    wizard.isStep3Valid()
+                  }
+                  nextStepHint={
+                    wizard.currentStep === 1 ? "Add at least a title and description." :
+                    wizard.currentStep === 2 ? "Create at least one module." :
+                    "Create at least one lesson to finish setup."
+                  }
                 />
-              </motion.div>
-            )}
-          </AnimatePresence>
+                
+                {/* Quick preview for mobile */}
+                {wizard.currentStep === 1 && wizard.courseData.slug && (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <p className="text-xs text-white/50 font-semibold mb-2">LIVE PREVIEW</p>
+                    <a
+                      href={`/course/${wizard.courseData.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-[#F5C518] hover:text-[#E8B800] transition-colors line-clamp-2 underline"
+                    >
+                      /courses/{wizard.courseData.slug}
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

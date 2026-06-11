@@ -967,9 +967,20 @@ export default function SuperAdminPage() {
                                   {submission.status}
                                 </span>
                               </div>
-                              <h3 className="text-lg font-semibold text-white mb-0.5">{submission.assignment.title}</h3>
+                              <h3 className="text-lg font-semibold text-white mb-0.5">
+                                <span className="text-[10px] font-mono uppercase tracking-wider text-[#F5C518] mr-2">L{submission.assignment.week.number}</span>
+                                {submission.assignment.title}
+                              </h3>
                               <p className="text-sm text-white/40">
-                                {submission.user.name || submission.user.email} · {submission.assignment.week.title}
+                                <button
+                                  type="button"
+                                  onClick={() => void openLearner(submission.user.id)}
+                                  className="text-white/60 hover:text-[#F5C518] underline-offset-2 hover:underline transition-colors"
+                                  title="View this learner's full profile"
+                                >
+                                  {submission.user.name || submission.user.email}
+                                </button>
+                                {' · '}{submission.assignment.week.title}
                               </p>
                             </div>
                             <p className="text-xs text-white/30">
