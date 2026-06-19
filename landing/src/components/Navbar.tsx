@@ -5,9 +5,15 @@ import { useLocation } from 'wouter'
 import { useTheme } from '../context/ThemeContext'
 import { URLS } from '../config/urls'
 
+// The Academy lives on its own subdomain, so the link is hard-coded to the
+// canonical URL — this avoids any chance of falling back to the localhost dev
+// default if the build-time env var (VITE_ACADEMY_URL) wasn't loaded.
+// `URLS.academy` is still kept as the source of truth for other usages.
+const ACADEMY_CANONICAL_URL = 'https://www.rubikconacademy.xyz/'
+
 const NAV_LINKS = [
   { label: 'About Us', href: '/about' },
-  { label: 'Academy', href: URLS.academy, external: true},
+  { label: 'Academy', href: ACADEMY_CANONICAL_URL, external: true },
   { label: 'Products', href: '/products' },
   { label: 'Projects', href: '/projects' },
   { label: 'Contact Us', href: '/contact' },
@@ -63,6 +69,8 @@ export default function Navbar() {
           <div className="hidden lg:flex items-center gap-8">
             {NAV_LINKS.map(link => (
               <a key={link.href} href={link.href}
+                target={link.external ? '_blank' : undefined}
+                rel={link.external ? 'noopener noreferrer' : undefined}
                 className={`text-sm font-medium transition-colors ${
                   location === link.href
                     ? 'text-[#F5C518]'
