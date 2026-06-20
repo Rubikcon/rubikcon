@@ -58,6 +58,18 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
       where: { email },
       include: { profile: true },
     })
+    // Helper: create a tracked session and return a session-bound JWT.
+    // Inlined here so the signup flow uses the same lifecycle as /login.
+    async function issueTokenFor(u: { id: string; email: string; role: string }): Promise<string> {
+      const sessionExpiresAt = new Date()
+      sessionExpiresAt.setDate(sessionExpiresAt.getDate() + 30)
+      const session = await prisma.session.create({
+        data: { userId: u.id, expiresAt: sessionExpiresAt },
+        select: { id: true },
+      })
+      return signToken({ userId: u.id, email: u.email, role: u.role, sessionId: session.id })
+    }
+
     if (existing) {
       const passwordMatch = await bcrypt.compare(password, existing.password)
       if (!passwordMatch) {
@@ -67,7 +79,7 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
       const profile = existing.profile ?? await prisma.userProfile.create({
         data: { userId: existing.id },
       })
-      const token = signToken({ userId: existing.id, email: existing.email, role: existing.role })
+      const token = await issueTokenFor(existing)
 
       return sendSuccess(
         res,
@@ -88,7 +100,7 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
       },
     })
 
-    const token = signToken({ userId: user.id, email: user.email, role: user.role })
+    const token = await issueTokenFor(user)
 
     return sendSuccess(res, { user: sanitizeUser(user, false), token }, 'Account created successfully.', 201)
   } catch (err) {
@@ -153,16 +165,25 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
     }
 
     const onboardingCompleted = user.profile?.onboardingCompleted ?? false
-    const token = signToken({ userId: user.id, email: user.email, role: user.role })
 
-    // Create new session
+    // Create the session FIRST so we can bind the JWT to its id. A token
+    // without a sessionId can't be selectively revoked, which was the root
+    // cause of "logout signs me out everywhere" complaints.
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 30) // 30-day session
-    await prisma.session.create({
+    const session = await prisma.session.create({
       data: {
         userId: user.id,
         expiresAt,
       },
+      select: { id: true },
+    })
+
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      sessionId: session.id,
     })
 
     // Return reset token if user logged in with blank password during reset
@@ -376,6 +397,20 @@ router.post('/confirm-reset-password', requireAuth, async (req: Request, res: Re
       },
     })
 
+    // Invalidate every OTHER session — keep the current one alive so the
+    // user stays signed in on the device they just reset from. This means a
+    // leaked-credentials scenario gets cleaned up automatically.
+    if (req.user?.sessionId) {
+      await prisma.session.updateMany({
+        where: {
+          userId: req.user!.userId,
+          expiresAt: { gt: new Date() },
+          NOT: { id: req.user.sessionId },
+        },
+        data: { expiresAt: new Date() },
+      })
+    }
+
     return sendSuccess(res, {}, 'Password reset successfully.')
   } catch (err) {
     next(err)
@@ -415,6 +450,20 @@ router.post('/change-password', requireAuth, async (req: Request, res: Response,
       data: { password: hashedPassword },
     })
 
+    // Same defence-in-depth as the reset flow: expire every OTHER session so
+    // anyone else still signed in (e.g. an attacker on a leaked device) is
+    // forced off, while the user stays logged in on the current device.
+    if (req.user?.sessionId) {
+      await prisma.session.updateMany({
+        where: {
+          userId: req.user!.userId,
+          expiresAt: { gt: new Date() },
+          NOT: { id: req.user.sessionId },
+        },
+        data: { expiresAt: new Date() },
+      })
+    }
+
     return sendSuccess(res, {}, 'Password changed successfully.')
   } catch (err) {
     next(err)
@@ -423,14 +472,53 @@ router.post('/change-password', requireAuth, async (req: Request, res: Response,
 
 // ─── POST /auth/logout ────────────────────────────────────────────────────────
 
+/**
+ * Sign out ONLY the device that made this request — i.e. the session bound
+ * to the current JWT. Previously this nuked every session for the user, which
+ * is why logging out on a laptop also kicked you off your phone and the team
+ * thought session management was broken. It was — not anymore.
+ */
 router.post('/logout', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Mark all sessions for this user as expired
-    await prisma.session.updateMany({
-      where: { userId: req.user!.userId },
+    const currentSessionId = req.user?.sessionId
+    if (currentSessionId) {
+      await prisma.session.update({
+        where: { id: currentSessionId },
+        data: { expiresAt: new Date() },
+      })
+    } else {
+      // Legacy token without a sessionId — best-effort fallback: expire the
+      // user's MOST RECENT active session so at least one device is signed
+      // out. Other devices stay logged in.
+      const latest = await prisma.session.findFirst({
+        where: { userId: req.user!.userId, expiresAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      })
+      if (latest) {
+        await prisma.session.update({
+          where: { id: latest.id },
+          data: { expiresAt: new Date() },
+        })
+      }
+    }
+    return sendSuccess(res, {}, 'Signed out of this device.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
+ * Sign out from EVERY device. Used when a user explicitly clicks "Sign out
+ * all devices" (e.g. after they lost a phone or suspect a leaked password).
+ */
+router.post('/logout-all', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await prisma.session.updateMany({
+      where: { userId: req.user!.userId, expiresAt: { gt: new Date() } },
       data: { expiresAt: new Date() },
     })
-    return sendSuccess(res, {}, 'Logged out successfully.')
+    return sendSuccess(res, { signedOut: result.count }, `Signed out of ${result.count} device${result.count === 1 ? '' : 's'}.`)
   } catch (err) {
     next(err)
   }

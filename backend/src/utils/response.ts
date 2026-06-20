@@ -60,6 +60,12 @@ export interface JWTPayload {
   userId: string
   email: string
   role: string
+  // The DB Session row this token was issued for. Optional ONLY for legacy
+  // tokens issued before the session-binding rollout; newly signed tokens
+  // always include it. The auth middleware uses it to:
+  //   - reject tokens whose session was logged out / expired
+  //   - logout one device without nuking the others
+  sessionId?: string
 }
 
 export const signToken = (payload: JWTPayload): string => {
@@ -74,7 +80,7 @@ export const signToken = (payload: JWTPayload): string => {
     })
 
     return jwt.sign(payload, config.jwtSecret, {
-      expiresIn: '7d',
+      expiresIn: '30d',
     } as jwt.SignOptions)
   }
 }

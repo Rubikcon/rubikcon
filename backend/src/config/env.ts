@@ -21,7 +21,10 @@ export const config = {
   port: parseInt(process.env.PORT || '4000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   jwtSecret: process.env.JWT_SECRET?.trim() || 'rubikcon-dev-secret',
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN?.trim() || '7d',
+  // JWT lifetime matches the session row's 30-day expiry so tokens and DB
+  // sessions live and die together. The auth middleware slides the session
+  // window on activity, so active users effectively never have to re-login.
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN?.trim() || '30d',
   allowedOrigins: [...new Set([...defaultAllowedOrigins, ...configuredAllowedOrigins])],
   isDev: process.env.NODE_ENV !== 'production',
 
