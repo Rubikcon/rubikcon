@@ -10,7 +10,7 @@ import Step1_CourseInfo from './steps/Step1_CourseInfo'
 import Step2_ModuleManagement from './steps/Step2_ModuleManagement'
 import Step3_LessonManagement from './steps/Step3_LessonManagement'
 import CompletionModal from './modals/CompletionModal'
-import type { AdminCourseDetail, CourseStatus } from '../../types/academy'
+import type { AdminCourseDetail, CourseStatus, FacilitatorSummary } from '../../types/academy'
 
 const TOTAL_STEPS = 3
 
@@ -37,6 +37,7 @@ export default function CourseBuilderWizard({ params }: CourseBuilderWizardProps
   const [initializing, setInitializing] = useState(true)
   const [showCompletion, setShowCompletion] = useState(false)
   const [courseStatus, setCourseStatus] = useState<CourseStatus | null>(null)
+  const [initialFacilitators, setInitialFacilitators] = useState<FacilitatorSummary[]>([])
   const auth = getStoredAuth()
   const isSuperAdmin = auth?.user.role === 'SUPER_ADMIN'
 
@@ -49,6 +50,7 @@ export default function CourseBuilderWizard({ params }: CourseBuilderWizardProps
         })
         const course = response as AdminCourseDetail
         setCourseStatus(course.status)
+        setInitialFacilitators(course.courseFacilitators.map(cf => cf.facilitator))
 
         // Populate wizard state with existing course data
         wizard.setCourseData({
@@ -261,6 +263,7 @@ export default function CourseBuilderWizard({ params }: CourseBuilderWizardProps
                     <Step1_CourseInfo
                       wizard={wizard}
                       courseId={actualCourseId}
+                      initialFacilitators={initialFacilitators}
                       onNext={() => handleStepChange(2)}
                     />
                   </motion.div>
