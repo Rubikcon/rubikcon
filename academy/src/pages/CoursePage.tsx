@@ -13,20 +13,29 @@ import type { CourseSummary } from '../types/academy'
 const DEFAULT_COURSE_SLUG = 'blockchain-social-impact'
 
 /**
- * Convert a slide-deck URL into an embeddable URL when needed.
+ * Convert a slide-deck URL into an embeddable URL.
  *
- * - Canva: admins paste the embed link directly (Canva → Share → Embed),
- *   so we pass it through unchanged.
- * - Google Slides: auto-normalize /edit URLs to /embed URLs.
+ * - Google Slides: normalize /edit (or bare /view) to /embed.
+ * - Canva: append ?embed — the only URL format Canva allows in iframes.
+ *   Works whether the admin pasted a /view, /edit, or share link.
  * - Anything else: pass through as-is.
  */
 function getSlideEmbedUrl(url: string): string {
   if (!url) return url
-  // Google Slides: /presentation/d/ID/edit → /presentation/d/ID/embed
+
+  // Google Slides
   const gsMatch = url.match(/docs\.google\.com\/presentation\/d\/([^/]+)/)
   if (gsMatch && !url.includes('/embed')) {
     return `https://docs.google.com/presentation/d/${gsMatch[1]}/embed?start=false&loop=false&delayms=3000`
   }
+
+  // Canva — strip any existing query/hash and append ?embed
+  if (url.includes('canva.com')) {
+    if (url.includes('?embed')) return url
+    const base = url.split('?')[0].split('#')[0]
+    return `${base}?embed`
+  }
+
   return url
 }
 
