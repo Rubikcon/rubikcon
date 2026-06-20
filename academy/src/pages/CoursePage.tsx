@@ -30,6 +30,12 @@ function getSlideEmbedUrl(url: string): string {
   return url
 }
 
+function facilitatorPhotoUrl(facilitator: { name: string; photoUrl: string | null }) {
+  if (facilitator.photoUrl) return facilitator.photoUrl
+  if (facilitator.name.toLowerCase().includes('joy egbu')) return '/icons/joy-egbu.jpeg'
+  return null
+}
+
 export default function CoursePage() {
   const params = useParams<{ slug?: string }>()
   const slug = params.slug || DEFAULT_COURSE_SLUG
@@ -123,6 +129,8 @@ export default function CoursePage() {
   }
 
   const unit = course.contentUnit
+  const learnerUnit = 'Module'
+  const learnerUnits = 'Modules'
   const units = `${unit}s`
 
   // ── Not enrolled: show overview + enroll CTA ─────────────────────────────
@@ -154,11 +162,17 @@ export default function CoursePage() {
                 {course.description}
               </p>
 
+              {course.heroImage && (
+                <div className="mb-8 overflow-hidden rounded-3xl border border-white/10 bg-black/30">
+                  <img src={course.heroImage} alt={`${course.title} preview`} loading="lazy" decoding="async" className="aspect-[16/9] w-full object-cover" />
+                </div>
+              )}
+
               {/* Stats row */}
               <div className="flex flex-wrap gap-6 text-sm text-white/40 mb-8">
                 <span className="inline-flex items-center gap-2">
                   <BookOpen size={14} className="text-[#F5C518]" />
-                  {course.totalWeeks} {unit.toLowerCase()}{course.totalWeeks !== 1 ? 's' : ''}
+                  {course.modules.length || course.totalWeeks} {learnerUnit.toLowerCase()}{(course.modules.length || course.totalWeeks) !== 1 ? 's' : ''}
                 </span>
                 {course.estimatedDuration && (
                   <span className="inline-flex items-center gap-2">
@@ -200,8 +214,8 @@ export default function CoursePage() {
                     const initials = f.name.replace(/^(Dr|Mr|Ms|Prof)\.\s*/i, '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
                     return (
                       <div key={f.id} className="flex items-center gap-3">
-                        {f.photoUrl ? (
-                          <img src={f.photoUrl} alt={f.name} className="w-10 h-10 rounded-full object-cover" />
+                        {facilitatorPhotoUrl(f) ? (
+                          <img src={facilitatorPhotoUrl(f)!} alt={f.name} className="w-10 h-10 rounded-full object-cover" />
                         ) : (
                           <div className="w-10 h-10 rounded-full bg-[#F5C518]/15 border border-[#F5C518]/25 flex items-center justify-center text-[#F5C518] font-extrabold text-sm">
                             {initials}
@@ -221,7 +235,7 @@ export default function CoursePage() {
             {/* Course outline preview */}
             <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-6">
               <p className="text-xs font-mono uppercase tracking-widest text-white/30 mb-4">
-                Course outline — {course.totalWeeks} {unit.toLowerCase()}{course.totalWeeks !== 1 ? 's' : ''}
+                Course outline — {course.modules.length || course.totalWeeks} {learnerUnit.toLowerCase()}{(course.modules.length || course.totalWeeks) !== 1 ? 's' : ''}
               </p>
               <div className="space-y-5">
                 {weekGroups.map((group, gi) => (
@@ -262,7 +276,7 @@ export default function CoursePage() {
                   className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-bold px-8 py-3 rounded-full hover:bg-[#E8B800] transition-colors disabled:opacity-60"
                 >
                   {enrolling && <Loader2 size={14} className="animate-spin" />}
-                  {enrolling ? 'Enrolling...' : `Enrol to unlock all ${units.toLowerCase()}`}
+                  {enrolling ? 'Enrolling...' : `Enrol to unlock all ${learnerUnits.toLowerCase()}`}
                   {!enrolling && <ArrowRight size={15} />}
                 </button>
               </div>
@@ -316,50 +330,46 @@ export default function CoursePage() {
               </p>
             </div>
 
-            {/* Week list */}
+            {/* Module list */}
             <div className="space-y-4">
               {weekGroups.map((group, gi) => (
                 <div key={group.module?.id ?? 'unassigned'}>
-                  {group.module && (
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-[#F5C518]/60 mb-2 px-1">
-                      {group.module.title}
-                    </p>
-                  )}
-                  <div className="space-y-2">
-                    {group.weeks.map(week => {
-                      const isComplete = week.progress.status === 'COMPLETE'
-                      const isInProgress = week.progress.status === 'IN_PROGRESS'
-                      return (
-                        <a
-                          key={week.id}
-                          href={`/course/${course.slug}/week/${week.slug}`}
-                          className={`flex items-start gap-3 rounded-2xl border p-3.5 hover:border-white/25 transition-colors ${
-                            isComplete
-                              ? 'border-[#F5C518]/20 bg-[#F5C518]/8'
-                              : isInProgress
-                                ? 'border-teal-400/20 bg-teal-400/8'
-                                : 'border-white/8 bg-white/[0.02]'
-                          }`}
-                        >
-                          <div className="shrink-0 mt-0.5">
-                            {isComplete
-                              ? <CheckCircle2 size={16} className="text-[#F5C518]" />
-                              : <PlayCircle size={16} className={isInProgress ? 'text-teal-400' : 'text-white/25'} />
-                            }
+                  {(() => {
+                    const completed = group.weeks.filter(w => w.progress.status === 'COMPLETE').length
+                    const inProgress = group.weeks.some(w => w.progress.status === 'IN_PROGRESS')
+                    const allDone = completed === group.weeks.length && group.weeks.length > 0
+                    const target = group.weeks.find(w => w.progress.status !== 'COMPLETE') ?? group.weeks[0]
+                    const title = group.module?.title ?? `${learnerUnit} ${gi + 1}`
+
+                    return (
+                      <a
+                        href={target ? `/course/${course.slug}/week/${target.slug}` : undefined}
+                        className={`flex items-start gap-3 rounded-2xl border p-3.5 hover:border-white/25 transition-colors ${
+                          allDone
+                            ? 'border-[#F5C518]/20 bg-[#F5C518]/8'
+                            : inProgress
+                              ? 'border-teal-400/20 bg-teal-400/8'
+                              : 'border-white/8 bg-white/[0.02]'
+                        }`}
+                      >
+                        <div className="shrink-0 mt-0.5">
+                          {allDone
+                            ? <CheckCircle2 size={16} className="text-[#F5C518]" />
+                            : <PlayCircle size={16} className={inProgress ? 'text-teal-400' : 'text-white/25'} />
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-mono uppercase tracking-widest text-white/30 mb-0.5">
+                            {learnerUnit} {gi + 1}
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-[10px] font-mono uppercase tracking-widest text-white/30 mb-0.5">
-                              {unit} {week.number}
-                            </div>
-                            <div className="text-sm font-medium text-white leading-snug truncate">{week.title}</div>
-                            <div className="flex items-center gap-2 mt-1 text-[10px] text-white/30">
-                              <Clock3 size={10} /> {week.durationLabel}
-                            </div>
+                          <div className="text-sm font-medium text-white leading-snug truncate">{title}</div>
+                          <div className="flex items-center gap-2 mt-1 text-[10px] text-white/30">
+                            <Clock3 size={10} /> {completed}/{group.weeks.length} complete
                           </div>
-                        </a>
-                      )
-                    })}
-                  </div>
+                        </div>
+                      </a>
+                    )
+                  })()}
                 </div>
               ))}
             </div>
@@ -378,6 +388,12 @@ export default function CoursePage() {
               <h2 className="font-display text-3xl md:text-4xl font-extrabold text-white leading-tight mb-3">{course.title}</h2>
               <p className="text-white/55 leading-relaxed mb-6">{course.description}</p>
 
+              {course.heroImage && (
+                <div className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+                  <img src={course.heroImage} alt={`${course.title} preview`} loading="lazy" decoding="async" className="aspect-[16/9] w-full object-cover" />
+                </div>
+              )}
+
               {/* Course preview video — blended into the hero, sits between the description and the CTAs */}
               {course.introVideoUrl && (
                 <div className="mb-6 rounded-2xl overflow-hidden border border-white/10 bg-black/40">
@@ -391,7 +407,7 @@ export default function CoursePage() {
                     href={`/course/${course.slug}/week/${continueWeek.slug}`}
                     className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-semibold px-6 py-3 rounded-full hover:bg-[#E8B800] transition-colors"
                   >
-                    {course.progressPercent > 0 ? `Continue — ${unit} ${continueWeek.number}` : `Start — ${unit} ${continueWeek.number}`}
+                    {course.progressPercent > 0 ? `Continue ${learnerUnit} ${continueWeek.number}` : `Start ${learnerUnit} ${continueWeek.number}`}
                     <ArrowRight size={15} />
                   </a>
                   <a
@@ -442,8 +458,8 @@ export default function CoursePage() {
                   const initials = f.name.replace(/^(Dr|Mr|Ms|Prof)\.\s*/i, '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
                   return (
                     <div key={f.id} className="flex items-center gap-3">
-                      {f.photoUrl ? (
-                        <img src={f.photoUrl} alt={f.name} className="w-9 h-9 rounded-full object-cover" />
+                      {facilitatorPhotoUrl(f) ? (
+                        <img src={facilitatorPhotoUrl(f)!} alt={f.name} className="w-9 h-9 rounded-full object-cover" />
                       ) : (
                         <div className="w-9 h-9 rounded-full bg-[#F5C518]/15 border border-[#F5C518]/25 flex items-center justify-center text-[#F5C518] font-extrabold text-xs">
                           {initials}
@@ -463,7 +479,7 @@ export default function CoursePage() {
             <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 md:p-8 mb-6">
               <div className="mb-6">
                 <p className="text-xs font-mono uppercase tracking-[0.18em] text-white/30 mb-1">Course modules</p>
-                <h3 className="font-display text-2xl font-extrabold text-white">Explore all {units.toLowerCase()}</h3>
+                <h3 className="font-display text-2xl font-extrabold text-white">Explore all {learnerUnits.toLowerCase()}</h3>
               </div>
 
               <div className="space-y-3">

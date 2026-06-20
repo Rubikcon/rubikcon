@@ -46,6 +46,35 @@ const INSTRUCTOR_COLORS = [
   'from-[#1A0030] to-[#0A0018]',
 ]
 
+function facilitatorPhotoUrl(facilitator: { name: string; photoUrl: string | null }) {
+  if (facilitator.photoUrl) return facilitator.photoUrl
+  if (facilitator.name.toLowerCase().includes('joy egbu')) return '/icons/joy-egbu.jpeg'
+  return null
+}
+
+function CourseThumbnail({ course, index }: { course: PublicCourse; index: number }) {
+  const accents = ['#F5C518', '#24C6A9', '#F97B72', '#A78BFA']
+  const accent = accents[index % accents.length]
+
+  return (
+    <div className="relative mb-5 aspect-[16/10] overflow-hidden rounded-xl bg-[#1C1C1C]">
+      {course.heroImage ? (
+        <img src={course.heroImage} alt={`${course.title} thumbnail`} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+      ) : (
+        <>
+          <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, #111 0%, ${accent}33 100%)` }} />
+          <div className="absolute left-5 top-5 h-14 w-14 rounded-full border border-white/15" />
+          <div className="absolute bottom-5 left-5 right-5">
+            <div className="mb-2 h-2 w-24 rounded-full bg-white/25" />
+            <div className="h-2 w-36 rounded-full bg-white/10" />
+          </div>
+        </>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+    </div>
+  )
+}
+
 export default function LandingPage() {
   const main = COURSE_BLOCKCHAIN
   const mainLessons = main.modules.reduce((a, m) => a + m.lessons.length, 0)
@@ -167,6 +196,7 @@ export default function LandingPage() {
                     transition={{ delay: i * 0.07 }}
                     className="bg-white rounded-2xl p-6 hover:shadow-md transition-shadow flex flex-col"
                   >
+                    <CourseThumbnail course={course} index={i} />
                     <div className="mb-4">
                       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${levelClass || 'bg-[#E8E0D0] text-[#1C1C1C]'}`}>
                         {level || 'COURSE'}
@@ -181,7 +211,11 @@ export default function LandingPage() {
                     <div className="flex items-center justify-between pt-4 border-t border-[#F2EDE2]">
                       {primaryFacilitator ? (
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-[#0A0A0A] flex items-center justify-center text-[#F5C518] font-display font-extrabold text-[10px]">{initials}</div>
+                          {facilitatorPhotoUrl(primaryFacilitator) ? (
+                            <img src={facilitatorPhotoUrl(primaryFacilitator)!} alt={primaryFacilitator.name} loading="lazy" decoding="async" className="w-7 h-7 rounded-full object-cover" />
+                          ) : (
+                            <div className="w-7 h-7 rounded-full bg-[#0A0A0A] flex items-center justify-center text-[#F5C518] font-display font-extrabold text-[10px]">{initials}</div>
+                          )}
                           <span className="text-xs text-[#1C1C1C]/60 truncate max-w-[100px]">{primaryFacilitator.name}</span>
                         </div>
                       ) : <div />}
@@ -220,7 +254,7 @@ export default function LandingPage() {
             <p className="text-xs font-mono text-[#1C1C1C]/50 tracking-widest uppercase mb-3">Curriculum Overview</p>
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
               <h2 className="font-display text-4xl md:text-5xl font-extrabold text-[#1C1C1C] leading-tight">
-                What you'll learn
+                Courses
               </h2>
               <p className="text-[#1C1C1C]/60 text-sm max-w-sm leading-relaxed md:text-right">
                 A grounded path from fundamentals to shipping. Every course is built around a real artifact you'll publish on-chain or to GitHub.
@@ -267,6 +301,7 @@ export default function LandingPage() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {dynamicCourses.flatMap(c => c.facilitators).filter((f, idx, arr) => arr.findIndex(x => x.id === f.id) === idx).slice(0, 8).map((facilitator, i) => {
                 const initials = facilitator.name.replace(/^(Dr|Mr|Ms|Prof)\.\s*/i, '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                const photoUrl = facilitatorPhotoUrl(facilitator)
                 return (
                   <motion.div key={facilitator.id}
                     initial={{ opacity: 0, y: 20 }}
@@ -276,8 +311,8 @@ export default function LandingPage() {
                     className="rounded-2xl overflow-hidden"
                   >
                     <div className={`bg-gradient-to-br ${INSTRUCTOR_COLORS[i % INSTRUCTOR_COLORS.length]} h-48 flex items-center justify-center`}>
-                      {facilitator.photoUrl ? (
-                        <img src={facilitator.photoUrl} alt={facilitator.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                      {photoUrl ? (
+                        <img src={photoUrl} alt={facilitator.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
                         <span className="font-display font-extrabold text-[#F5C518] text-6xl">{initials}</span>
                       )}

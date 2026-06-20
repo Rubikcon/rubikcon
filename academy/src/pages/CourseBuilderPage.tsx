@@ -7,6 +7,7 @@ import AcademyNavbar from '../components/AcademyNavbar'
 import { VideoSourceBadge } from '../components/VideoEmbed'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
+import { compressImageToBase64 } from '../lib/imageCompress'
 import type { AdminCourseDetail, AdminWeek, FacilitatorSummary } from '../types/academy'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -34,8 +35,9 @@ export default function CourseBuilderPage() {
   // Edit course info
   const [editInfo, setEditInfo] = useState(false)
   const [infoForm, setInfoForm] = useState({
-    title: '', description: '', tagline: '', level: '', estimatedDuration: '', slug: '', contentUnit: 'Lesson', introVideoUrl: '', isPaid: false,
+    title: '', description: '', tagline: '', level: '', estimatedDuration: '', slug: '', contentUnit: 'Lesson', introVideoUrl: '', overviewSlideUrl: '', heroImage: '', isPaid: false,
   })
+  const [uploadingCourseImage, setUploadingCourseImage] = useState(false)
 
   // Facilitators
   const [allFacilitators, setAllFacilitators] = useState<FacilitatorSummary[]>([])
@@ -83,6 +85,8 @@ export default function CourseBuilderPage() {
       slug: data.slug,
       contentUnit: data.contentUnit,
       introVideoUrl: data.introVideoUrl ?? '',
+      overviewSlideUrl: data.overviewSlideUrl ?? '',
+      heroImage: data.heroImage ?? '',
       isPaid: data.isPaid ?? false,
     })
   }
@@ -111,6 +115,8 @@ export default function CourseBuilderPage() {
             slug: courseData.slug,
             contentUnit: courseData.contentUnit,
             introVideoUrl: courseData.introVideoUrl ?? '',
+            overviewSlideUrl: courseData.overviewSlideUrl ?? '',
+            heroImage: courseData.heroImage ?? '',
             isPaid: courseData.isPaid ?? false,
           })
         }
@@ -131,9 +137,23 @@ export default function CourseBuilderPage() {
     e.preventDefault()
     setSaving(true)
     try {
+      const payload: Record<string, unknown> = {
+        title: infoForm.title,
+        description: infoForm.description,
+        slug: infoForm.slug,
+        contentUnit: infoForm.contentUnit,
+        isPaid: infoForm.isPaid,
+      }
+      if (infoForm.tagline.trim()) payload.tagline = infoForm.tagline.trim()
+      if (infoForm.level.trim()) payload.level = infoForm.level.trim()
+      if (infoForm.estimatedDuration.trim()) payload.estimatedDuration = infoForm.estimatedDuration.trim()
+      if (infoForm.introVideoUrl.trim()) payload.introVideoUrl = infoForm.introVideoUrl.trim()
+      if (infoForm.overviewSlideUrl.trim()) payload.overviewSlideUrl = infoForm.overviewSlideUrl.trim()
+      if (infoForm.heroImage.trim()) payload.heroImage = infoForm.heroImage.trim()
+
       await apiRequest(`/academy/admin/courses/${courseId}`, {
         method: 'PATCH',
-        body: JSON.stringify(infoForm),
+        body: JSON.stringify(payload),
       })
       await reload()
       setEditInfo(false)
@@ -198,6 +218,34 @@ export default function CourseBuilderPage() {
       setAddingFacilitator(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create facilitator.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleCourseImageUpload(file: File | null) {
+    if (!file) return
+    setUploadingCourseImage(true)
+    setError(null)
+    try {
+      const dataUrl = await compressImageToBase64(file, { maxBase64KB: 180, maxDimension: 1200 })
+      setInfoForm(prev => ({ ...prev, heroImage: dataUrl }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process course thumbnail.')
+    } finally {
+      setUploadingCourseImage(false)
+    }
+  }
+
+  async function handleNewFacilitatorPhotoUpload(file: File | null) {
+    if (!file) return
+    setSaving(true)
+    setError(null)
+    try {
+      const dataUrl = await compressImageToBase64(file, { maxBase64KB: 100 })
+      setNewFacForm(prev => ({ ...prev, photoUrl: dataUrl }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process facilitator icon.')
     } finally {
       setSaving(false)
     }
@@ -583,6 +631,33 @@ export default function CourseBuilderPage() {
                       className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40" />
                   </div>
                   <div>
+                    <label className="block text-xs text-white/40 mb-1">Course Overview Slides</label>
+                    <input value={infoForm.overviewSlideUrl} onChange={e => setInfoForm(p => ({ ...p, overviewSlideUrl: e.target.value }))} type="url" placeholder="Canva or Google Slides embed/share URL"
+                      className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs text-white/40 mb-1">Course Thumbnail Image</label>
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+                      <input value={infoForm.heroImage} onChange={e => setInfoForm(p => ({ ...p, heroImage: e.target.value }))} placeholder="Paste an image URL or upload a thumbnail"
+                        className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40" />
+                      <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/12 px-4 py-2 text-sm text-white/70 hover:border-[#F5C518]/30 hover:text-white transition-colors">
+                        <Image size={14} />
+                        {uploadingCourseImage ? 'Processing...' : 'Upload'}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={e => void handleCourseImageUpload(e.target.files?.[0] ?? null)}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                    {infoForm.heroImage && (
+                      <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black/30">
+                        <img src={infoForm.heroImage} alt="Course thumbnail preview" className="aspect-[16/9] w-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
                     <label className="flex items-center gap-2 text-white/60 cursor-pointer">
                       <input type="checkbox" checked={infoForm.isPaid} onChange={e => setInfoForm(p => ({ ...p, isPaid: e.target.checked }))} className="accent-[#F5C518]" />
                       <span className="text-xs">This is a paid course</span>
@@ -614,6 +689,8 @@ export default function CourseBuilderPage() {
                   ['Content unit', course.contentUnit],
                   ['Type', course.isPaid ? 'Paid' : 'Free'],
                   ['Intro Video', course.introVideoUrl],
+                  ['Overview Slides', course.overviewSlideUrl],
+                  ['Course Thumbnail', course.heroImage ? 'Added' : 'Not added'],
                 ].map(([label, val]) => val && (
                   <div key={label as string}>
                     <dt className="text-white/35 text-xs mb-0.5">{label}</dt>
@@ -624,6 +701,11 @@ export default function CourseBuilderPage() {
                   <dt className="text-white/35 text-xs mb-0.5">Description</dt>
                   <dd className="text-white/75 leading-relaxed">{course.description}</dd>
                 </div>
+                {course.heroImage && (
+                  <div className="md:col-span-2 overflow-hidden rounded-xl border border-white/10 bg-black/30">
+                    <img src={course.heroImage} alt={`${course.title} thumbnail`} className="aspect-[16/9] w-full object-cover" />
+                  </div>
+                )}
               </dl>
             )}
           </section>
@@ -712,10 +794,19 @@ export default function CourseBuilderPage() {
                         <input
                           value={newFacForm.photoUrl}
                           onChange={e => setNewFacForm(prev => ({ ...prev, photoUrl: e.target.value }))}
-                          type="url"
-                          placeholder="https://example.com/photo.jpg"
+                          placeholder="https://example.com/photo.jpg or upload below"
                           className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
                         />
+                        <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-xs text-white/60 hover:border-[#F5C518]/30 hover:text-white transition-colors">
+                          <Image size={12} />
+                          Upload facilitator icon
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={e => void handleNewFacilitatorPhotoUpload(e.target.files?.[0] ?? null)}
+                            className="hidden"
+                          />
+                        </label>
                         {newFacForm.photoUrl && (
                           <div className="mt-2 rounded-xl overflow-hidden border border-white/10 w-20 h-20">
                             <img src={newFacForm.photoUrl} alt="Preview" className="w-full h-full object-cover" />

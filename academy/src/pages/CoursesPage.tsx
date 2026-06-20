@@ -55,6 +55,12 @@ function levelKey(level: string | null) {
   return (level ?? '').split(' ')[0].toUpperCase()
 }
 
+function facilitatorPhotoUrl(facilitator: { name: string; photoUrl: string | null }) {
+  if (facilitator.photoUrl) return facilitator.photoUrl
+  if (facilitator.name.toLowerCase().includes('joy egbu')) return '/icons/joy-egbu.jpeg'
+  return null
+}
+
 const LEVEL_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
   BEGINNER:     { color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/25', label: 'Beginner' },
   INTERMEDIATE: { color: 'text-amber-400',   bg: 'bg-amber-400/10 border-amber-400/25',     label: 'Intermediate' },
@@ -97,6 +103,7 @@ function CourseCard({
   const initials = primary
     ? primary.name.replace(/^(Dr|Mr|Ms|Prof)\.\s*/i, '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : 'RC'
+  const primaryPhoto = primary ? facilitatorPhotoUrl(primary) : null
 
   return (
     <motion.div
@@ -163,8 +170,8 @@ function CourseCard({
         {/* Instructor */}
         {primary && (
           <div className="flex items-center gap-2 mb-3">
-            {primary.photoUrl ? (
-              <img src={primary.photoUrl} alt={primary.name} className="w-5 h-5 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
+            {primaryPhoto ? (
+              <img src={primaryPhoto} alt={primary.name} className="w-5 h-5 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
             ) : (
               <div
                 className="w-5 h-5 rounded-full flex items-center justify-center text-[7px] font-extrabold shrink-0"
@@ -338,6 +345,7 @@ function FeaturedSpotlight({ course, onEnroll, enrolling }: { course: PublicCour
   const lk = levelKey(course.level)
   const cfg = LEVEL_CONFIG[lk]
   const primary = course.facilitators[0]
+  const primaryPhoto = primary ? facilitatorPhotoUrl(primary) : null
   const progress = course.progressPercent ?? 0
 
   return (
@@ -383,9 +391,13 @@ function FeaturedSpotlight({ course, onEnroll, enrolling }: { course: PublicCour
           <div className="flex items-center gap-4 text-xs text-white/40">
             {primary && (
               <span className="flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[8px] font-bold text-white/60">
-                  {primary.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                </div>
+                {primaryPhoto ? (
+                  <img src={primaryPhoto} alt={primary.name} className="w-5 h-5 rounded-full object-cover" />
+                ) : (
+                  <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[8px] font-bold text-white/60">
+                    {primary.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  </div>
+                )}
                 {primary.name}
               </span>
             )}
