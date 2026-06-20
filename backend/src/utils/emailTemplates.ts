@@ -163,6 +163,54 @@ ${opts.submissionPreview ? `Preview:\n${opts.submissionPreview.slice(0, 400)}\n\
   }
 }
 
+// ─── Internal: production error alert ────────────────────────────────────
+
+export function bugAlertEmail(opts: {
+  errorName: string
+  errorMessage: string
+  stack: string
+  method: string
+  path: string
+  userId?: string
+  timestamp: string
+}): { subject: string; html: string; text: string } {
+  const stackPreview = opts.stack ? opts.stack.slice(0, 1500) : 'No stack trace available'
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px;">An unhandled error occurred in production at <strong>${escapeHtml(opts.timestamp)}</strong>.</p>
+    <table style="width:100%;border-collapse:collapse;margin:0 0 16px;font-size:13px;">
+      <tr><td style="padding:6px 12px 6px 0;color:#71717a;white-space:nowrap;">Error</td><td style="padding:6px 0;color:#1c1c1c;font-weight:600;">${escapeHtml(opts.errorName)}</td></tr>
+      <tr><td style="padding:6px 12px 6px 0;color:#71717a;white-space:nowrap;">Request</td><td style="padding:6px 0;color:#1c1c1c;">${escapeHtml(opts.method)} ${escapeHtml(opts.path)}</td></tr>
+      ${opts.userId ? `<tr><td style="padding:6px 12px 6px 0;color:#71717a;white-space:nowrap;">User ID</td><td style="padding:6px 0;color:#1c1c1c;">${escapeHtml(opts.userId)}</td></tr>` : ''}
+    </table>
+    <div style="margin:0 0 16px;padding:16px;background:#fef2f2;border-left:3px solid #ef4444;border-radius:8px;">
+      <p style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:#b91c1c;font-weight:700;">Message</p>
+      <p style="margin:8px 0 0;font-size:14px;line-height:1.5;color:#3f3f46;">${escapeHtml(opts.errorMessage)}</p>
+    </div>
+    <div style="padding:16px;background:#f5f5f7;border-radius:8px;">
+      <p style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:#71717a;font-weight:700;">Stack Trace</p>
+      <pre style="margin:8px 0 0;font-size:12px;line-height:1.5;color:#3f3f46;white-space:pre-wrap;word-break:break-all;">${escapeHtml(stackPreview)}</pre>
+    </div>
+  `
+
+  const text = `Unhandled error in production — ${opts.timestamp}
+
+Error:   ${opts.errorName}
+Message: ${opts.errorMessage}
+Request: ${opts.method} ${opts.path}
+${opts.userId ? `User ID: ${opts.userId}\n` : ''}
+Stack:
+${stackPreview}
+
+— Rubikcon Error Monitor`
+
+  return {
+    subject: `[ERROR] ${opts.errorName}: ${opts.errorMessage.slice(0, 80)}`,
+    html: layout({ title: 'Production Error Alert', bodyHtml }),
+    text,
+  }
+}
+
 // ─── Learner: password reset ─────────────────────────────────────────────
 
 export function passwordResetEmail(opts: {

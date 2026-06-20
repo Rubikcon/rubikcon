@@ -4,6 +4,34 @@ import compression from 'compression'
 import { config } from './config/env'
 import prisma from './config/database'
 import { errorHandler, notFoundHandler } from './middleware/error.middleware'
+import { sendEmailInBackground } from './utils/mailer'
+import { bugAlertEmail } from './utils/emailTemplates'
+
+const BUG_ALERT_RECIPIENT = 'bdlsmdsadiq@gmail.com'
+
+function alertProcessError(label: string, err: unknown): void {
+  const error = err instanceof Error ? err : new Error(String(err))
+  console.error(`[${label}]`, error)
+  const tpl = bugAlertEmail({
+    errorName: `${label}: ${error.name}`,
+    errorMessage: error.message,
+    stack: error.stack ?? '',
+    method: 'PROCESS',
+    path: label,
+    timestamp: new Date().toISOString(),
+  })
+  sendEmailInBackground({ to: BUG_ALERT_RECIPIENT, subject: tpl.subject, html: tpl.html, text: tpl.text })
+}
+
+process.on('uncaughtException', (err) => {
+  alertProcessError('uncaughtException', err)
+  // Give the mailer a moment to fire before the process exits
+  setTimeout(() => process.exit(1), 1000)
+})
+
+process.on('unhandledRejection', (reason) => {
+  alertProcessError('unhandledRejection', reason)
+})
 
 // Routes
 import authRoutes from './modules/auth/auth.routes'
