@@ -2601,6 +2601,10 @@ router.get('/admin/courses/:courseId', requireAuth, requireAdmin, async (req: Re
             readingResources: { orderBy: { position: 'asc' } },
             slideDecks: { orderBy: { position: 'asc' } },
             glossaryTerms: { orderBy: { position: 'asc' } },
+            facilitators: {
+              include: { facilitator: { select: { id: true, name: true, title: true, organization: true, photoUrl: true } } },
+              orderBy: { position: 'asc' },
+            },
           },
         },
         approvals: {
@@ -3231,6 +3235,59 @@ router.patch('/admin/courses/:courseId/weeks/:weekId/module', requireAuth, requi
 
     const updated = await prisma.week.update({ where: { id: week.id }, data: { moduleId } })
     return sendSuccess(res, { moduleId: updated.moduleId }, 'Week module assignment updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Add facilitator to a week
+router.post('/admin/courses/:courseId/weeks/:weekId/facilitators', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const { facilitatorId } = z.object({ facilitatorId: z.string().uuid() }).parse(req.body)
+
+    const facilitator = await prisma.facilitator.findUnique({ where: { id: facilitatorId } })
+    if (!facilitator) return sendError(res, 'Facilitator not found.', 404)
+
+    const existing = await prisma.weekFacilitator.findUnique({
+      where: { weekId_facilitatorId: { weekId: week.id, facilitatorId } },
+    })
+    if (existing) return sendError(res, 'Facilitator already assigned to this lesson.', 409)
+
+    const count = await prisma.weekFacilitator.count({ where: { weekId: week.id } })
+    const wf = await prisma.weekFacilitator.create({
+      data: { weekId: week.id, facilitatorId, position: count + 1 },
+      include: { facilitator: { select: { id: true, name: true, title: true, organization: true, photoUrl: true } } },
+    })
+    return sendSuccess(res, wf.facilitator, 'Facilitator added to lesson.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Remove facilitator from a week
+router.delete('/admin/courses/:courseId/weeks/:weekId/facilitators/:facilitatorId', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId
+    const course = await getCourseOrFail(req.params.courseId, userId, req.user!.role, res)
+    if (!course) return
+
+    const week = await prisma.week.findFirst({ where: { id: req.params.weekId, courseId: course.id } })
+    if (!week) return sendError(res, 'Week not found.', 404)
+
+    const wf = await prisma.weekFacilitator.findUnique({
+      where: { weekId_facilitatorId: { weekId: week.id, facilitatorId: req.params.facilitatorId } },
+    })
+    if (!wf) return sendError(res, 'Facilitator not assigned to this lesson.', 404)
+
+    await prisma.weekFacilitator.delete({ where: { id: wf.id } })
+    return sendSuccess(res, { facilitatorId: req.params.facilitatorId }, 'Facilitator removed from lesson.')
   } catch (err) {
     next(err)
   }

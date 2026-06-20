@@ -15,7 +15,7 @@
 
 import { FormEvent, useEffect, useState } from 'react'
 import { useParams } from 'wouter'
-import { ArrowLeft, GripVertical, Loader2, Plus, Save, Trash2, Video as VideoIcon, ListChecks, Target, FileQuestion, ClipboardList } from 'lucide-react'
+import { ArrowLeft, GripVertical, Loader2, Plus, Save, Trash2, Video as VideoIcon, ListChecks, Target, FileQuestion, ClipboardList, Users, X } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -64,6 +64,9 @@ type WeekDetail = {
   readingResources: ExistingReadingResource[]
   slideDecks: ExistingSlideDeck[]
   glossaryTerms: ExistingGlossaryTerm[]
+  facilitators: Array<{
+    facilitator: { id: string; name: string; title: string; organization: string; photoUrl: string | null }
+  }>
 }
 
 export default function WeekEditorPage() {
@@ -540,6 +543,15 @@ export default function WeekEditorPage() {
             />
           </Section>
 
+          {/* Taught by */}
+          <Section title="Taught By" icon={Users}>
+            <WeekFacilitatorsPanel
+              courseId={courseId!}
+              weekId={weekId!}
+              initialFacilitators={week.facilitators.map(wf => wf.facilitator)}
+            />
+          </Section>
+
           {/* Quiz */}
           <Section title="Quiz" icon={FileQuestion}>
             <QuizEditor
@@ -562,6 +574,157 @@ export default function WeekEditorPage() {
 
         </div>
       </main>
+    </div>
+  )
+}
+
+// ─── Lesson facilitator panel ─────────────────────────────────────────────────
+
+type FacilitatorMin = { id: string; name: string; title: string; organization: string; photoUrl: string | null }
+
+function WeekFacilitatorsPanel({
+  courseId,
+  weekId,
+  initialFacilitators,
+}: {
+  courseId: string
+  weekId: string
+  initialFacilitators: FacilitatorMin[]
+}) {
+  const [assigned, setAssigned] = useState<FacilitatorMin[]>(initialFacilitators)
+  const [allFacilitators, setAllFacilitators] = useState<FacilitatorMin[]>([])
+  const [loadingList, setLoadingList] = useState(true)
+  const [selectedId, setSelectedId] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  const [panelError, setPanelError] = useState<string | null>(null)
+
+  useEffect(() => {
+    apiRequest<FacilitatorMin[]>('/academy/admin/facilitators')
+      .then(setAllFacilitators)
+      .catch(() => setPanelError('Could not load facilitator list.'))
+      .finally(() => setLoadingList(false))
+  }, [])
+
+  const unassigned = allFacilitators.filter(f => !assigned.find(a => a.id === f.id))
+
+  async function handleAdd() {
+    if (!selectedId) return
+    setAdding(true)
+    setPanelError(null)
+    try {
+      const added = await apiRequest<FacilitatorMin>(
+        `/academy/admin/courses/${courseId}/weeks/${weekId}/facilitators`,
+        { method: 'POST', body: JSON.stringify({ facilitatorId: selectedId }) }
+      )
+      setAssigned(prev => [...prev, added])
+      setSelectedId('')
+    } catch (err) {
+      setPanelError(err instanceof Error ? err.message : 'Failed to add facilitator.')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function handleRemove(facilitatorId: string) {
+    setRemovingId(facilitatorId)
+    setPanelError(null)
+    try {
+      await apiRequest(
+        `/academy/admin/courses/${courseId}/weeks/${weekId}/facilitators/${facilitatorId}`,
+        { method: 'DELETE' }
+      )
+      setAssigned(prev => prev.filter(f => f.id !== facilitatorId))
+    } catch (err) {
+      setPanelError(err instanceof Error ? err.message : 'Failed to remove facilitator.')
+    } finally {
+      setRemovingId(null)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-white/40 leading-relaxed">
+        Map which facilitators teach this specific lesson. This appears on the lesson page and helps learners know who to reach out to.
+      </p>
+
+      {/* Assigned */}
+      {assigned.length > 0 ? (
+        <div className="space-y-2">
+          {assigned.map(f => (
+            <div
+              key={f.id}
+              className="flex items-center gap-3 rounded-xl border border-white/8 bg-black/30 px-3 py-2.5"
+            >
+              {f.photoUrl ? (
+                <img src={f.photoUrl} alt={f.name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-[#F5C518]/15 border border-[#F5C518]/25 flex items-center justify-center shrink-0">
+                  <span className="text-[#F5C518] text-xs font-bold">
+                    {f.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()}
+                  </span>
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">{f.name}</p>
+                <p className="text-xs text-white/45 truncate">{f.title} · {f.organization}</p>
+              </div>
+              <button
+                onClick={() => handleRemove(f.id)}
+                disabled={removingId === f.id}
+                className="shrink-0 rounded-lg p-1.5 text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-40"
+                title="Remove from lesson"
+              >
+                {removingId === f.id
+                  ? <Loader2 size={13} className="animate-spin" />
+                  : <X size={13} />
+                }
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-white/30 italic">No facilitators assigned to this lesson yet.</p>
+      )}
+
+      {/* Add row */}
+      {loadingList ? (
+        <div className="flex items-center gap-2 text-xs text-white/30">
+          <Loader2 size={12} className="animate-spin" /> Loading…
+        </div>
+      ) : unassigned.length > 0 ? (
+        <div className="flex gap-2 pt-1">
+          <select
+            value={selectedId}
+            onChange={e => setSelectedId(e.target.value)}
+            className="flex-1 min-w-0 rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40 transition-colors [color-scheme:dark]"
+          >
+            <option value="">Select a facilitator…</option>
+            {unassigned.map(f => (
+              <option key={f.id} value={f.id}>
+                {f.name} — {f.title}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleAdd}
+            disabled={!selectedId || adding}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black hover:bg-[#E8B800] disabled:opacity-40 transition-colors"
+          >
+            {adding ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+            Add
+          </button>
+        </div>
+      ) : allFacilitators.length > 0 ? (
+        <p className="text-xs text-white/30 italic">All available facilitators are already assigned.</p>
+      ) : (
+        <p className="text-xs text-white/30 italic">
+          No facilitators in the system.{' '}
+          <a href="/admin/superadmin" className="text-[#F5C518]/70 hover:text-[#F5C518] underline">Add via Super Admin</a>
+        </p>
+      )}
+
+      {panelError && <p className="text-xs text-red-400">{panelError}</p>}
     </div>
   )
 }

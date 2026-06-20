@@ -100,6 +100,9 @@ export type AdminWeek = {
   videos: Array<{ id: string; title: string; url: string; description: string | null; position: number }>
   quiz: AdminQuiz | null
   assignments: AdminAssignment[]
+  facilitators: Array<{
+    facilitator: { id: string; name: string; title: string; organization: string; photoUrl: string | null }
+  }>
 }
 
 export type AdminQuiz = {
