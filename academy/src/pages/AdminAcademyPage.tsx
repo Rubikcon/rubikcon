@@ -84,12 +84,20 @@ export default function AdminAcademyPage() {
 
   // Profile (own Facilitator record)
   const [showProfile, setShowProfile] = useState(false)
-  const [myFacilitator, setMyFacilitator] = useState<{ id: string; name: string; title: string; organization: string; email: string; photoUrl: string | null; bio: string | null } | null>(null)
+  // Pulled out so we can reference it inside narrowed `if (!myFacilitator)` blocks
+  // (using `typeof myFacilitator` there collapses to `never`).
+  type MyFacilitator = { id: string; name: string; title: string; organization: string; email: string; linkedinUrl: string | null; photoUrl: string | null; bio: string | null }
+  const [myFacilitator, setMyFacilitator] = useState<MyFacilitator | null>(null)
   const [loadingMyFacilitator, setLoadingMyFacilitator] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
   const [profileMessage, setProfileMessage] = useState<string | null>(null)
   const profileFileInputRef = useRef<HTMLInputElement | null>(null)
+  // Editable text-field drafts. We keep them separate from `myFacilitator` so
+  // the user can type freely without each keystroke hitting the API. On Save,
+  // we PATCH whatever's changed.
+  const [profileForm, setProfileForm] = useState({ title: '', organization: '', linkedinUrl: '', bio: '' })
+  const [savingProfile, setSavingProfile] = useState(false)
   const [savingFeedbackId, setSavingFeedbackId] = useState<string | null>(null)
 
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -202,14 +210,65 @@ export default function AdminAcademyPage() {
     if (!myFacilitator) {
       setLoadingMyFacilitator(true)
       try {
-        const data = await apiRequest<typeof myFacilitator>('/academy/admin/facilitators/me')
+        const data = await apiRequest<MyFacilitator>('/academy/admin/facilitators/me')
         setMyFacilitator(data)
+        setProfileForm({
+          title: data.title ?? '',
+          organization: data.organization ?? '',
+          linkedinUrl: data.linkedinUrl ?? '',
+          bio: data.bio ?? '',
+        })
       } catch (err) {
         // 404 here means "you're not registered as a facilitator yet" — surface that gently.
         setProfileError(err instanceof Error ? err.message : 'Unable to load your profile.')
       } finally {
         setLoadingMyFacilitator(false)
       }
+    } else {
+      // Re-seed the form so reopening the modal shows the latest server state.
+      setProfileForm({
+        title: myFacilitator.title ?? '',
+        organization: myFacilitator.organization ?? '',
+        linkedinUrl: myFacilitator.linkedinUrl ?? '',
+        bio: myFacilitator.bio ?? '',
+      })
+    }
+  }
+
+  /**
+   * Save the editable text fields (title, organization, LinkedIn, bio).
+   * Sends only the keys that actually changed so we don't touch what the user
+   * didn't intend to (and the backend's per-field validators stay focused).
+   */
+  async function saveProfileFields() {
+    if (!myFacilitator) return
+    const payload: Record<string, string> = {}
+    const trimmedTitle = profileForm.title.trim()
+    const trimmedOrg = profileForm.organization.trim()
+    const trimmedLi = profileForm.linkedinUrl.trim()
+    const trimmedBio = profileForm.bio.trim()
+    if (trimmedTitle && trimmedTitle !== myFacilitator.title) payload.title = trimmedTitle
+    if (trimmedOrg && trimmedOrg !== myFacilitator.organization) payload.organization = trimmedOrg
+    if (trimmedLi !== (myFacilitator.linkedinUrl ?? '')) payload.linkedinUrl = trimmedLi
+    if (trimmedBio !== (myFacilitator.bio ?? '')) payload.bio = trimmedBio
+    if (Object.keys(payload).length === 0) {
+      setProfileMessage('No changes to save.')
+      return
+    }
+    setSavingProfile(true)
+    setProfileError(null)
+    setProfileMessage(null)
+    try {
+      const updated = await apiRequest<MyFacilitator>('/academy/admin/facilitators/me', {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      })
+      setMyFacilitator(updated)
+      setProfileMessage('Profile updated.')
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : 'Unable to save profile.')
+    } finally {
+      setSavingProfile(false)
     }
   }
 
@@ -234,7 +293,7 @@ export default function AdminAcademyPage() {
     try {
       // Compress to <100KB base64 client-side so we never round-trip a huge blob.
       const dataUrl = await compressImageToBase64(file, { maxBase64KB: 100 })
-      const updated = await apiRequest<typeof myFacilitator>('/academy/admin/facilitators/me', {
+      const updated = await apiRequest<MyFacilitator>('/academy/admin/facilitators/me', {
         method: 'PATCH',
         body: JSON.stringify({ photoUrl: dataUrl }),
       })
@@ -254,7 +313,7 @@ export default function AdminAcademyPage() {
     setProfileError(null)
     setProfileMessage(null)
     try {
-      const updated = await apiRequest<typeof myFacilitator>('/academy/admin/facilitators/me', {
+      const updated = await apiRequest<MyFacilitator>('/academy/admin/facilitators/me', {
         method: 'PATCH',
         body: JSON.stringify({ photoUrl: null }),
       })
@@ -1268,6 +1327,68 @@ export default function AdminAcademyPage() {
                 <p className="text-[11px] text-white/40 leading-relaxed">
                   JPEG, PNG, or WebP. We'll resize and compress your image to <strong className="text-white/60">under 100 KB</strong> in the browser before sending it — you can upload a much bigger original and we'll handle the rest.
                 </p>
+
+                {/* Editable text fields — title, organization, LinkedIn, and bio */}
+                <div className="space-y-3 pt-3 border-t border-white/10">
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-mono uppercase tracking-widest text-white/40 mb-1.5">Role / title</label>
+                      <input
+                        value={profileForm.title}
+                        onChange={e => setProfileForm(p => ({ ...p, title: e.target.value }))}
+                        placeholder="e.g. Product Manager"
+                        maxLength={200}
+                        className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#F5C518]/40 transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-mono uppercase tracking-widest text-white/40 mb-1.5">Organization</label>
+                      <input
+                        value={profileForm.organization}
+                        onChange={e => setProfileForm(p => ({ ...p, organization: e.target.value }))}
+                        placeholder="e.g. Rubikcon Nexus"
+                        maxLength={200}
+                        className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#F5C518]/40 transition-colors"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase tracking-widest text-white/40 mb-1.5">LinkedIn URL</label>
+                    <input
+                      type="url"
+                      value={profileForm.linkedinUrl}
+                      onChange={e => setProfileForm(p => ({ ...p, linkedinUrl: e.target.value }))}
+                      placeholder="https://www.linkedin.com/in/your-handle/"
+                      className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#F5C518]/40 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase tracking-widest text-white/40 mb-1.5">
+                      Bio <span className="normal-case font-sans text-white/30">— shown to learners on course pages</span>
+                    </label>
+                    <textarea
+                      value={profileForm.bio}
+                      onChange={e => setProfileForm(p => ({ ...p, bio: e.target.value }))}
+                      placeholder="A short paragraph about your background, focus, and what you bring to the programme. Paste from a document — Markdown isn't rendered, plain text works best."
+                      rows={6}
+                      maxLength={2000}
+                      className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#F5C518]/40 transition-colors resize-y leading-relaxed"
+                    />
+                    <p className="mt-1 text-[10px] text-white/35 text-right">
+                      {profileForm.bio.length} / 2000
+                    </p>
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={saveProfileFields}
+                      disabled={savingProfile}
+                      className="inline-flex items-center gap-2 rounded-full bg-[#F5C518] px-5 py-2 text-sm font-semibold text-black disabled:opacity-40 hover:bg-[#E8B800] transition-colors"
+                    >
+                      {savingProfile ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                      {savingProfile ? 'Saving…' : 'Save profile'}
+                    </button>
+                  </div>
+                </div>
 
                 {profileError && (
                   <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-100">

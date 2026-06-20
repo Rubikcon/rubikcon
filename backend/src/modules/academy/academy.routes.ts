@@ -2368,6 +2368,13 @@ const updateOwnFacilitatorSchema = z.object({
     )
     .optional(),
   bio: z.string().trim().max(2000).optional().nullable(),
+  // Self-editable display title (e.g. "Product Manager"). Trimmed; must not
+  // exceed 200 chars to match the DB-level constraint applied at creation.
+  title: z.string().trim().min(2).max(200).optional(),
+  // Self-editable organization label (e.g. "Rubikcon Nexus").
+  organization: z.string().trim().min(2).max(200).optional(),
+  // LinkedIn URL — validated as URL when provided so it always renders cleanly.
+  linkedinUrl: z.string().url().optional(),
 })
 
 router.patch('/admin/facilitators/me', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
@@ -2387,9 +2394,18 @@ router.patch('/admin/facilitators/me', requireAuth, requireAdmin, async (req: Re
       )
     }
 
-    const data: { photoUrl?: string | null; bio?: string | null } = {}
+    const data: {
+      photoUrl?: string | null
+      bio?: string | null
+      title?: string
+      organization?: string
+      linkedinUrl?: string
+    } = {}
     if (parsed.data.photoUrl !== undefined) data.photoUrl = parsed.data.photoUrl
     if (parsed.data.bio !== undefined) data.bio = parsed.data.bio
+    if (parsed.data.title !== undefined) data.title = parsed.data.title
+    if (parsed.data.organization !== undefined) data.organization = parsed.data.organization
+    if (parsed.data.linkedinUrl !== undefined) data.linkedinUrl = parsed.data.linkedinUrl
 
     const updated = await prisma.facilitator.update({
       where: { id: facilitator.id },
