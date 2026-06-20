@@ -23,6 +23,7 @@ type Facilitator = {
 
 function Avatar({ facilitator }: { facilitator: Facilitator }) {
   const src = facilitator.photoUrl ?? null
+  const [imgFailed, setImgFailed] = useState(false)
   const initials = facilitator.name
     .split(' ')
     .slice(0, 2)
@@ -30,12 +31,13 @@ function Avatar({ facilitator }: { facilitator: Facilitator }) {
     .join('')
     .toUpperCase()
 
-  if (src) {
+  if (src && !imgFailed) {
     return (
       <img
         src={src}
         alt={facilitator.name}
         className="w-20 h-20 rounded-full object-cover ring-2 ring-white/10"
+        onError={() => setImgFailed(true)}
       />
     )
   }

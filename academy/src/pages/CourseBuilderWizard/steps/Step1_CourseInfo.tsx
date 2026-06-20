@@ -15,6 +15,13 @@ interface Step1_CourseInfoProps {
 
 // ─── Facilitator panel ────────────────────────────────────────────────────────
 
+type AdminUser = { id: string; name: string | null; email: string; role: string }
+
+// A selectable option that is either an existing Facilitator record or an admin user.
+type FacilitatorOption =
+  | { kind: 'facilitator'; facilitatorId: string; label: string }
+  | { kind: 'user'; userId: string; label: string }
+
 function CourseFacilitatorsPanel({
   courseId,
   initialFacilitators,
@@ -24,8 +31,9 @@ function CourseFacilitatorsPanel({
 }) {
   const [assigned, setAssigned] = useState<FacilitatorSummary[]>(initialFacilitators)
   const [allFacilitators, setAllFacilitators] = useState<FacilitatorSummary[]>([])
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [loadingList, setLoadingList] = useState(true)
-  const [selectedId, setSelectedId] = useState('')
+  const [selectedValue, setSelectedValue] = useState('')
   const [adding, setAdding] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -35,25 +43,58 @@ function CourseFacilitatorsPanel({
   }, [initialFacilitators])
 
   useEffect(() => {
-    apiRequest<FacilitatorSummary[]>('/academy/admin/facilitators')
-      .then(setAllFacilitators)
+    Promise.all([
+      apiRequest<FacilitatorSummary[]>('/academy/admin/facilitators'),
+      apiRequest<AdminUser[]>('/academy/admin/admin-users').catch(() => [] as AdminUser[]),
+    ])
+      .then(([facilitators, users]) => {
+        setAllFacilitators(facilitators)
+        setAdminUsers(users)
+      })
       .catch(() => setError('Failed to load facilitator list.'))
       .finally(() => setLoadingList(false))
   }, [])
 
-  const unassigned = allFacilitators.filter(f => !assigned.find(a => a.id === f.id))
+  // Build combined options: existing Facilitator records + admin users who don't
+  // already have a Facilitator record (matched by email, case-insensitive).
+  const facilitatorEmails = new Set(allFacilitators.map(f => f.email?.toLowerCase()).filter(Boolean))
+  const assignedFacilitatorIds = new Set(assigned.map(f => f.id))
+
+  const options: FacilitatorOption[] = [
+    // Existing facilitator records not yet assigned to this course
+    ...allFacilitators
+      .filter(f => !assignedFacilitatorIds.has(f.id))
+      .map(f => ({
+        kind: 'facilitator' as const,
+        facilitatorId: f.id,
+        label: `${f.name} — ${f.title}`,
+      })),
+    // Admin users who don't have a Facilitator record yet
+    ...adminUsers
+      .filter(u => !facilitatorEmails.has(u.email.toLowerCase()))
+      .map(u => ({
+        kind: 'user' as const,
+        userId: u.id,
+        label: `${u.name || u.email} (admin)`,
+      })),
+  ]
 
   async function handleAdd() {
-    if (!selectedId) return
+    if (!selectedValue) return
     setAdding(true)
     setError(null)
     try {
+      const [kind, id] = selectedValue.split(':')
+      const body = kind === 'facilitator' ? { facilitatorId: id } : { userId: id }
       const added = await apiRequest<FacilitatorSummary>(
         `/academy/admin/courses/${courseId}/facilitators`,
-        { method: 'POST', body: JSON.stringify({ facilitatorId: selectedId }) }
+        { method: 'POST', body: JSON.stringify(body) }
       )
       setAssigned(prev => [...prev, added])
-      setSelectedId('')
+      setSelectedValue('')
+      // Refresh facilitator list so the newly created record appears next time
+      const updated = await apiRequest<FacilitatorSummary[]>('/academy/admin/facilitators').catch(() => allFacilitators)
+      setAllFacilitators(updated)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add facilitator.')
     } finally {
@@ -116,38 +157,50 @@ function CourseFacilitatorsPanel({
         <div className="flex items-center gap-2 text-xs text-white/30">
           <Loader2 size={12} className="animate-spin" /> Loading facilitators…
         </div>
-      ) : unassigned.length > 0 ? (
+      ) : options.length > 0 ? (
         <div className="flex gap-2">
           <select
-            value={selectedId}
-            onChange={e => setSelectedId(e.target.value)}
+            value={selectedValue}
+            onChange={e => setSelectedValue(e.target.value)}
             className="flex-1 min-w-0 rounded-lg border border-white/12 bg-black/30 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40 transition-colors"
           >
             <option value="">Select a facilitator…</option>
-            {unassigned.map(f => (
-              <option key={f.id} value={f.id}>
-                {f.name} — {f.title}
-              </option>
-            ))}
+            {options.some(o => o.kind === 'facilitator') && (
+              <optgroup label="Facilitator records">
+                {options
+                  .filter((o): o is Extract<FacilitatorOption, { kind: 'facilitator' }> => o.kind === 'facilitator')
+                  .map(o => (
+                    <option key={o.facilitatorId} value={`facilitator:${o.facilitatorId}`}>
+                      {o.label}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
+            {options.some(o => o.kind === 'user') && (
+              <optgroup label="Admin users">
+                {options
+                  .filter((o): o is Extract<FacilitatorOption, { kind: 'user' }> => o.kind === 'user')
+                  .map(o => (
+                    <option key={o.userId} value={`user:${o.userId}`}>
+                      {o.label}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
           </select>
           <button
             onClick={handleAdd}
-            disabled={!selectedId || adding}
+            disabled={!selectedValue || adding}
             className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-[#F5C518] px-3 py-2 text-sm font-semibold text-black hover:bg-[#E8B800] disabled:opacity-40 transition-colors"
           >
             {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
             Add
           </button>
         </div>
-      ) : allFacilitators.length > 0 ? (
-        <p className="text-xs text-white/30 italic">All facilitators are already assigned.</p>
+      ) : assigned.length > 0 ? (
+        <p className="text-xs text-white/30 italic">All available facilitators are already assigned.</p>
       ) : (
-        <p className="text-xs text-white/30 italic">
-          No facilitators in the system yet.{' '}
-          <a href="/admin/superadmin" className="text-[#F5C518]/70 hover:text-[#F5C518] underline">
-            Add one via Super Admin
-          </a>
-        </p>
+        <p className="text-xs text-white/30 italic">No facilitators available.</p>
       )}
 
       {error && (

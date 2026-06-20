@@ -2422,15 +2422,26 @@ router.patch('/admin/facilitators/me', requireAuth, requireAdmin, async (req: Re
     if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
 
     const userEmail = req.user!.email.toLowerCase()
-    const facilitator = await prisma.facilitator.findFirst({
+    let facilitator = await prisma.facilitator.findFirst({
       where: { email: { equals: userEmail, mode: 'insensitive' } },
     })
     if (!facilitator) {
-      return sendError(
-        res,
-        'You\'re not registered as a facilitator yet. A super admin needs to add you under Admin → Facilitators first.',
-        404
-      )
+      // Auto-create a Facilitator record from the admin's User data so all
+      // admins can manage their own profile without a super admin having to
+      // pre-register them.
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.userId },
+        select: { name: true, email: true },
+      })
+      facilitator = await prisma.facilitator.create({
+        data: {
+          name: user?.name || userEmail.split('@')[0],
+          email: userEmail,
+          title: 'Facilitator',
+          organization: 'Rubikcon',
+          linkedinUrl: 'https://linkedin.com',
+        },
+      })
     }
 
     const data: {
@@ -2459,7 +2470,7 @@ router.patch('/admin/facilitators/me', requireAuth, requireAdmin, async (req: Re
 router.get('/admin/facilitators/me', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userEmail = req.user!.email.toLowerCase()
-    const facilitator = await prisma.facilitator.findFirst({
+    let facilitator = await prisma.facilitator.findFirst({
       where: { email: { equals: userEmail, mode: 'insensitive' } },
       select: {
         id: true, name: true, title: true, organization: true, email: true,
@@ -2467,13 +2478,42 @@ router.get('/admin/facilitators/me', requireAuth, requireAdmin, async (req: Requ
       },
     })
     if (!facilitator) {
-      return sendError(
-        res,
-        'You\'re not registered as a facilitator yet.',
-        404
-      )
+      // Auto-create so the admin can fill in their profile immediately.
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.userId },
+        select: { name: true, email: true },
+      })
+      const created = await prisma.facilitator.create({
+        data: {
+          name: user?.name || userEmail.split('@')[0],
+          email: userEmail,
+          title: 'Facilitator',
+          organization: 'Rubikcon',
+          linkedinUrl: 'https://linkedin.com',
+        },
+        select: {
+          id: true, name: true, title: true, organization: true, email: true,
+          linkedinUrl: true, photoUrl: true, bio: true,
+        },
+      })
+      facilitator = created
     }
     return sendSuccess(res, facilitator)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// List admin users (ADMIN + SUPER_ADMIN roles) so they can be picked as
+// course facilitators directly from the course builder.
+router.get('/admin/admin-users', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { role: { in: ['ADMIN', 'SUPER_ADMIN'] } },
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: { name: 'asc' },
+    })
+    return sendSuccess(res, users)
   } catch (err) {
     next(err)
   }
@@ -3813,15 +3853,53 @@ router.post('/admin/courses/:courseId/facilitators', requireAuth, requireAdmin, 
     if (!course) return
     if (course.status === 'APPROVED' && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') return sendError(res, 'Cannot edit an approved course.', 400)
 
-    const { facilitatorId } = z.object({ facilitatorId: z.string().uuid() }).parse(req.body)
+    const parsed = z.object({
+      facilitatorId: z.string().uuid().optional(),
+      userId: z.string().uuid().optional(),
+    }).safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Provide facilitatorId or userId.', 400)
 
-    const facilitator = await prisma.facilitator.findUnique({ where: { id: facilitatorId } })
-    if (!facilitator) return sendError(res, 'Facilitator not found.', 404)
+    let facilitatorId: string
 
-    const existing = await prisma.courseFacilitator.findUnique({
+    if (parsed.data.facilitatorId) {
+      // Standard flow: use an existing Facilitator record.
+      const existing = await prisma.facilitator.findUnique({ where: { id: parsed.data.facilitatorId } })
+      if (!existing) return sendError(res, 'Facilitator not found.', 404)
+      facilitatorId = existing.id
+    } else if (parsed.data.userId) {
+      // Admin-user flow: find or auto-create the Facilitator record for the user.
+      const user = await prisma.user.findUnique({
+        where: { id: parsed.data.userId },
+        select: { id: true, name: true, email: true, role: true },
+      })
+      if (!user) return sendError(res, 'User not found.', 404)
+      if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+        return sendError(res, 'Only admin users can be added as facilitators this way.', 400)
+      }
+      const userEmail = user.email.toLowerCase()
+      let facilitatorRecord = await prisma.facilitator.findFirst({
+        where: { email: { equals: userEmail, mode: 'insensitive' } },
+      })
+      if (!facilitatorRecord) {
+        facilitatorRecord = await prisma.facilitator.create({
+          data: {
+            name: user.name || userEmail.split('@')[0],
+            email: userEmail,
+            title: 'Facilitator',
+            organization: 'Rubikcon',
+            linkedinUrl: 'https://linkedin.com',
+          },
+        })
+      }
+      facilitatorId = facilitatorRecord.id
+    } else {
+      return sendError(res, 'Provide either facilitatorId or userId.', 400)
+    }
+
+    const alreadyLinked = await prisma.courseFacilitator.findUnique({
       where: { courseId_facilitatorId: { courseId: course.id, facilitatorId } },
     })
-    if (existing) return sendError(res, 'Facilitator already assigned to this course.', 409)
+    if (alreadyLinked) return sendError(res, 'Facilitator already assigned to this course.', 409)
 
     const count = await prisma.courseFacilitator.count({ where: { courseId: course.id } })
     const cf = await prisma.courseFacilitator.create({

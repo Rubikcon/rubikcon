@@ -95,7 +95,13 @@ export default function LoginPage() {
       if (err instanceof ApiError && (err.errors as any)?.code === 'DEVICE_LIMIT') {
         setDeviceLimitHit({ count: (err.errors as any).activeSessions ?? 5 })
       }
-      setError(err instanceof Error ? err.message : 'Unable to authenticate.')
+      // "Failed to fetch" means the server is unreachable (e.g. sleeping on Render free tier)
+      const msg = err instanceof Error ? err.message : 'Unable to authenticate.'
+      setError(
+        msg === 'Failed to fetch'
+          ? 'Unable to reach the server. It may be starting up — please wait a moment and try again.'
+          : msg
+      )
     } finally {
       setSubmitting(false)
     }
