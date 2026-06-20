@@ -448,6 +448,45 @@ async function getUserWeekState(userId: string, weekId: string, quizId?: string 
 
 // New LMS endpoints
 
+// Public facilitator directory — no email exposed
+router.get('/facilitators', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const facilitators = await prisma.facilitator.findMany({
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        title: true,
+        organization: true,
+        bio: true,
+        photoUrl: true,
+        linkedinUrl: true,
+        courses: {
+          select: {
+            course: {
+              select: { id: true, slug: true, title: true, published: true },
+            },
+          },
+        },
+      },
+    })
+    return sendSuccess(res, facilitators.map(f => ({
+      id: f.id,
+      name: f.name,
+      title: f.title,
+      organization: f.organization,
+      bio: f.bio,
+      photoUrl: f.photoUrl,
+      linkedinUrl: f.linkedinUrl,
+      courses: f.courses
+        .filter(cf => cf.course.published)
+        .map(cf => ({ id: cf.course.id, slug: cf.course.slug, title: cf.course.title })),
+    })))
+  } catch (err) {
+    next(err)
+  }
+})
+
 // Public course catalog (with optional enrollment status if logged in)
 router.get('/courses', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {

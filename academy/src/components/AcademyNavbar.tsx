@@ -60,6 +60,7 @@ export default function AcademyNavbar({
 
               <div className="hidden md:flex items-center gap-6">
                 <a href="/courses" className={`text-sm transition-all ${textColor} opacity-70 hover:opacity-100 ${hoverColor}`}>Courses</a>
+                <a href="/facilitators" className={`text-sm transition-all ${textColor} opacity-70 hover:opacity-100 ${hoverColor}`}>Facilitators</a>
                 <a href="/dashboard" className={`text-sm transition-all ${textColor} opacity-70 hover:opacity-100 ${hoverColor}`}>Dashboard</a>
                 <a href={URLS.landing} className={`text-sm transition-all ${textColor} opacity-70 hover:opacity-100 ${hoverColor}`}>Main site</a>
               </div>
