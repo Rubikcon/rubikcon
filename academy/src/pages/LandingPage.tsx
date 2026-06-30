@@ -121,15 +121,15 @@ export default function LandingPage() {
           <motion.h1 variants={fadeUp} initial="hidden" animate="visible" custom={1}
             className="font-display font-extrabold text-white leading-[1.06] tracking-[-0.025em] mb-7"
             style={{ fontSize: 'clamp(36px, 5vw, 68px)' }}>
-            Learn{' '}
-            <span className="inline-block bg-[#F5C518] text-[#0A0A0A] px-5 py-1 rounded-full align-middle leading-snug">Digital skills</span>{' '}
-            to build in today's world
+            Build{' '}
+            <span className="inline-block bg-[#F5C518] text-[#0A0A0A] px-5 py-1 rounded-full align-middle leading-snug">In-Demand</span>{' '}
+            Tech Skills. Create Real-World Impact.
           </motion.h1>
 
           {/* Subtitle */}
           <motion.p variants={fadeUp} initial="hidden" animate="visible" custom={2}
-            className="text-white/50 text-[17px] max-w-[520px] mx-auto mb-11 leading-relaxed">
-            Practical, project-based courses taught by builders shipping real Web3 products across Africa and beyond.
+            className="text-white/50 text-[17px] max-w-[620px] mx-auto mb-11 leading-relaxed">
+            Rubikcon Nexus Academy equips individuals, startups, businesses, and organisations across Africa with practical, industry-focused training in Artificial Intelligence, Blockchain, Product Management, Software Development, and other emerging technologies — helping learners build careers, solve meaningful problems, and drive innovation.
           </motion.p>
 
           {/* CTAs */}
@@ -137,11 +137,11 @@ export default function LandingPage() {
             className="flex items-center justify-center gap-4 mb-20 flex-wrap">
             <a href="/courses"
               className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-bold px-8 py-3.5 rounded-full hover:bg-[#E8B800] transition-colors text-[15px]">
-              Browse courses →
+              Enrol Now →
             </a>
-            <a href="/course/blockchain-social-impact/week/week-1-blockchain-fundamentals-history"
+            <a href="/courses"
               className="inline-flex items-center gap-2 bg-white/[0.07] border border-white/[0.15] text-white px-7 py-3.5 rounded-full hover:bg-white/[0.12] transition-colors text-[15px]">
-              <Play size={12} className="fill-white" /> Watch intro
+              <Play size={12} className="fill-white" /> Preview a course
             </a>
           </motion.div>
 
@@ -163,7 +163,168 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── COURSES CTA ─── (moved above the curriculum section so learners see real courses first) */}
+      {/* ─── COURSE PREVIEW ─── */}
+      <section className="bg-[#0A0A0A] py-24 px-6 border-t border-white/5">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col lg:flex-row items-center gap-12">
+            {/* Video placeholder */}
+            <motion.div
+              initial={{ opacity: 0, x: -24 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              className="w-full lg:w-1/2 shrink-0"
+            >
+              <div className="relative aspect-video rounded-2xl overflow-hidden bg-[#141414] border border-white/10">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#3D2F00]/60 to-[#0A0A0A]" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-[#F5C518] flex items-center justify-center shadow-2xl">
+                    <Play size={22} className="fill-[#0A0A0A] text-[#0A0A0A] ml-1" />
+                  </div>
+                  <p className="text-white/40 text-xs font-mono tracking-widest uppercase">Course preview</p>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Copy */}
+            <motion.div
+              initial={{ opacity: 0, x: 24 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              className="flex-1"
+            >
+              <p className="text-xs font-mono text-white/30 tracking-widest uppercase mb-4">Free preview</p>
+              <h2 className="font-display font-extrabold text-white text-4xl md:text-5xl leading-tight mb-5">
+                Experience Learning Before You Commit
+              </h2>
+              <p className="text-white/50 text-base leading-relaxed mb-8">
+                Explore a free course preview to see how our programmes are taught. Watch an introduction from our facilitators, explore the learning approach, and discover what you'll build throughout the programme — no registration required.
+              </p>
+              <a
+                href="/course/blockchain-social-impact/week/week-1-blockchain-fundamentals-history"
+                className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-bold px-7 py-3.5 rounded-full hover:bg-[#E8B800] transition-colors text-[15px]"
+              >
+                <Play size={13} className="fill-[#0A0A0A]" /> Preview Course
+              </a>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── CURRICULUM OVERVIEW ─── */}
+      <section className="bg-[#F2EDE2] py-24 px-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-12">
+            <p className="text-xs font-mono text-[#1C1C1C]/50 tracking-widest uppercase mb-3">What you'll learn</p>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <h2 className="font-display text-4xl md:text-5xl font-extrabold text-[#1C1C1C] leading-tight">
+                Skills that ship.
+              </h2>
+              <p className="text-[#1C1C1C]/60 text-sm max-w-sm leading-relaxed md:text-right">
+                Practical, industry-focused training that builds careers and turns ideas into real products — across AI, blockchain, product management, and emerging tech.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {CURRICULUM_TOPICS.map((topic, i) => (
+              <motion.div key={topic.num}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.07 }}
+                className="bg-white rounded-2xl p-7 hover:shadow-md transition-shadow"
+              >
+                <span className="inline-block bg-[#F2EDE2] text-[#1C1C1C] text-xs font-mono font-bold px-2.5 py-1 rounded-lg mb-4">{topic.num}</span>
+                <h3 className="font-display font-extrabold text-[#1C1C1C] text-lg mb-2 leading-snug">{topic.title}</h3>
+                <p className="text-[#1C1C1C]/55 text-sm leading-relaxed">{topic.body}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── WHO OUR PROGRAMMES ARE FOR ─── */}
+      <section className="bg-[#F2EDE2] py-24 px-6 border-t border-black/5">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-12">
+            <p className="text-xs font-mono text-[#1C1C1C]/50 tracking-widest uppercase mb-3">Our learners</p>
+            <h2 className="font-display text-4xl md:text-5xl font-extrabold text-[#1C1C1C] leading-tight mb-4">
+              Who Our Programmes Are For
+            </h2>
+            <p className="text-[#1C1C1C]/60 text-base max-w-xl leading-relaxed">
+              Whether you're starting your tech journey or looking to expand your expertise, Rubikcon Nexus Academy is designed for:
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[
+              { icon: '🎓', label: 'Students & Recent Graduates', desc: 'Build tech skills that make you employable from day one.' },
+              { icon: '💼', label: 'Professionals Transitioning into Tech', desc: 'Leverage your existing expertise and add in-demand digital skills.' },
+              { icon: '🚀', label: 'Entrepreneurs & Startup Founders', desc: 'Understand the technologies that will power your next venture.' },
+              { icon: '🌍', label: 'NGOs & Social Impact Organisations', desc: 'Use blockchain, AI, and digital tools to amplify your mission.' },
+              { icon: '🏢', label: 'MSMEs Seeking Digital Transformation', desc: 'Equip your team to compete in an increasingly digital economy.' },
+              { icon: '⚙️', label: 'Developers & Innovators', desc: "Go deeper into emerging technologies and build what's next." },
+            ].map((item, i) => (
+              <motion.div
+                key={item.label}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.07 }}
+                className="bg-white rounded-2xl p-7 hover:shadow-md transition-shadow flex flex-col gap-3"
+              >
+                <span className="text-3xl">{item.icon}</span>
+                <h3 className="font-display font-extrabold text-[#1C1C1C] text-base leading-snug">{item.label}</h3>
+                <p className="text-[#1C1C1C]/55 text-sm leading-relaxed">{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── FEATURED PROGRAMME ─── */}
+      <section className="bg-[#0A0A0A] py-24 px-6">
+        <div className="max-w-6xl mx-auto">
+          <p className="text-xs font-mono text-white/30 tracking-widest uppercase mb-6">Featured programme</p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 md:p-12 flex flex-col md:flex-row gap-10 items-start"
+          >
+            <div className="flex-1">
+              <div className="inline-flex items-center gap-2 bg-[#F5C518]/10 border border-[#F5C518]/30 px-3 py-1 rounded-full mb-6">
+                <span className="w-1.5 h-1.5 bg-[#F5C518] rounded-full" />
+                <span className="text-[#F5C518] text-xs font-mono tracking-widest uppercase">Blockchain for Social Impact</span>
+              </div>
+              <h2 className="font-display font-extrabold text-white text-3xl md:text-4xl leading-tight mb-5">
+                Harness blockchain to build transparent, accountable, and future-ready organisations.
+              </h2>
+              <p className="text-white/50 text-base leading-relaxed mb-8">
+                Learn how blockchain can improve transparency, accountability, fundraising, digital identity, and operational efficiency for businesses and organisations creating social impact.
+              </p>
+              <div className="flex flex-wrap gap-3 mb-8">
+                <span className="inline-flex items-center gap-1.5 bg-white/[0.07] border border-white/10 text-white/70 text-sm px-4 py-2 rounded-full">
+                  <CheckCircle size={13} className="text-[#F5C518]" /> 15 Weeks
+                </span>
+                <span className="inline-flex items-center gap-1.5 bg-white/[0.07] border border-white/10 text-white/70 text-sm px-4 py-2 rounded-full">
+                  <CheckCircle size={13} className="text-[#F5C518]" /> 3 Comprehensive Modules
+                </span>
+              </div>
+              <a
+                href="/courses"
+                className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-bold px-7 py-3.5 rounded-full hover:bg-[#E8B800] transition-colors text-[15px]"
+              >
+                Enrol Now →
+              </a>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ─── COURSES CATALOG ─── */}
       <section id="courses" className="bg-[#F2EDE2] py-24 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="mb-10">
@@ -247,50 +408,17 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── CURRICULUM OVERVIEW ─── (moved below courses so it acts as a deeper-dive on what's covered) */}
-      <section className="bg-[#F2EDE2] py-24 px-6 border-t border-black/5">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-12">
-            <p className="text-xs font-mono text-[#1C1C1C]/50 tracking-widest uppercase mb-3">Curriculum Overview</p>
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-              <h2 className="font-display text-4xl md:text-5xl font-extrabold text-[#1C1C1C] leading-tight">
-                Courses
-              </h2>
-              <p className="text-[#1C1C1C]/60 text-sm max-w-sm leading-relaxed md:text-right">
-                A grounded path from fundamentals to shipping. Every course is built around a real artifact you'll publish on-chain or to GitHub.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {CURRICULUM_TOPICS.map((topic, i) => (
-              <motion.div key={topic.num}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.07 }}
-                className="bg-white rounded-2xl p-7 hover:shadow-md transition-shadow"
-              >
-                <span className="inline-block bg-[#F2EDE2] text-[#1C1C1C] text-xs font-mono font-bold px-2.5 py-1 rounded-lg mb-4">{topic.num}</span>
-                <h3 className="font-display font-extrabold text-[#1C1C1C] text-lg mb-2 leading-snug">{topic.title}</h3>
-                <p className="text-[#1C1C1C]/55 text-sm leading-relaxed">{topic.body}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ─── INSTRUCTORS ─── */}
       <section id="instructors" className="bg-[#0A0A0A] py-24 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="mb-12">
-            <p className="text-xs font-mono text-white/30 tracking-widest uppercase mb-3">Who's Teaching</p>
+            <p className="text-xs font-mono text-white/30 tracking-widest uppercase mb-3">Meet Your Facilitators</p>
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
               <h2 className="font-display text-4xl md:text-5xl font-extrabold text-white leading-tight">
                 Builders, not theorists
               </h2>
               <p className="text-white/40 text-sm max-w-sm leading-relaxed md:text-right">
-                Every instructor ships in production. You'll learn the patterns they actually use — including the ones that took them years to find.
+                Learn from experienced technology leaders passionate about building Africa's next generation of innovators.
               </p>
             </div>
           </div>
@@ -327,6 +455,32 @@ export default function LandingPage() {
               })}
             </div>
           )}
+
+          <div className="mt-10 text-center">
+            <a href="/facilitators" className="inline-flex items-center gap-2 border border-white/20 text-white px-6 py-3 rounded-full hover:border-white/40 transition-colors text-sm">
+              Meet All Facilitators →
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── OUR MISSION ─── */}
+      <section className="bg-[#F2EDE2] py-24 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <p className="text-xs font-mono text-[#1C1C1C]/50 tracking-widest uppercase mb-6">Our mission</p>
+            <h2 className="font-display font-extrabold text-[#1C1C1C] text-3xl md:text-5xl leading-tight mb-6">
+              Technology should create opportunities —{' '}
+              <span className="text-[#1C1C1C]/40">not barriers.</span>
+            </h2>
+            <p className="text-[#1C1C1C]/60 text-base md:text-lg leading-relaxed max-w-2xl mx-auto">
+              At Rubikcon Nexus Academy, our mission is to equip Africans with practical, future-ready technology skills that enable them to build meaningful careers, strengthen businesses, and solve pressing challenges across communities. Through accessible, hands-on education, we're helping bridge the gap between learning and real-world impact.
+            </p>
+          </motion.div>
         </div>
       </section>
 
@@ -462,16 +616,16 @@ export default function LandingPage() {
               <span className="text-xs font-mono text-white/50 tracking-widest uppercase">Start today</span>
             </div>
             <h2 className="font-display text-4xl md:text-6xl font-extrabold text-white leading-tight mb-5">
-              Ready to build on{' '}
-              <span className="text-[#F5C518]">Web3?</span>
+              Ready to start your{' '}
+              <span className="text-[#F5C518]">journey?</span>
             </h2>
             <p className="text-white/50 text-base max-w-lg mx-auto mb-10 leading-relaxed">
-              Join {totalStudents.toLocaleString()} learners already studying with Rubikcon Academy.
+              Whether you're building your first tech skill, advancing your career, or preparing your organisation for the future, your learning journey starts here.
             </p>
             <div className="flex items-center justify-center gap-4 flex-wrap">
               <a href="/courses"
                 className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-semibold px-8 py-3.5 rounded-full hover:bg-[#E8B800] transition-colors text-sm">
-                Browse courses →
+                Enrol Now →
               </a>
               <a href="/login"
                 className="inline-flex items-center gap-2 border border-white/20 text-white px-7 py-3.5 rounded-full hover:border-white/40 transition-colors text-sm">
