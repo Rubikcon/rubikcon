@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus, Trash2, Loader2, Save, X, ExternalLink, BookOpen, FileText, Video as VideoIcon, GraduationCap } from 'lucide-react'
 import { apiRequest } from '../../lib/api'
+import { extractEmbedUrl } from '../../lib/embedUrl'
 
 type ResourceType = 'ARTICLE' | 'COURSE' | 'DOCUMENTATION' | 'WHITEPAPER' | 'VIDEO' | 'INTERACTIVE'
 
@@ -74,6 +75,17 @@ export default function ResourcesEditor({ courseId, weekId, resources, slideDeck
       setSlideError('URL is required')
       return
     }
+    // Be forgiving: if the admin pasted Canva's <div>...<iframe src="…"></iframe></div>
+    // embed code, sniff the src out automatically. Same for bare iframe tags or
+    // scheme-less URLs. Anything we can't normalize is sent as-is for the
+    // backend's URL validator to flag specifically.
+    const cleanedUrl = extractEmbedUrl(slideForm.url)
+    if (!/^https?:\/\//i.test(cleanedUrl)) {
+      setSlideError(
+        'That doesn\'t look like a valid URL. Paste the full link starting with https:// — for Canva, click Share → Embed → copy just the URL inside src="…" (or paste the whole embed code and we\'ll extract it).'
+      )
+      return
+    }
     setSavingSlide(true)
     setSlideError(null)
     try {
@@ -81,7 +93,7 @@ export default function ResourcesEditor({ courseId, weekId, resources, slideDeck
         method: 'POST',
         body: JSON.stringify({
           title: slideForm.title.trim(),
-          url: slideForm.url.trim(),
+          url: cleanedUrl,
           slideCount: slideForm.slideCount,
         }),
       })
