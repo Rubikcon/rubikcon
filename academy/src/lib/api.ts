@@ -1,5 +1,5 @@
 import { URLS } from '../config/urls'
-import { getAuthToken, setStoredAuth, type StoredAuth } from './auth'
+import { clearStoredAuth, getAuthToken, setStoredAuth, type StoredAuth } from './auth'
 
 type ApiEnvelope<T> = {
   success: boolean
@@ -57,7 +57,49 @@ function networkFriendlyMessage(err: unknown): string {
   return err instanceof Error ? err.message : 'Unexpected error.'
 }
 
+/**
+ * A 401 on a request that carried a token means the session is dead (expired,
+ * revoked by logout-elsewhere, or wiped server-side). Retrying can never
+ * succeed — the only fix is a fresh login. Clear the stale credentials and
+ * send the user to the login page with a return path, so buttons like "Enrol"
+ * stop failing silently forever.
+ */
+function handleSessionExpired(): never {
+  clearStoredAuth()
+  if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+    const redirect = encodeURIComponent(window.location.pathname + window.location.search)
+    window.location.href = `/login?redirect=${redirect}&reason=session-expired`
+  }
+  throw new ApiError('Your session has expired. Please log in again.', 401)
+}
+
+const RETRYABLE_STATUS = new Set([502, 503, 504])
+const RETRY_DELAYS_MS = [2000, 5000]
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method || 'GET').toUpperCase()
+  // Only GETs are retried — they're idempotent, and the hosted backend cold-starts
+  // after idle periods, which used to surface as "courses sometimes don't load".
+  const maxAttempts = method === 'GET' ? RETRY_DELAYS_MS.length + 1 : 1
+
+  let lastError: ApiError = new ApiError('Request failed.', 0)
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) await sleep(RETRY_DELAYS_MS[attempt - 1])
+    try {
+      return await apiRequestOnce<T>(path, init)
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err
+      const retryable = err.status === 0 || RETRYABLE_STATUS.has(err.status)
+      if (!retryable || attempt === maxAttempts - 1) throw err
+      lastError = err
+    }
+  }
+  throw lastError
+}
+
+async function apiRequestOnce<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers || {})
   headers.set('Content-Type', 'application/json')
 
@@ -73,6 +115,12 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     // fetch() throws only on network failure (DNS, offline, CORS preflight reject).
     // Translate to a friendly message rather than letting the bare error reach the UI.
     throw new ApiError(networkFriendlyMessage(err), 0)
+  }
+
+  // Auth endpoints return 401 for wrong credentials — that must reach the login
+  // form as-is, not be treated as an expired session.
+  if (response.status === 401 && token && !path.startsWith('/auth/')) {
+    handleSessionExpired()
   }
 
   let payload: ApiEnvelope<T>

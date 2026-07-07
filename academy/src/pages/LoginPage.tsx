@@ -17,7 +17,12 @@ export default function LoginPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('reason') === 'session-expired'
+      ? 'Your session has expired. Please log in again to continue.'
+      : null
+  })
   const [submitting, setSubmitting] = useState(false)
 
   // Device limit handling
@@ -60,6 +65,14 @@ export default function LoginPage() {
     : !!name && isNameValid(name) && !!email && isValidEmail(email) && isPasswordValid(password)
 
   function redirectAfterAuth(user: StoredAuth['user']) {
+    // Honour a ?redirect= return path (e.g. the course someone tried to enrol
+    // in while logged out) before falling back to role-based homes.
+    const params = new URLSearchParams(window.location.search)
+    const redirect = params.get('redirect')
+    if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+      if (!user.onboardingCompleted && user.role === 'USER') return setLocation('/onboarding')
+      return setLocation(redirect)
+    }
     if (user.role === 'SUPER_ADMIN') return setLocation('/admin/superadmin')
     if (user.role === 'ADMIN') return setLocation('/admin/academy')
     if (!user.onboardingCompleted) return setLocation('/onboarding')

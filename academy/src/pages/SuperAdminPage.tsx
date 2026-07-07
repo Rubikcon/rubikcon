@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Search,
   ShieldCheck,
+  Tag,
   Trash2,
   Users,
   XCircle,
@@ -55,6 +56,10 @@ type SuperAdminCourse = {
   contentUnit: string
   submittedAt: string | null
   createdAt: string
+  // Prisma Decimal fields arrive as strings over JSON
+  priceUsd: string | number | null
+  priceNgn: string | number | null
+  discountPercent: number | null
   _count: { weeks: number }
   courseFacilitators: Array<{ facilitator: { id: string; name: string; title: string } }>
   createdBy: { id: string; name: string | null; email: string } | null
@@ -174,11 +179,18 @@ export default function SuperAdminPage() {
   // Courses
   const [courses, setCourses] = useState<SuperAdminCourse[]>([])
   const [coursesLoading, setCoursesLoading] = useState(false)
-  const [statusFilter, setStatusFilter] = useState('PENDING_REVIEW')
+  // Default to "All" — a pending-only default hid freshly created DRAFT courses
+  // and read as "added courses are not reflecting on the board".
+  const [statusFilter, setStatusFilter] = useState('')
   const [actionCourseId, setActionCourseId] = useState<string | null>(null)
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null)
   const [actionNotes, setActionNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  // Pricing editor
+  const [pricingCourse, setPricingCourse] = useState<SuperAdminCourse | null>(null)
+  const [pricingForm, setPricingForm] = useState({ priceUsd: '', priceNgn: '', discountPercent: '' })
+  const [savingPricing, setSavingPricing] = useState(false)
 
   // Users
   const [users, setUsers] = useState<PlatformUser[]>([])
@@ -419,6 +431,44 @@ export default function SuperAdminPage() {
       setError(err instanceof Error ? err.message : 'Action failed.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  function openPricing(course: SuperAdminCourse) {
+    setPricingCourse(course)
+    setPricingForm({
+      priceUsd: course.priceUsd != null ? String(Number(course.priceUsd)) : '',
+      priceNgn: course.priceNgn != null ? String(Number(course.priceNgn)) : '',
+      discountPercent: course.discountPercent != null ? String(course.discountPercent) : '',
+    })
+  }
+
+  async function savePricing(e: FormEvent) {
+    e.preventDefault()
+    if (!pricingCourse) return
+    const parseNum = (raw: string) => {
+      const trimmed = raw.trim()
+      if (!trimmed) return null
+      const n = Number(trimmed)
+      return Number.isFinite(n) && n >= 0 ? n : null
+    }
+    setSavingPricing(true)
+    setError(null)
+    try {
+      await apiRequest(`/academy/admin/courses/${pricingCourse.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          priceUsd: parseNum(pricingForm.priceUsd),
+          priceNgn: parseNum(pricingForm.priceNgn),
+          discountPercent: pricingForm.discountPercent.trim() ? Math.round(Number(pricingForm.discountPercent)) : null,
+        }),
+      })
+      setPricingCourse(null)
+      await loadCourses(statusFilter)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save pricing.')
+    } finally {
+      setSavingPricing(false)
     }
   }
 
@@ -719,19 +769,25 @@ export default function SuperAdminPage() {
             <div>
               <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
                 <div className="flex gap-2 flex-wrap">
-                  {STATUS_FILTERS.map(f => (
-                    <button
-                      key={f.value}
-                      onClick={() => setStatusFilter(f.value)}
-                      className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
-                        statusFilter === f.value
-                          ? 'border-[#F5C518]/50 bg-[#F5C518]/10 text-[#F5C518]'
-                          : 'border-white/10 text-white/50 hover:border-white/20'
-                      }`}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
+                  {STATUS_FILTERS.map(f => {
+                    const count = f.value === ''
+                      ? overview?.totalCourses
+                      : overview?.coursesByStatus[f.value] ?? 0
+                    return (
+                      <button
+                        key={f.value}
+                        onClick={() => setStatusFilter(f.value)}
+                        className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
+                          statusFilter === f.value
+                            ? 'border-[#F5C518]/50 bg-[#F5C518]/10 text-[#F5C518]'
+                            : 'border-white/10 text-white/50 hover:border-white/20'
+                        }`}
+                      >
+                        {f.label}
+                        {count !== undefined && <span className="ml-1.5 text-xs opacity-60">{count}</span>}
+                      </button>
+                    )
+                  })}
                 </div>
                 <button
                   onClick={() => setShowCreateCourse(!showCreateCourse)}
@@ -826,6 +882,17 @@ export default function SuperAdminPage() {
                               <span>{course._count.weeks} {course.contentUnit.toLowerCase()}{course._count.weeks !== 1 ? 's' : ''}</span>
                               <span>{course.courseFacilitators.length} facilitator{course.courseFacilitators.length !== 1 ? 's' : ''}</span>
                               {course.createdBy && <span>by {course.createdBy.name || course.createdBy.email}</span>}
+                              {(Number(course.priceUsd) > 0 || Number(course.priceNgn) > 0) ? (
+                                <span className="text-teal-300">
+                                  {[
+                                    Number(course.priceUsd) > 0 ? `$${Number(course.priceUsd).toLocaleString()}` : null,
+                                    Number(course.priceNgn) > 0 ? `₦${Number(course.priceNgn).toLocaleString()}` : null,
+                                  ].filter(Boolean).join(' / ')}
+                                  {(course.discountPercent ?? 0) > 0 && ` · −${course.discountPercent}%`}
+                                </span>
+                              ) : (
+                                <span className="text-emerald-300/70">Free</span>
+                              )}
                             </div>
                             {course.courseFacilitators.length > 0 && (
                               <div className="flex flex-wrap gap-2 mt-3">
@@ -866,21 +933,28 @@ export default function SuperAdminPage() {
                             >
                               <Eye size={14} /> Preview
                             </a>
+                            <button
+                              onClick={() => openPricing(course)}
+                              title="Set USD/NGN pricing and discount"
+                              className="inline-flex items-center gap-1.5 rounded-full border border-teal-400/30 bg-teal-400/10 px-4 py-2 text-sm text-teal-300 hover:bg-teal-400/20 transition-colors"
+                            >
+                              <Tag size={14} /> Pricing
+                            </button>
+                            {course.status !== 'APPROVED' && (
+                              <button
+                                onClick={() => { setActionCourseId(course.id); setActionType('approve'); setActionNotes('') }}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-400/20 transition-colors"
+                              >
+                                <CheckCircle2 size={14} /> Approve &amp; publish
+                              </button>
+                            )}
                             {course.status === 'PENDING_REVIEW' && (
-                              <>
-                                <button
-                                  onClick={() => { setActionCourseId(course.id); setActionType('approve'); setActionNotes('') }}
-                                  className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-400/20 transition-colors"
-                                >
-                                  <CheckCircle2 size={14} /> Approve
-                                </button>
-                                <button
-                                  onClick={() => { setActionCourseId(course.id); setActionType('reject'); setActionNotes('') }}
-                                  className="inline-flex items-center gap-1.5 rounded-full border border-red-400/30 bg-red-400/10 px-4 py-2 text-sm text-red-300 hover:bg-red-400/20 transition-colors"
-                                >
-                                  <XCircle size={14} /> Reject
-                                </button>
-                              </>
+                              <button
+                                onClick={() => { setActionCourseId(course.id); setActionType('reject'); setActionNotes('') }}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-red-400/30 bg-red-400/10 px-4 py-2 text-sm text-red-300 hover:bg-red-400/20 transition-colors"
+                              >
+                                <XCircle size={14} /> Reject
+                              </button>
                             )}
                             <button
                               onClick={() => setDeleteConfirm({ type: 'course', id: course.id, name: course.title })}
@@ -1401,6 +1475,71 @@ export default function SuperAdminPage() {
                 <button
                   type="button"
                   onClick={() => { setActionCourseId(null); setActionType(null); setActionNotes('') }}
+                  className="rounded-full border border-white/10 px-5 py-3 text-sm text-white/60 hover:border-white/20"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Pricing modal */}
+      {pricingCourse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#111] p-6">
+            <h2 className="font-display text-xl font-extrabold text-white mb-1">Course pricing</h2>
+            <p className="text-sm text-white/50 mb-5">"{pricingCourse.title}"</p>
+            <form onSubmit={savePricing} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-white/40 mb-1">Price (USD)</label>
+                  <input
+                    type="number" min="0" step="0.01"
+                    value={pricingForm.priceUsd}
+                    onChange={e => setPricingForm(p => ({ ...p, priceUsd: e.target.value }))}
+                    placeholder="e.g. 150"
+                    className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#F5C518]/40"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-white/40 mb-1">Price (NGN)</label>
+                  <input
+                    type="number" min="0" step="0.01"
+                    value={pricingForm.priceNgn}
+                    onChange={e => setPricingForm(p => ({ ...p, priceNgn: e.target.value }))}
+                    placeholder="e.g. 220000"
+                    className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#F5C518]/40"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-white/40 mb-1">Discount (%) — slashes the original price on the storefront</label>
+                <input
+                  type="number" min="0" max="100" step="1"
+                  value={pricingForm.discountPercent}
+                  onChange={e => setPricingForm(p => ({ ...p, discountPercent: e.target.value }))}
+                  placeholder="e.g. 20"
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#F5C518]/40"
+                />
+              </div>
+              <p className="text-[11px] text-white/35 leading-relaxed">
+                Leave both prices empty to make the course free. Learners see the original price struck
+                through next to the discounted price. Online payment (Paystack &amp; crypto) integration is
+                coming — pricing is display-only until then.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={savingPricing}
+                  className="flex-1 rounded-full bg-[#F5C518] py-3 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors disabled:opacity-50"
+                >
+                  {savingPricing ? 'Saving…' : 'Save pricing'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPricingCourse(null)}
                   className="rounded-full border border-white/10 px-5 py-3 text-sm text-white/60 hover:border-white/20"
                 >
                   Cancel

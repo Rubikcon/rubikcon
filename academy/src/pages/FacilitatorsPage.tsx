@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { BookOpen, ExternalLink, Linkedin, Loader2 } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
+import AcademyFooter from '../components/AcademyFooter'
 import { apiRequest } from '../lib/api'
 
 type FacilitatorCourse = {
@@ -157,10 +158,12 @@ export default function FacilitatorsPage() {
             Our Team
           </span>
           <h1 className="text-white font-bold text-4xl sm:text-5xl leading-tight mb-4">
-            Meet the Facilitators
+            Meet Our Facilitators
           </h1>
-          <p className="text-white/50 text-lg max-w-xl leading-relaxed">
-            Industry practitioners who bring real-world experience into every lesson.
+          <p className="text-white/50 text-lg max-w-2xl leading-relaxed">
+            Behind every great learning experience is a team of practitioners who have built, led, and delivered
+            real-world technology solutions. At Rubikcon Nexus Academy, our facilitators combine industry expertise
+            with a passion for teaching, ensuring every learner gains practical knowledge they can apply with confidence.
           </p>
         </motion.div>
 
@@ -197,7 +200,46 @@ export default function FacilitatorsPage() {
             ))}
           </div>
         )}
+
+        {/* Guest facilitators */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mt-14 rounded-2xl border border-white/10 bg-white/[0.03] p-7"
+        >
+          <p className="text-xs font-mono uppercase tracking-widest text-white/30 mb-3">Guest Facilitators</p>
+          <p className="text-white/55 text-sm leading-relaxed max-w-3xl">
+            Each cohort may include guest facilitators — industry experts, founders, researchers, and technology
+            leaders who bring specialised knowledge and real-world perspectives to selected sessions. Guest
+            facilitators are announced before each cohort begins.
+          </p>
+        </motion.div>
+
+        {/* Partner with our facilitators */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mt-6 rounded-2xl border border-[#F5C518]/20 bg-[#F5C518]/[0.06] p-7 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
+        >
+          <div>
+            <p className="text-xs font-mono uppercase tracking-widest text-[#F5C518] mb-3">Partner With Our Facilitators</p>
+            <p className="text-white/55 text-sm leading-relaxed max-w-2xl">
+              Interested in bringing Rubikcon Nexus Academy to your organisation? We welcome opportunities to
+              collaborate on corporate training, funded learning programmes, university partnerships, workshops,
+              speaking engagements, and technology capacity-building initiatives across Africa.
+            </p>
+          </div>
+          <a
+            href="/contact"
+            className="shrink-0 inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-bold px-6 py-3 rounded-full hover:bg-[#E8B800] transition-colors text-sm whitespace-nowrap"
+          >
+            Contact Us →
+          </a>
+        </motion.div>
       </main>
+      <AcademyFooter />
     </div>
   )
 }

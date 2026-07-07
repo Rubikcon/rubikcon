@@ -1,0 +1,114 @@
+<svg viewBox="0 0 800 640" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A community of learners — students, professionals, founders, NGOs, MSMEs and developers">
+  <defs>
+    <linearGradient id="tile-yellow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F5C518"/>
+      <stop offset="100%" stop-color="#D9A800"/>
+    </linearGradient>
+    <linearGradient id="tile-teal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2DD4BF"/>
+      <stop offset="100%" stop-color="#0F766E"/>
+    </linearGradient>
+    <linearGradient id="tile-coral" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F97B72"/>
+      <stop offset="100%" stop-color="#B33F38"/>
+    </linearGradient>
+    <linearGradient id="tile-violet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#A78BFA"/>
+      <stop offset="100%" stop-color="#6D28D9"/>
+    </linearGradient>
+    <linearGradient id="tile-dark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#26262B"/>
+      <stop offset="100%" stop-color="#0A0A0A"/>
+    </linearGradient>
+    <linearGradient id="tile-sand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E8E0D0"/>
+      <stop offset="100%" stop-color="#C9BFA8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- backdrop card -->
+  <rect x="24" y="24" width="752" height="592" rx="40" fill="#1C1C1C"/>
+  <circle cx="700" cy="90" r="160" fill="#F5C518" opacity="0.08"/>
+  <circle cx="90" cy="560" r="140" fill="#2DD4BF" opacity="0.08"/>
+
+  <!-- ─ row 1 ─ -->
+  <!-- student -->
+  <g transform="translate(64,72)">
+    <rect width="200" height="160" rx="24" fill="url(#tile-yellow)"/>
+    <circle cx="100" cy="62" r="30" fill="#1C1C1C"/>
+    <path d="M40 160 C40 112 70 100 100 100 C130 100 160 112 160 160 Z" fill="#1C1C1C"/>
+    <!-- grad cap -->
+    <path d="M64 48 L100 32 L136 48 L100 64 Z" fill="#F2EDE2"/>
+    <path d="M128 52 L128 68" stroke="#F2EDE2" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <!-- professional -->
+  <g transform="translate(288,72)">
+    <rect width="200" height="160" rx="24" fill="url(#tile-dark)"/>
+    <circle cx="100" cy="62" r="30" fill="#F5C518"/>
+    <path d="M40 160 C40 112 70 100 100 100 C130 100 160 112 160 160 Z" fill="#F5C518"/>
+    <!-- tie -->
+    <path d="M100 104 L92 120 L100 152 L108 120 Z" fill="#1C1C1C"/>
+  </g>
+  <!-- founder -->
+  <g transform="translate(512,72)">
+    <rect width="200" height="160" rx="24" fill="url(#tile-teal)"/>
+    <circle cx="100" cy="62" r="30" fill="#0A0A0A"/>
+    <path d="M40 160 C40 112 70 100 100 100 C130 100 160 112 160 160 Z" fill="#0A0A0A"/>
+    <!-- rocket badge -->
+    <circle cx="156" cy="36" r="20" fill="#F2EDE2"/>
+    <path d="M156 24 C162 30 162 40 156 46 C150 40 150 30 156 24 Z" fill="#0F766E"/>
+    <circle cx="156" cy="34" r="3" fill="#F2EDE2"/>
+  </g>
+
+  <!-- ─ row 2 ─ -->
+  <!-- NGO / social impact -->
+  <g transform="translate(64,256)">
+    <rect width="200" height="160" rx="24" fill="url(#tile-coral)"/>
+    <circle cx="100" cy="62" r="30" fill="#F2EDE2"/>
+    <path d="M40 160 C40 112 70 100 100 100 C130 100 160 112 160 160 Z" fill="#F2EDE2"/>
+    <!-- heart -->
+    <path d="M148 28 C144 22 134 22 132 30 C130 22 120 22 116 28 C112 36 122 46 132 52 C142 46 152 36 148 28 Z" fill="#1C1C1C"/>
+  </g>
+  <!-- centre brand tile -->
+  <g transform="translate(288,256)">
+    <rect width="200" height="160" rx="24" fill="#F5C518"/>
+    <text x="100" y="98" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="64" font-weight="800" fill="#0A0A0A">R</text>
+    <text x="100" y="132" text-anchor="middle" font-family="Verdana, Geneva, sans-serif" font-size="13" letter-spacing="4" fill="#0A0A0A" opacity="0.7">NEXUS</text>
+  </g>
+  <!-- MSME -->
+  <g transform="translate(512,256)">
+    <rect width="200" height="160" rx="24" fill="url(#tile-sand)"/>
+    <circle cx="100" cy="62" r="30" fill="#1C1C1C"/>
+    <path d="M40 160 C40 112 70 100 100 100 C130 100 160 112 160 160 Z" fill="#1C1C1C"/>
+    <!-- storefront awning -->
+    <path d="M120 26 h44 v10 a8 8 0 0 1 -8 8 h-28 a8 8 0 0 1 -8 -8 Z" fill="#B33F38"/>
+    <rect x="126" y="44" width="32" height="22" rx="4" fill="#1C1C1C"/>
+  </g>
+
+  <!-- ─ row 3 ─ -->
+  <!-- developer -->
+  <g transform="translate(64,440)">
+    <rect width="200" height="136" rx="24" fill="url(#tile-violet)"/>
+    <circle cx="100" cy="54" r="26" fill="#0A0A0A"/>
+    <path d="M44 136 C44 96 72 86 100 86 C128 86 156 96 156 136 Z" fill="#0A0A0A"/>
+    <!-- code brackets -->
+    <text x="160" y="44" text-anchor="middle" font-family="Courier New, monospace" font-size="26" font-weight="700" fill="#F2EDE2">&lt;/&gt;</text>
+  </g>
+  <!-- cohort strip: three heads together -->
+  <g transform="translate(288,440)">
+    <rect width="424" height="136" rx="24" fill="url(#tile-dark)"/>
+    <g>
+      <circle cx="120" cy="52" r="24" fill="#F5C518"/>
+      <path d="M72 136 C72 100 96 90 120 90 C144 90 168 100 168 136 Z" fill="#F5C518"/>
+    </g>
+    <g>
+      <circle cx="212" cy="48" r="26" fill="#2DD4BF"/>
+      <path d="M160 136 C160 98 186 88 212 88 C238 88 264 98 264 136 Z" fill="#2DD4BF"/>
+    </g>
+    <g>
+      <circle cx="304" cy="52" r="24" fill="#F97B72"/>
+      <path d="M256 136 C256 100 280 90 304 90 C328 90 352 100 352 136 Z" fill="#F97B72"/>
+    </g>
+    <text x="212" y="30" text-anchor="middle" font-family="Verdana, Geneva, sans-serif" font-size="12" letter-spacing="3" fill="#F2EDE2" opacity="0.55">LEARN TOGETHER</text>
+  </g>
+</svg>

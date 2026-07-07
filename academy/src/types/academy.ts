@@ -180,6 +180,13 @@ export type CourseSummary = {
   overviewSlideUrl: string | null
   contentUnit: string
   enrolled: boolean
+  // Pricing — null/0 means the course is free (or fees announced per intake).
+  isPaid: boolean
+  priceUsd: number | null
+  priceNgn: number | null
+  discountPercent: number
+  discountedPriceUsd: number | null
+  discountedPriceNgn: number | null
   facilitators: Array<{ id: string; name: string; title: string; organization: string; photoUrl: string | null }>
   progressPercent: number
   completedCount: number

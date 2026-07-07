@@ -8,6 +8,7 @@ import VideoEmbed from '../components/VideoEmbed'
 import EmbedFrame from '../components/EmbedFrame'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
+import { coursePriceInfo } from '../lib/pricing'
 import type { CourseSummary } from '../types/academy'
 
 const DEFAULT_COURSE_SLUG = 'blockchain-social-impact'
@@ -53,6 +54,7 @@ export default function CoursePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [enrolling, setEnrolling] = useState(false)
+  const [enrollError, setEnrollError] = useState<string | null>(null)
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({})
   const auth = getStoredAuth()
 
@@ -77,12 +79,13 @@ export default function CoursePage() {
   async function handleEnroll() {
     if (!auth) { window.location.href = `/login?redirect=/course/${slug}`; return }
     setEnrolling(true)
+    setEnrollError(null)
     try {
       await apiRequest(`/academy/courses/${slug}/enroll`, { method: 'POST' })
       const data = await apiRequest<CourseSummary>(`/academy/courses/${slug}`)
       setCourse(data)
-    } catch {
-      /* ignore */
+    } catch (err) {
+      setEnrollError(err instanceof Error ? err.message : 'Enrolment failed. Please try again.')
     } finally {
       setEnrolling(false)
     }
@@ -143,6 +146,7 @@ export default function CoursePage() {
   const units = `${unit}s`
 
   // ── Not enrolled: show overview + enroll CTA ─────────────────────────────
+  const price = coursePriceInfo(course)
   if (!course.enrolled) {
     return (
       <div className="min-h-screen bg-[#0A0A0A]">
@@ -197,7 +201,37 @@ export default function CoursePage() {
                 )}
               </div>
 
+              {/* Pricing */}
+              {price ? (
+                <div className="mb-6 flex flex-wrap items-center gap-3">
+                  {price.discounted && (
+                    <span className="text-white/35 line-through decoration-white/40 text-lg">{price.original}</span>
+                  )}
+                  <span className="font-display text-2xl font-extrabold text-[#F5C518]">{price.current}</span>
+                  {price.discounted && (
+                    <span className="rounded-full bg-[#F5C518]/15 border border-[#F5C518]/30 text-[#F5C518] text-xs font-bold px-2.5 py-1">
+                      Save {price.discountPercent}%
+                    </span>
+                  )}
+                  <span className="w-full text-xs text-white/35">
+                    Online payment (card via Paystack &amp; crypto) is launching soon — enrol now to reserve your seat and our team will follow up on payment.
+                  </span>
+                </div>
+              ) : (
+                <p className="mb-6 text-xs text-white/40 max-w-xl leading-relaxed">
+                  Programme fees and cohort schedules are announced before each intake. From time to time we also
+                  offer funded or subsidised cohorts through partnerships with ecosystem organisations and sponsors —{' '}
+                  <a href="/contact" className="text-[#F5C518] hover:text-[#FFE070] underline underline-offset-2">contact us</a>{' '}
+                  about current pricing, scholarships, or funded opportunities.
+                </p>
+              )}
+
               {/* Enroll CTA */}
+              {enrollError && (
+                <div className="mb-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                  {enrollError}
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-4">
                 <button
                   onClick={handleEnroll}

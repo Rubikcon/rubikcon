@@ -58,7 +58,10 @@ export async function logout() {
   try {
     const token = getAuthToken()
     if (token) {
-      await fetch('/academy/api/auth/logout', {
+      // Hit the API origin directly — a relative path here would post to the
+      // frontend host and the server-side session would never be revoked.
+      const { URLS } = await import('../config/urls')
+      await fetch(`${URLS.api}/auth/logout`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
       })

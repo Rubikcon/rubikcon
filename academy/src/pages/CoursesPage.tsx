@@ -16,8 +16,10 @@ import {
   Zap,
 } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
+import AcademyFooter from '../components/AcademyFooter'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
+import { coursePriceInfo } from '../lib/pricing'
 
 type PublicCourse = {
   id: string
@@ -31,7 +33,39 @@ type PublicCourse = {
   contentUnit: string
   enrolled: boolean
   progressPercent?: number
+  isPaid: boolean
+  priceUsd: number | null
+  priceNgn: number | null
+  discountPercent: number
+  discountedPriceUsd: number | null
+  discountedPriceNgn: number | null
   facilitators: Array<{ id: string; name: string; title: string; organization: string; photoUrl: string | null }>
+}
+
+// ── Pricing display ────────────────────────────────────────────────────────────
+
+function PriceTag({ course, size = 'sm' }: { course: PublicCourse; size?: 'sm' | 'lg' }) {
+  const price = coursePriceInfo(course)
+  if (!price) {
+    return (
+      <span className={`inline-flex items-center rounded-full border border-emerald-400/25 bg-emerald-400/10 text-emerald-300 font-semibold ${size === 'lg' ? 'px-3 py-1 text-xs' : 'px-2 py-0.5 text-[10px]'}`}>
+        Free
+      </span>
+    )
+  }
+  return (
+    <span className={`inline-flex items-baseline gap-1.5 flex-wrap ${size === 'lg' ? 'text-sm' : 'text-[11px]'}`}>
+      {price.discounted && (
+        <span className="text-white/30 line-through decoration-white/40">{price.original}</span>
+      )}
+      <span className="text-[#F5C518] font-bold">{price.current}</span>
+      {price.discounted && (
+        <span className={`rounded-full bg-[#F5C518]/15 border border-[#F5C518]/25 text-[#F5C518] font-semibold ${size === 'lg' ? 'px-2 py-0.5 text-[10px]' : 'px-1.5 py-px text-[9px]'}`}>
+          −{price.discountPercent}%
+        </span>
+      )}
+    </span>
+  )
 }
 
 // Deterministic rich gradient from course id
@@ -188,10 +222,11 @@ function CourseCard({
         )}
 
         {/* Meta */}
-        <div className="flex items-center gap-3 text-[10px] text-white/28 mb-3">
-          {course.estimatedDuration && (
+        <div className="flex items-center justify-between gap-3 text-[10px] text-white/28 mb-3">
+          {course.estimatedDuration ? (
             <span className="flex items-center gap-1"><Clock size={9} />{course.estimatedDuration}</span>
-          )}
+          ) : <span />}
+          <PriceTag course={course} />
         </div>
 
         {/* Progress */}
@@ -409,6 +444,9 @@ function FeaturedSpotlight({ course, onEnroll, enrolling }: { course: PublicCour
         </div>
 
         <div className="shrink-0 flex flex-col items-stretch gap-2 min-w-[160px]">
+          <div className="flex justify-center mb-1">
+            <PriceTag course={course} size="lg" />
+          </div>
           {course.enrolled ? (
             <div>
               <div className="flex justify-between text-[10px] text-white/40 mb-1.5">
@@ -429,7 +467,9 @@ function FeaturedSpotlight({ course, onEnroll, enrolling }: { course: PublicCour
               {enrolling ? 'Enrolling…' : 'Enrol'}
             </button>
           )}
-          <p className="text-center text-[10px] text-white/25">No credit card required</p>
+          <p className="text-center text-[10px] text-white/25">
+            {coursePriceInfo(course) ? 'Online payment launching soon' : 'No credit card required'}
+          </p>
         </div>
       </div>
     </motion.div>
@@ -441,6 +481,8 @@ function FeaturedSpotlight({ course, onEnroll, enrolling }: { course: PublicCour
 export default function CoursesPage() {
   const [courses, setCourses] = useState<PublicCourse[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [enrollError, setEnrollError] = useState<string | null>(null)
   const [enrollingId, setEnrollingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState('')
@@ -449,10 +491,11 @@ export default function CoursesPage() {
   async function load() {
     try {
       setLoading(true)
+      setLoadError(null)
       const data = await apiRequest<PublicCourse[]>('/academy/courses')
       setCourses(data)
-    } catch {
-      /* ignore */
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Unable to load courses right now.')
     } finally {
       setLoading(false)
     }
@@ -461,12 +504,14 @@ export default function CoursesPage() {
   useEffect(() => { void load() }, [])
 
   async function handleEnroll(slug: string) {
-    if (!auth) { window.location.href = `/login?redirect=/courses`; return }
+    if (!auth) { window.location.href = `/login?redirect=/course/${slug}`; return }
     setEnrollingId(slug)
+    setEnrollError(null)
     try {
       await apiRequest(`/academy/courses/${slug}/enroll`, { method: 'POST' })
       window.location.href = `/course/${slug}`
-    } catch {
+    } catch (err) {
+      setEnrollError(err instanceof Error ? err.message : 'Enrolment failed. Please try again.')
       setEnrollingId(null)
     }
   }
@@ -520,7 +565,7 @@ export default function CoursesPage() {
                 {[
                   { val: courses.length, label: 'Courses' },
                   { val: courses.reduce((a, c) => a + c.weekCount, 0), label: 'Lessons' },
-                  { val: '100%', label: 'Free' },
+                  ...(courses.every(c => !coursePriceInfo(c)) ? [{ val: '100%', label: 'Free' }] : []),
                 ].map(({ val, label }) => (
                   <div key={label} className="text-center">
                     <div className="font-display text-xl font-extrabold text-white">{val}</div>
@@ -577,6 +622,20 @@ export default function CoursesPage() {
       </div>
 
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-10 pb-20">
+
+        {/* Error banners */}
+        {loadError && !loading && (
+          <div className="mb-6 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-100 flex items-center justify-between gap-4">
+            <span>{loadError}</span>
+            <button onClick={() => void load()} className="shrink-0 text-red-200 underline underline-offset-2 hover:text-white">Retry</button>
+          </div>
+        )}
+        {enrollError && (
+          <div className="mb-6 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 flex items-center justify-between gap-4">
+            <span>{enrollError}</span>
+            <button onClick={() => setEnrollError(null)} className="shrink-0 text-amber-200/70 hover:text-amber-100">✕</button>
+          </div>
+        )}
 
         {/* Continue learning rail */}
         {!loading && enrolledCourses.length > 0 && (
@@ -696,6 +755,7 @@ export default function CoursesPage() {
           </motion.div>
         )}
       </main>
+      <AcademyFooter />
     </div>
   )
 }

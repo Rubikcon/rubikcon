@@ -109,6 +109,13 @@ model Course {
   published         Boolean      @default(false)
   publishedAt       DateTime?
   isPaid            Boolean      @default(false)
+  // Pricing — set by super admins. Both currencies are stored explicitly so the
+  // team controls the NGN figure rather than relying on a live FX rate.
+  // discountPercent (0-100) slashes the displayed price; the original stays
+  // visible as a strikethrough on the storefront.
+  priceUsd          Decimal?     @db.Decimal(10, 2)
+  priceNgn          Decimal?     @db.Decimal(14, 2)
+  discountPercent   Int?
   status            CourseStatus @default(DRAFT)
   createdById       String?
   approvalNotes     String?
@@ -125,6 +132,8 @@ model Course {
   enrollments        CourseEnrollment[]
 
   @@index([createdById])
+  @@index([status])
+  @@index([published])
   @@map("courses")
 }
 

@@ -103,6 +103,7 @@ export default function AdminAcademyPage() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [creating, setCreating] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [submittingReviewId, setSubmittingReviewId] = useState<string | null>(null)
   const [createForm, setCreateForm] = useState({
     title: '', slug: '', description: '',
   })
@@ -414,6 +415,23 @@ export default function AdminAcademyPage() {
     }
   }
 
+  // Draft courses used to be stuck: the only "submit for review" affordance was
+  // the wizard's completion modal, so closing it left the course invisible to
+  // the super admin's review queue. This surfaces the same action on the list.
+  async function submitForReview(courseId: string, courseTitle: string) {
+    if (!confirm(`Submit "${courseTitle}" for super admin review? You won't be able to edit it while it's pending.`)) return
+    setSubmittingReviewId(courseId)
+    setError(null)
+    try {
+      await apiRequest(`/academy/admin/courses/${courseId}/submit`, { method: 'POST' })
+      setCourses(prev => prev.map(c => c.id === courseId ? { ...c, status: 'PENDING_REVIEW' as const } : c))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit course for review.')
+    } finally {
+      setSubmittingReviewId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0A0A0A]">
@@ -649,6 +667,24 @@ export default function AdminAcademyPage() {
                           <p className="relative text-xs text-amber-300/70 border border-amber-400/15 bg-amber-400/5 rounded-xl px-3 py-2 pointer-events-none">
                             Awaiting super admin review
                           </p>
+                        )}
+                        {(course.status === 'DRAFT' || course.status === 'REJECTED') && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              void submitForReview(course.id, course.title)
+                            }}
+                            disabled={submittingReviewId === course.id}
+                            className="relative z-10 inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-300 hover:bg-amber-400/20 transition-colors disabled:opacity-50"
+                          >
+                            {submittingReviewId === course.id ? (
+                              <><Loader2 size={12} className="animate-spin" /> Submitting…</>
+                            ) : (
+                              <>Submit for review →</>
+                            )}
+                          </button>
                         )}
                         {/* Floating action buttons on the card */}
                         <div className="absolute top-3 right-3 z-10 flex gap-1.5">

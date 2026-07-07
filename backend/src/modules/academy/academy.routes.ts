@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express'
+import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import prisma from '../../config/database'
 import { sendSuccess, sendError, sendPaginated } from '../../utils/response'
@@ -54,6 +55,35 @@ const unlockRetakeSchema = z.object({
 const adminWeekFilterSchema = z.object({
   weekSlug: z.string().optional(),
 })
+
+/**
+ * Normalise a course's pricing for API responses.
+ *
+ * Prisma Decimal fields serialise to strings in JSON; the storefront needs
+ * numbers. `discountPercent` slashes the original price — both figures are
+ * returned so the UI can render "was $X, now $Y" in USD and NGN.
+ */
+function serializeCoursePricing(c: {
+  isPaid: boolean
+  priceUsd: Prisma.Decimal | null
+  priceNgn: Prisma.Decimal | null
+  discountPercent: number | null
+}) {
+  const priceUsd = c.priceUsd !== null ? Number(c.priceUsd) : null
+  const priceNgn = c.priceNgn !== null ? Number(c.priceNgn) : null
+  const discountPercent = Math.min(100, Math.max(0, c.discountPercent ?? 0))
+  const hasPrice = (priceUsd ?? 0) > 0 || (priceNgn ?? 0) > 0
+  const applyDiscount = (value: number | null) =>
+    value === null ? null : Math.round(value * (100 - discountPercent)) / 100
+  return {
+    isPaid: c.isPaid || hasPrice,
+    priceUsd,
+    priceNgn,
+    discountPercent,
+    discountedPriceUsd: applyDiscount(priceUsd),
+    discountedPriceNgn: applyDiscount(priceNgn),
+  }
+}
 
 function maskEmail(email: string) {
   const [local, domain] = email.split('@')
@@ -487,6 +517,55 @@ router.get('/facilitators', async (req: Request, res: Response, next: NextFuncti
   }
 })
 
+// ── Public contact form ───────────────────────────────────────────────────────
+// Emails the academy inbox. Best-effort mail (never blocks the response) and a
+// honeypot field ("website") quietly drops naive spam bots.
+const CONTACT_RECIPIENT = 'rubikconnexus@gmail.com'
+
+const contactSchema = z.object({
+  fullName: z.string().trim().min(2).max(200),
+  email: z.string().trim().email(),
+  subject: z.enum([
+    'General Enquiry',
+    'Enrolment Question',
+    'Partnership or Collaboration',
+    'Funded Cohort Request',
+    'Media or Press',
+  ]),
+  message: z.string().trim().min(10).max(5000),
+  website: z.string().max(0).optional(), // honeypot — must stay empty
+})
+
+router.post('/contact', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = contactSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const { fullName, email, subject, message } = parsed.data
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    sendEmailInBackground({
+      to: CONTACT_RECIPIENT,
+      replyTo: email,
+      subject: `[Academy Contact] ${subject} — ${fullName}`,
+      text: `From: ${fullName} <${email}>\nSubject: ${subject}\n\n${message}`,
+      html: `
+        <h2 style="margin:0 0 12px">New contact form message</h2>
+        <p><strong>From:</strong> ${esc(fullName)} &lt;${esc(email)}&gt;</p>
+        <p><strong>Subject:</strong> ${esc(subject)}</p>
+        <p style="white-space:pre-line;border-left:3px solid #F5C518;padding-left:12px;margin-top:16px">${esc(message)}</p>
+      `,
+    })
+
+    return sendSuccess(
+      res,
+      { received: true },
+      'Thank you for contacting Rubikcon Nexus Academy. Your message has been received, and a member of our team will respond within 2 business days.',
+    )
+  } catch (err) {
+    next(err)
+  }
+})
+
 // Public course catalog (with optional enrollment status if logged in)
 router.get('/courses', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -504,6 +583,9 @@ router.get('/courses', optionalAuth, async (req: Request, res: Response, next: N
           tagline: true,
           level: true,
           isPaid: true,
+          priceUsd: true,
+          priceNgn: true,
+          discountPercent: true,
           estimatedDuration: true,
           phaseLabel: true,
           heroImage: true,
@@ -534,7 +616,7 @@ router.get('/courses', optionalAuth, async (req: Request, res: Response, next: N
       title: c.title,
       tagline: c.tagline,
       level: c.level,
-      isPaid: c.isPaid,
+      ...serializeCoursePricing(c),
       estimatedDuration: c.estimatedDuration,
       phaseLabel: c.phaseLabel,
       heroImage: c.heroImage,
@@ -648,6 +730,7 @@ router.get('/courses/:slug', optionalAuth, async (req: Request, res: Response, n
       introVideoUrl: course.introVideoUrl,
       overviewSlideUrl: course.overviewSlideUrl,
       contentUnit: course.contentUnit,
+      ...serializeCoursePricing(course),
       // Facilitators in preview mode get "enrolled: true" so the UI doesn't
       // pester them with enrol prompts. The viewerMode field tells the
       // frontend to render a preview banner instead.
@@ -2180,6 +2263,14 @@ const createCourseSchema = z.object({
 
 const updateCourseSchema = createCourseSchema.partial()
 
+// Pricing is set separately from general course info and only by SUPER_ADMINs —
+// the handlers strip these fields for regular admins.
+const coursePricingSchema = z.object({
+  priceUsd: z.number().min(0).max(1_000_000).nullable().optional(),
+  priceNgn: z.number().min(0).max(1_000_000_000).nullable().optional(),
+  discountPercent: z.number().int().min(0).max(100).nullable().optional(),
+})
+
 const createWeekSchema = z.object({
   number: z.number().int().min(1),
   title: z.string().trim().min(3).max(200),
@@ -2686,7 +2777,17 @@ router.patch('/admin/courses/:courseId', requireAuth, requireAdmin, async (req: 
       if (existing) return sendError(res, 'A course with this slug already exists.', 409)
     }
 
-    const updated = await prisma.course.update({ where: { id: course.id }, data: parsed.data })
+    // Pricing fields ride along on the same PATCH but only super admins may set
+    // them — for everyone else they're silently ignored so a stale admin UI
+    // can't overwrite pricing.
+    let pricingData: z.infer<typeof coursePricingSchema> = {}
+    if (req.user!.role === 'SUPER_ADMIN') {
+      const pricingParsed = coursePricingSchema.safeParse(req.body)
+      if (!pricingParsed.success) return sendError(res, 'Validation failed', 400, pricingParsed.error.flatten().fieldErrors)
+      pricingData = pricingParsed.data
+    }
+
+    const updated = await prisma.course.update({ where: { id: course.id }, data: { ...parsed.data, ...pricingData } })
     await markCourseDirtyIfNeeded(course.id, req.user!.role, course.status)
     return sendSuccess(res, updated, 'Course updated.')
   } catch (err) {
@@ -3998,7 +4099,12 @@ router.post('/superadmin/courses/:courseId/approve', requireAuth, requireSuperAd
   try {
     const course = await prisma.course.findUnique({ where: { id: req.params.courseId } })
     if (!course) return sendError(res, 'Course not found.', 404)
-    if (course.status !== 'PENDING_REVIEW') return sendError(res, 'Only courses pending review can be approved.', 400)
+    // Super admins may approve straight from DRAFT — requiring a separate
+    // "submit for review" step for a course they can already see and edit was
+    // pure friction ("no way to approve pending courses").
+    if (course.status !== 'PENDING_REVIEW' && course.status !== 'DRAFT' && course.status !== 'REJECTED') {
+      return sendError(res, 'This course is already approved.', 400)
+    }
 
     const { notes } = z.object({ notes: z.string().trim().max(2000).optional() }).parse(req.body)
 
@@ -4396,7 +4502,6 @@ router.post('/superadmin/users', requireAuth, requireSuperAdmin, async (req: Req
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) return sendError(res, 'A user with this email already exists.', 409)
 
-    const bcrypt = await import('bcryptjs')
     const hashed = await bcrypt.hash(password, 12)
 
     const user = await prisma.user.create({

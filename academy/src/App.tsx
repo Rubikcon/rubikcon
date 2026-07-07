@@ -22,6 +22,8 @@ const WeekEditorPage = lazy(() => import('./pages/WeekEditorPage'))
 const SuperAdminPage = lazy(() => import('./pages/SuperAdminPage'))
 const SuperAdminCourseDetailPage = lazy(() => import('./pages/SuperAdminCourseDetailPage'))
 const FacilitatorsPage = lazy(() => import('./pages/FacilitatorsPage'))
+const AboutPage = lazy(() => import('./pages/AboutPage'))
+const ContactPage = lazy(() => import('./pages/ContactPage'))
 
 function RouteFallback() {
   return (
@@ -50,6 +52,8 @@ export default function App() {
         <Route path="/admin/superadmin" component={SuperAdminPage} />
         <Route path="/admin/superadmin/courses/:courseId" component={SuperAdminCourseDetailPage} />
         <Route path="/facilitators" component={FacilitatorsPage} />
+        <Route path="/about" component={AboutPage} />
+        <Route path="/contact" component={ContactPage} />
         <Route path="/courses" component={CoursesPage} />
         <Route path="/course" component={CoursePage} />
         <Route path="/course/:slug" component={CoursePage} />
