@@ -25,20 +25,40 @@ const WHO_SHOULD_CONTACT = [
   'Media and community partners',
 ]
 
+interface ContactForm {
+  fullName: string
+  email: string
+  subject: string
+  message: string
+  bot_catch: string // Honeypot field
+}
+
 export default function ContactPage() {
-  const [form, setForm] = useState({ fullName: '', email: '', subject: '' as string, message: '' })
+  const [form, setForm] = useState<ContactForm>({ fullName: '', email: '', subject: '', message: '', bot_catch: '' })
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    setSubmitting(true)
-    setError(null)
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    
+    // Honeypot check: If a bot fills out this hidden field, silently return success
+    if (form.bot_catch) {
+      setSubmitted(true)
+      return
+    }
+
     try {
+      setSubmitting(true)
+      setError(null)
       await apiRequest('/academy/contact', {
         method: 'POST',
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          fullName: form.fullName,
+          email: form.email,
+          subject: form.subject,
+          message: form.message
+        })
       })
       setSubmitted(true)
     } catch (err) {
@@ -97,6 +117,19 @@ export default function ContactPage() {
                     </div>
                   )}
                   <div className="grid sm:grid-cols-2 gap-5">
+                    {/* Honeypot Field - Hidden from real users */}
+                    <div aria-hidden="true" className="hidden opacity-0 absolute pointer-events-none -left-[9999px] -z-50" tabIndex={-1}>
+                      <label htmlFor="bot_catch">Don't fill this out if you're human:</label>
+                      <input
+                        id="bot_catch"
+                        name="bot_catch"
+                        type="text"
+                        tabIndex={-1}
+                        autoComplete="off"
+                        value={form.bot_catch}
+                        onChange={e => setForm(f => ({ ...f, bot_catch: e.target.value }))}
+                      />
+                    </div>
                     <div>
                       <label className="block text-xs text-white/40 mb-1.5">Full Name *</label>
                       <input

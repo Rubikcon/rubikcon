@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLocation } from 'wouter'
 import { motion, AnimatePresence } from 'framer-motion'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth, setStoredAuth } from '../lib/auth'
@@ -55,28 +56,30 @@ const COUNTRIES = [
 ]
 
 const EXPERIENCE_LEVELS = [
-  { value: 'beginner', label: 'Complete beginner', desc: 'I know little to nothing about Web3' },
-  { value: 'some_knowledge', label: 'Some knowledge', desc: "I understand the basics but haven't built anything" },
-  { value: 'building', label: 'Already building', desc: "I've shipped something in Web3" },
+  { value: 'beginner', label: 'Complete beginner', desc: 'I have little to no background in technology or digital tools' },
+  { value: 'some_knowledge', label: 'Some knowledge', desc: 'I understand the basics but have not built or shipped anything yet' },
+  { value: 'building', label: 'Already building', desc: 'I have hands-on experience and have shipped or deployed a project' },
 ]
 
 const MOTIVATIONS = [
-  { value: 'career_change', label: 'Switch my career into Web3' },
-  { value: 'build_project', label: 'Build a specific project or idea' },
+  { value: 'career_change', label: 'Build a career in technology' },
+  { value: 'build_project', label: 'Build a specific project or product' },
+  { value: 'upskill', label: 'Upskill in my current role' },
   { value: 'curiosity', label: 'General curiosity and learning' },
   { value: 'organisation', label: 'My organisation sent me' },
-  { value: 'investment', label: 'Make better investment decisions' },
+  { value: 'entrepreneurship', label: 'Start or grow a business using technology' },
 ]
 
+// Aligned with the actual Rubikcon Nexus Academy curriculum tracks
 const INTERESTS = [
-  { value: 'blockchain_basics', label: 'Blockchain Basics' },
-  { value: 'smart_contracts', label: 'Smart Contracts' },
-  { value: 'defi', label: 'DeFi' },
-  { value: 'nfts', label: 'NFTs' },
-  { value: 'daos', label: 'DAOs' },
-  { value: 'web3_product', label: 'Web3 Product Building' },
-  { value: 'tokenomics', label: 'Tokenomics' },
-  { value: 'crypto_law', label: 'Crypto & Regulation' },
+  { value: 'blockchain_social_impact', label: 'Blockchain for Social Impact' },
+  { value: 'product_management', label: 'Product Management' },
+  { value: 'ai_emerging_tech', label: 'AI & Emerging Technologies' },
+  { value: 'software_development', label: 'Software Development' },
+  { value: 'digital_leadership', label: 'Digital Leadership' },
+  { value: 'data_analytics', label: 'Data & Analytics' },
+  { value: 'business_transformation', label: 'Business Transformation' },
+  { value: 'entrepreneurship', label: 'Tech Entrepreneurship' },
 ]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -103,6 +106,7 @@ const selectClass = `${inputClass} appearance-none cursor-pointer`
 export default function OnboardingPage() {
   const auth = getStoredAuth()
   const firstName = auth?.user.name?.split(' ')[0] ?? 'there'
+  const [, setLocation] = useLocation()
 
   const [step, setStep] = useState(1)
 
@@ -147,7 +151,14 @@ export default function OnboardingPage() {
       if (auth) {
         setStoredAuth({ ...auth, user: { ...auth.user, onboardingCompleted: true } })
       }
-      window.location.href = '/dashboard'
+      // Use wouter for SPA navigation — avoids a full page reload and
+      // correctly handles any ?redirect= param the login page may have set.
+      const params = new URLSearchParams(window.location.search)
+      const redirect = params.get('redirect')
+      if (redirect && redirect.startsWith('/') && !redirect.startsWith('//'))
+        setLocation(redirect)
+      else
+        setLocation('/dashboard')
     } catch {
       setError('Something went wrong. Please try again.')
       setSubmitting(false)
@@ -272,7 +283,7 @@ export default function OnboardingPage() {
                 <h1 className="font-display text-2xl font-extrabold text-white mb-1">Where are you starting from?</h1>
                 <p className="text-white/45 text-sm mb-6">Helps us tailor course recommendations.</p>
 
-                <p className="text-sm font-medium text-white/70 mb-3">Web3 experience level</p>
+                <p className="text-sm font-medium text-white/70 mb-3">Technology experience level</p>
                 <div className="flex flex-col gap-2 mb-5">
                   {EXPERIENCE_LEVELS.map(e => (
                     <button

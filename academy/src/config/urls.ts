@@ -3,5 +3,5 @@ export const URLS = {
   academy:   import.meta.env.VITE_ACADEMY_URL   || 'http://localhost:3001',
   games:     import.meta.env.VITE_GAMES_URL     || 'http://localhost:3002',
   blockgigs: import.meta.env.VITE_BLOCKGIGS_URL || 'http://localhost:3003',
-  api:       import.meta.env.VITE_API_URL        || 'http://localhost:4000',
+  api:       import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000',
 }

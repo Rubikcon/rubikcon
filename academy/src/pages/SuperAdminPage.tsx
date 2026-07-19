@@ -244,9 +244,17 @@ export default function SuperAdminPage() {
 
   const currentAuth = getStoredAuth()
 
+  // ─ Synchronous proactive role check ─────────────────────────────────────────
+  // localStorage reads are synchronous — gate the render before React
+  // paints anything, eliminating any flash of superadmin UI on direct visits.
+  if (!currentAuth) { window.location.replace('/login'); return null }
+  if (currentAuth.user.role !== 'SUPER_ADMIN') { window.location.replace('/dashboard'); return null }
+
   useEffect(() => {
-    if (!currentAuth) { window.location.href = '/login'; return }
-    if (currentAuth.user.role !== 'SUPER_ADMIN') { window.location.href = '/dashboard'; return }
+    // Belt-and-suspenders: covers the case where auth state changes
+    // while the user is already on this page.
+    if (!currentAuth) { window.location.replace('/login'); return }
+    if (currentAuth.user.role !== 'SUPER_ADMIN') { window.location.replace('/dashboard'); return }
     void loadOverview()
   }, [])
 

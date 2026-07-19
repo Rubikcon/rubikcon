@@ -114,6 +114,15 @@ export default function AdminAcademyPage() {
 
   const auth = getStoredAuth()
 
+  // ─ Synchronous proactive role check ─────────────────────────────────────────
+  // Reading localStorage is synchronous, so we can gate the entire render
+  // before React paints anything. This eliminates the flash of admin UI that
+  // appeared between the first render and the useEffect redirect.
+  if (!auth) { window.location.replace('/login'); return null }
+  if (auth.user.role !== 'ADMIN' && auth.user.role !== 'SUPER_ADMIN') {
+    window.location.replace('/dashboard'); return null
+  }
+
   async function loadAdminData() {
     const [progressData, submissionData, coursesData] = await Promise.all([
       apiRequest<AdminLearnerProgress>('/academy/admin/learners/progress'),
@@ -126,9 +135,12 @@ export default function AdminAcademyPage() {
   }
 
   useEffect(() => {
-    if (!auth) { window.location.href = '/login'; return }
+    // useEffect guard kept as a belt-and-suspenders fallback in case
+    // the synchronous check above is somehow bypassed (e.g. auth state
+    // changes while the user is already on the page).
+    if (!auth) { window.location.replace('/login'); return }
     if (auth.user.role !== 'ADMIN' && auth.user.role !== 'SUPER_ADMIN') {
-      window.location.href = '/dashboard'; return
+      window.location.replace('/dashboard'); return
     }
     let cancelled = false
     async function load() {
