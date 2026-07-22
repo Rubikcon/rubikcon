@@ -7,12 +7,19 @@ export default function ScrollToTopButton() {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    function handleScroll() {
+    function handleScroll(e?: Event) {
+      let targetScroll = 0
+      if (e?.target && e.target instanceof Element) {
+        targetScroll = e.target.scrollTop || 0
+      } else if (e?.target === document) {
+        targetScroll = document.documentElement.scrollTop || document.body.scrollTop || 0
+      }
+
       const winScroll = window.scrollY || window.pageYOffset || 0
       const docScroll = document.documentElement.scrollTop || document.body.scrollTop || 0
       const rootScroll = document.getElementById('root')?.scrollTop || 0
       
-      const maxScroll = Math.max(winScroll, docScroll, rootScroll)
+      const maxScroll = Math.max(winScroll, docScroll, rootScroll, targetScroll)
       setVisible(maxScroll > THRESHOLD)
     }
 
@@ -27,6 +34,12 @@ export default function ScrollToTopButton() {
     const root = document.getElementById('root')
     if (root) root.scrollTo({ top: 0, behavior: 'smooth' })
     document.documentElement.scrollTo({ top: 0, behavior: 'smooth' })
+    
+    // Also try to scroll the first scrollable container if any exists
+    const scrollableContainers = document.querySelectorAll('.overflow-y-auto, .overflow-auto')
+    scrollableContainers.forEach(container => {
+      container.scrollTo({ top: 0, behavior: 'smooth' })
+    })
   }
 
   return (

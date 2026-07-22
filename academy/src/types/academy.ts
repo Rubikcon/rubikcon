@@ -163,6 +163,7 @@ export type CourseWeekSummary = {
     quizSubmitted: boolean
     assignmentSubmitted: boolean
     completedAt: string | null
+    rating: number | null
   }
 }
 
@@ -235,12 +236,14 @@ export type WeekDetail = {
       slug: string
       title: string
       number: number
+      moduleId: string | null
     } | null
     next: {
       id: string
       slug: string
       title: string
       number: number
+      moduleId: string | null
     } | null
   }
   heroSlides: Array<{
@@ -383,6 +386,7 @@ export type WeekDetail = {
     quizSubmitted: boolean
     assignmentSubmitted: boolean
     completedAt: string | null
+    rating: number | null
   }
   // 'facilitator-preview' when a facilitator is viewing the lesson without being enrolled —
   // used to render a preview-mode banner. Defaults to 'learner' on older backends.

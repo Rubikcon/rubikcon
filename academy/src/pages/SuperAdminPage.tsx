@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ClipboardList,
   Clock,
+  Database,
   Eye,
   Key,
   Loader2,
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
 import { apiRequest } from '../lib/api'
+import SiteContentManager from '../components/SiteContentManager'
 import { getStoredAuth } from '../lib/auth'
 import type { AdminSubmission, CourseStatus } from '../types/academy'
 
@@ -95,7 +97,7 @@ const STATUS_FILTERS = [
   { value: 'DRAFT', label: 'Draft' },
 ]
 
-type Tab = 'overview' | 'courses' | 'submissions' | 'learners' | 'users'
+type Tab = 'overview' | 'courses' | 'submissions' | 'learners' | 'users' | 'content'
 
 // ─── Learner activity types (matches GET /superadmin/learners response) ───
 
@@ -600,6 +602,7 @@ export default function SuperAdminPage() {
     { id: 'submissions', label: 'Submissions', icon: ClipboardList },
     { id: 'learners',    label: 'Learners',    icon: Users },
     { id: 'users',       label: 'Users',       icon: Users },
+    { id: 'content',     label: 'Site Content',icon: Database },
   ]
 
   return (
@@ -1442,6 +1445,13 @@ export default function SuperAdminPage() {
               )}
             </div>
           )}
+
+        {/* ─── SITE CONTENT TAB ────────────────────────────────────────────── */}
+        {activeTab === 'content' && (
+          <div className="rounded-3xl border border-white/5 bg-[#0A0A0A]/50 p-6 backdrop-blur-md">
+            <SiteContentManager />
+          </div>
+        )}
 
         </div>
       </main>

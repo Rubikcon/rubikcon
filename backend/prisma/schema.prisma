@@ -41,6 +41,7 @@ model User {
   coursesCreated  Course[]         @relation("CourseCreator")
   courseApprovals CourseApproval[] @relation("CourseApprovalReviewer")
   courseEnrollments CourseEnrollment[]
+  moduleFeedbacks ModuleFeedback[]
   profile      UserProfile?
 
   @@index([email])
@@ -193,9 +194,25 @@ model Module {
   course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons Lesson[]
   weeks   Week[]
+  moduleFeedbacks ModuleFeedback[] @relation("ModuleFeedback")
 
   @@index([courseId])
   @@map("modules")
+}
+
+model ModuleFeedback {
+  id        String   @id @default(uuid())
+  userId    String
+  moduleId  String
+  feedback  String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module Module @relation("ModuleFeedback", fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([moduleId])
+  @@map("module_feedback")
 }
 
 model Lesson {
@@ -681,6 +698,7 @@ model WeekProgress {
   // from NOT_STARTED → IN_PROGRESS even before any submission.
   firstOpenedAt       DateTime?
   completedAt         DateTime?
+  rating              Int?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
@@ -799,6 +817,22 @@ enum WeekDifficulty {
 enum SlideDeckViewerType {
   MODAL
   EXTERNAL
+}
+
+// ─── Testimonials ────────────────────────────────────────────────────────────
+
+model Testimonial {
+  id        String   @id @default(uuid())
+  name      String
+  role      String?
+  quote     String
+  photoUrl  String?
+  isActive  Boolean  @default(true)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("testimonials")
 }
 
 enum ReadingResourceType {

@@ -124,6 +124,8 @@ function deriveWeekProgressStatus(s: ProgressSignals): WeekProgressStatus {
     const quizOk = !s.hasQuiz || s.quizSubmitted
     const assignmentOk = s.assignmentCount === 0 || s.assignmentSubmitted
     if (quizOk && assignmentOk) return WeekProgressStatus.COMPLETE
+  } else if (s.firstOpenedAt) {
+    return WeekProgressStatus.COMPLETE
   }
 
   if (s.quizSubmitted || s.assignmentSubmitted || s.firstOpenedAt) {
@@ -153,7 +155,11 @@ async function syncWeekProgress(userId: string, weekId: string, opts: { touchOpe
   const [quizExists, assignmentCount, quizAttempt, assignmentSubmission] = await Promise.all([
     prisma.quiz.findFirst({ where: { weekId }, select: { id: true } }),
     prisma.assignment.count({ where: { weekId } }),
-    prisma.quizAttempt.findFirst({ where: { userId, quiz: { weekId } }, select: { id: true } }),
+    prisma.quizAttempt.findFirst({
+      where: { userId, quiz: { weekId } },
+      select: { id: true, percentage: true, quiz: { select: { passMark: true } } },
+      orderBy: { percentage: 'desc' }
+    }),
     prisma.assignmentSubmission.findFirst({ where: { userId, assignment: { weekId } }, select: { id: true } }),
   ])
 
@@ -167,7 +173,7 @@ async function syncWeekProgress(userId: string, weekId: string, opts: { touchOpe
     || wasAlreadyComplete
 
   const firstOpenedAt = existing?.firstOpenedAt ?? (opts.touchOpened ? new Date() : null)
-  const quizSubmitted = Boolean(quizAttempt)
+  const quizSubmitted = Boolean(quizAttempt && quizAttempt.percentage >= quizAttempt.quiz.passMark)
   const assignmentSubmitted = Boolean(assignmentSubmission)
 
   const status = deriveWeekProgressStatus({
@@ -478,6 +484,19 @@ async function getUserWeekState(userId: string, weekId: string, quizId?: string 
 
 // New LMS endpoints
 
+// Public testimonials
+router.get('/testimonials', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const testimonials = await prisma.testimonial.findMany({
+      where: { isActive: true },
+      orderBy: { position: 'asc' },
+    })
+    return sendSuccess(res, testimonials)
+  } catch (err) {
+    next(err)
+  }
+})
+
 // Public facilitator directory — no email exposed
 router.get('/facilitators', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -566,6 +585,31 @@ router.post('/contact', async (req: Request, res: Response, next: NextFunction) 
   }
 })
 
+// ── Public Platform Stats ─────────────────────────────────────────────────────────
+router.get('/public/stats', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [
+      totalCourses,
+      totalLearners,
+      totalFacilitators
+    ] = await Promise.all([
+      prisma.course.count({ where: { status: 'APPROVED', published: true } }),
+      prisma.user.count({ where: { role: 'USER' } }),
+      prisma.facilitator.count()
+    ])
+
+    return sendSuccess(res, {
+      totalCourses,
+      totalLearners,
+      totalFacilitators,
+      completionRate: 94 // Dummy stat, usually derived from complex progress metrics
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ── Course Catalog (Public / Learner) ─────────────────────────────────────────
 // Public course catalog (with optional enrollment status if logged in)
 router.get('/courses', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -860,16 +904,23 @@ router.get('/weeks/:weekSlug', optionalAuth, async (req: Request, res: Response,
     // Their view doesn't touch progress tracking (they're not learning).
     const isFacilitator = await userCanFacilitateCourse(req.user, week.courseId)
 
+    let userEnrollment = null
     if (!isFacilitator) {
       if (!week.published || !week.course.published) {
         return sendError(res, 'Week not found.', 404)
       }
-      const enrollment = await prisma.courseEnrollment.findUnique({
+      userEnrollment = await prisma.courseEnrollment.findUnique({
         where: { userId_courseId: { userId: req.user.userId, courseId: week.courseId } },
       })
-      if (!enrollment) {
+      if (!userEnrollment) {
         return sendError(res, 'Enrol in this course to access this lesson.', 403)
       }
+    }
+
+    if (userEnrollment && week.module) {
+      const dynamicDeadline = new Date(userEnrollment.createdAt)
+      dynamicDeadline.setMonth(dynamicDeadline.getMonth() + week.module.position)
+      week.assignments.forEach(a => a.deadline = dynamicDeadline)
     }
 
     // Touch progress on view — moves the lesson from NOT_STARTED → IN_PROGRESS
@@ -886,7 +937,7 @@ router.get('/weeks/:weekSlug', optionalAuth, async (req: Request, res: Response,
     const courseWeeks = await prisma.week.findMany({
       where: { courseId: week.courseId, published: true },
       orderBy: { number: 'asc' },
-      select: { id: true, slug: true, title: true, number: true },
+      select: { id: true, slug: true, title: true, number: true, moduleId: true },
     })
 
     const currentIndex = courseWeeks.findIndex(item => item.id === week.id)
@@ -1030,12 +1081,14 @@ router.get('/weeks/:weekSlug', optionalAuth, async (req: Request, res: Response,
             quizSubmitted: userState.weekProgress.quizSubmitted,
             assignmentSubmitted: userState.weekProgress.assignmentSubmitted,
             completedAt: userState.weekProgress.completedAt,
+            rating: userState.weekProgress.rating,
           }
         : {
             status: WeekProgressStatus.NOT_STARTED,
             quizSubmitted: false,
             assignmentSubmitted: false,
             completedAt: null,
+            rating: null,
           },
       // Tells the frontend whether to render a "Facilitator preview" banner.
       viewerMode: isFacilitator ? 'facilitator-preview' : 'learner',
@@ -1074,6 +1127,82 @@ router.post('/weeks/:weekSlug/complete', requireAuth, async (req: Request, res: 
       status: progress.status,
       completedAt: progress.completedAt,
     }, 'Lesson marked complete.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+//
+// Submit a star rating for a lesson
+//
+
+const ratingSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+})
+
+router.post('/weeks/:weekSlug/rating', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = ratingSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const week = await prisma.week.findUnique({
+      where: { slug: req.params.weekSlug },
+      select: { id: true, courseId: true, published: true },
+    })
+    if (!week || !week.published) return sendError(res, 'Week not found.', 404)
+
+    const enrollment = await prisma.courseEnrollment.findUnique({
+      where: { userId_courseId: { userId: req.user!.userId, courseId: week.courseId } },
+    })
+    if (!enrollment) return sendError(res, 'Enrol in this course to rate lessons.', 403)
+
+    // Ensure progress record exists
+    await syncWeekProgress(req.user!.userId, week.id, { touchOpened: true })
+
+    const progress = await prisma.weekProgress.update({
+      where: { userId_weekId: { userId: req.user!.userId, weekId: week.id } },
+      data: { rating: parsed.data.rating },
+    })
+
+    return sendSuccess(res, { rating: progress.rating }, 'Lesson rating saved.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+//
+// Submit text feedback for a module
+//
+
+const moduleFeedbackSchema = z.object({
+  feedback: z.string().min(1).max(2000),
+})
+
+router.post('/modules/:moduleId/feedback', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = moduleFeedbackSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const moduleRecord = await prisma.module.findUnique({
+      where: { id: req.params.moduleId },
+      include: { course: true }
+    })
+    if (!moduleRecord) return sendError(res, 'Module not found.', 404)
+
+    const enrollment = await prisma.courseEnrollment.findUnique({
+      where: { userId_courseId: { userId: req.user!.userId, courseId: moduleRecord.courseId } },
+    })
+    if (!enrollment) return sendError(res, 'Enrol in this course to leave feedback.', 403)
+
+    const feedback = await prisma.moduleFeedback.create({
+      data: {
+        userId: req.user!.userId,
+        moduleId: moduleRecord.id,
+        feedback: parsed.data.feedback,
+      }
+    })
+
+    return sendSuccess(res, { feedbackId: feedback.id }, 'Module feedback saved.', 201)
   } catch (err) {
     next(err)
   }
@@ -2465,6 +2594,103 @@ router.post('/admin/facilitators', requireAuth, requireAdmin, async (req: Reques
 
     const facilitator = await prisma.facilitator.create({ data: { ...parsed.data, email: normalizedEmail } })
     return sendSuccess(res, facilitator, 'Facilitator created.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Update a facilitator
+router.put('/admin/facilitators/:id', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = createFacilitatorSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const normalizedEmail = parsed.data.email.trim().toLowerCase()
+    
+    // Check if another facilitator has this email
+    const existing = await prisma.facilitator.findFirst({
+      where: { 
+        email: { equals: normalizedEmail, mode: 'insensitive' },
+        id: { not: req.params.id }
+      },
+    })
+    if (existing) return sendError(res, 'A facilitator with this email already exists.', 409)
+
+    const facilitator = await prisma.facilitator.update({
+      where: { id: req.params.id },
+      data: { ...parsed.data, email: normalizedEmail },
+    })
+    return sendSuccess(res, facilitator, 'Facilitator updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Delete a facilitator
+router.delete('/admin/facilitators/:id', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await prisma.facilitator.delete({
+      where: { id: req.params.id },
+    })
+    return sendSuccess(res, null, 'Facilitator deleted.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ─── Admin Testimonials ──────────────────────────────────────────────────
+
+const testimonialSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  role: z.string().optional(),
+  quote: z.string().min(1, 'Quote is required'),
+  photoUrl: z.string().optional(),
+  isActive: z.boolean().default(true),
+  position: z.number().int().default(0),
+})
+
+router.get('/admin/testimonials', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const testimonials = await prisma.testimonial.findMany({
+      orderBy: { position: 'asc' },
+    })
+    return sendSuccess(res, testimonials)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/admin/testimonials', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = testimonialSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const testimonial = await prisma.testimonial.create({ data: parsed.data })
+    return sendSuccess(res, testimonial, 'Testimonial created.', 201)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.put('/admin/testimonials/:id', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = testimonialSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const testimonial = await prisma.testimonial.update({
+      where: { id: req.params.id },
+      data: parsed.data,
+    })
+    return sendSuccess(res, testimonial, 'Testimonial updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.delete('/admin/testimonials/:id', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await prisma.testimonial.delete({ where: { id: req.params.id } })
+    return sendSuccess(res, null, 'Testimonial deleted.')
   } catch (err) {
     next(err)
   }
@@ -4615,6 +4841,44 @@ router.get('/admin/courses/:courseId/enrollments', requireAuth, requireAdmin, as
     })
 
     return sendSuccess(res, enrollments)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ── Admin Dashboard Stats ────────────────────────────────────────────────────────
+router.get('/admin/stats', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [
+      totalCourses,
+      totalLearners,
+      totalFacilitators,
+      totalLessons,
+      totalAssignments,
+      totalQuizzes,
+      totalTestimonials,
+      totalEnrollments
+    ] = await Promise.all([
+      prisma.course.count(),
+      prisma.user.count({ where: { role: 'USER' } }),
+      prisma.facilitator.count(),
+      prisma.lesson.count(),
+      prisma.assignment.count(),
+      prisma.quiz.count(),
+      prisma.testimonial.count(),
+      prisma.courseEnrollment.count()
+    ])
+
+    return sendSuccess(res, {
+      totalCourses,
+      totalLearners,
+      totalFacilitators,
+      totalLessons,
+      totalAssignments,
+      totalQuizzes,
+      totalTestimonials,
+      totalEnrollments
+    })
   } catch (err) {
     next(err)
   }

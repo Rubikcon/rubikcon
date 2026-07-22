@@ -1,78 +1,130 @@
-import { PrismaClient, WeekDifficulty, SlideDeckViewerType, ReadingResourceType } from '@prisma/client'
-import bcrypt from 'bcryptjs'
-import { academyPhase1Course } from './academyPhase1Data'
+import {
+  PrismaClient,
+  WeekDifficulty,
+  SlideDeckViewerType,
+  ReadingResourceType,
+} from "@prisma/client";
+import bcrypt from "bcryptjs";
+import { academyPhase1Course } from "./academyPhase1Data";
+import { seedRichData } from "./richSeedData";
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 async function seedUsers() {
-  const adminPassword = await bcrypt.hash('admin123456', 12)
-  const demoPassword = await bcrypt.hash('demo12345', 12)
-  const superadminPassword = await bcrypt.hash('superadmin123456', 12)
+  const adminPassword = await bcrypt.hash("admin123456", 12);
+  const demoPassword = await bcrypt.hash("demo12345", 12);
+  const superadminPassword = await bcrypt.hash("superadmin123456", 12);
 
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@rubikcon.com' },
+    where: { email: "admin@rubikcon.com" },
     update: {
       password: adminPassword,
-      name: 'Rubikcon Admin',
-      role: 'ADMIN',
+      name: "Rubikcon Admin",
+      role: "ADMIN",
     },
     create: {
-      email: 'admin@rubikcon.com',
+      email: "admin@rubikcon.com",
       password: adminPassword,
-      name: 'Rubikcon Admin',
-      role: 'ADMIN',
+      name: "Rubikcon Admin",
+      role: "ADMIN",
     },
-  })
+  });
 
   const superadmin = await prisma.user.upsert({
-    where: { email: 'superadmin@rubikcon.com' },
+    where: { email: "superadmin@rubikcon.com" },
     update: {
       password: superadminPassword,
-      name: 'Rubikcon Superadmin',
-      role: 'SUPER_ADMIN',
+      name: "Rubikcon Superadmin",
+      role: "SUPER_ADMIN",
     },
     create: {
-      email: 'superadmin@rubikcon.com',
+      email: "superadmin@rubikcon.com",
       password: superadminPassword,
-      name: 'Rubikcon Superadmin',
-      role: 'SUPER_ADMIN',
+      name: "Rubikcon Superadmin",
+      role: "SUPER_ADMIN",
     },
-  })
+  });
 
   const demo = await prisma.user.upsert({
-    where: { email: 'demo@rubikcon.com' },
+    where: { email: "demo@rubikcon.com" },
     update: {
       password: demoPassword,
-      name: 'Demo User',
-      role: 'USER',
+      name: "Demo User",
+      role: "USER",
     },
     create: {
-      email: 'demo@rubikcon.com',
+      email: "demo@rubikcon.com",
       password: demoPassword,
-      name: 'Demo User',
-      role: 'USER',
+      name: "Demo User",
+      role: "USER",
     },
-  })
+  });
 
-  return { admin, superadmin, demo }
+  return { admin, superadmin, demo };
+}
+
+async function seedTestimonials() {
+  await prisma.testimonial.createMany({
+    data: [
+      {
+        name: "Ozioma Onukogu",
+        role: "Learner",
+        quote:
+          "This program transformed my understanding of Web3 and gave me the practical skills I needed.",
+        photoUrl:
+          "https://images.pexels.com/photos/5308640/pexels-photo-5308640.jpeg",
+        position: 1,
+      },
+      {
+        name: "Joy Egbu",
+        role: "Learner",
+        quote:
+          "The best blockchain course out there. Highly practical and community-driven.",
+        photoUrl:
+          "https://images.pexels.com/photos/37580515/pexels-photo-37580515.jpeg",
+        position: 2,
+      },
+      {
+        name: "Obinna Duru",
+        role: "Learner",
+        quote:
+          "I gained a deep understanding of blockchain technology and feel confident to build my own projects.",
+        photoUrl:
+          "https://images.pexels.com/photos/14673044/pexels-photo-14673044.jpeg",
+        position: 3,
+      },
+      {
+        name: "Chinonso Eze",
+        role: "Learner",
+        quote:
+          "The mentorship and guidance I received during this course were invaluable. I highly recommend it to anyone looking to break into Web3.",
+        photoUrl:
+          "https://images.pexels.com/photos/19759802/pexels-photo-19759802.jpeg",
+        position: 4,
+      },
+    ],
+    skipDuplicates: true,
+  });
 }
 
 async function seedLegacyCourse() {
   const legacyCourse = await prisma.course.upsert({
-    where: { slug: 'web3-fundamentals' },
+    where: { slug: "web3-fundamentals" },
     update: {
-      title: 'Web3 Fundamentals',
-      description: 'A comprehensive deep-dive into blockchain technology, DeFi, smart contracts, and NFTs.',
+      title: "Web3 Fundamentals",
+      description:
+        "A comprehensive deep-dive into blockchain technology, DeFi, smart contracts, and NFTs.",
       published: true,
     },
     create: {
-      title: 'Web3 Fundamentals',
-      description: 'A comprehensive deep-dive into blockchain technology, DeFi, smart contracts, and NFTs.',
-      slug: 'web3-fundamentals',
+      title: "Web3 Fundamentals",
+      description:
+        "A comprehensive deep-dive into blockchain technology, DeFi, smart contracts, and NFTs.",
+      slug: "web3-fundamentals",
       published: true,
       publishedAt: new Date(),
     },
-  })
+  });
 
   await prisma.lesson.deleteMany({
     where: {
@@ -80,36 +132,53 @@ async function seedLegacyCourse() {
         courseId: legacyCourse.id,
       },
     },
-  })
-  await prisma.module.deleteMany({ where: { courseId: legacyCourse.id } })
+  });
+  await prisma.module.deleteMany({ where: { courseId: legacyCourse.id } });
 
   const module1 = await prisma.module.create({
     data: {
-      title: 'Module 1: Blockchain Basics',
+      title: "Module 1: Blockchain Basics",
       position: 1,
       courseId: legacyCourse.id,
     },
+  });
+
+  const lesson1 = await prisma.lesson.create({
+    data: {
+      title: 'What is Blockchain?',
+      content: 'A blockchain is a distributed database shared among computer network nodes...',
+      duration: 12,
+      position: 1,
+      moduleId: module1.id,
+    },
   })
 
-  await prisma.lesson.createMany({
-    data: [
-      {
-        title: 'What is Blockchain?',
-        content: 'A blockchain is a distributed database shared among computer network nodes...',
-        videoUrl: 'https://www.youtube.com/embed/SSo_EIwHSd4',
-        duration: 12,
-        position: 1,
-        moduleId: module1.id,
-      },
-      {
-        title: 'Consensus Mechanisms',
-        content: 'Proof of Work vs Proof of Stake — how blockchains agree on state...',
-        videoUrl: 'https://www.youtube.com/embed/M3EFi_POhps',
-        duration: 18,
-        position: 2,
-        moduleId: module1.id,
-      },
-    ],
+  await prisma.lessonVideo.create({
+    data: {
+      lessonId: lesson1.id,
+      title: 'What is Blockchain?',
+      url: 'https://www.youtube.com/embed/SSo_EIwHSd4',
+      position: 1,
+    },
+  })
+
+  const lesson2 = await prisma.lesson.create({
+    data: {
+      title: 'Consensus Mechanisms',
+      content: 'Proof of Work vs Proof of Stake — how blockchains agree on state...',
+      duration: 18,
+      position: 2,
+      moduleId: module1.id,
+    },
+  })
+
+  await prisma.lessonVideo.create({
+    data: {
+      lessonId: lesson2.id,
+      title: 'Consensus Mechanisms',
+      url: 'https://www.youtube.com/embed/M3EFi_POhps',
+      position: 1,
+    },
   })
 }
 
@@ -134,7 +203,7 @@ async function seedAcademyCourse() {
         photoUrl: facilitator.photoUrl ?? null,
         bio: facilitator.bio,
       },
-    })
+    });
   }
 
   const course = await prisma.course.upsert({
@@ -162,9 +231,9 @@ async function seedAcademyCourse() {
       published: true,
       publishedAt: new Date(),
     },
-  })
+  });
 
-  await prisma.week.deleteMany({ where: { courseId: course.id } })
+  await prisma.week.deleteMany({ where: { courseId: course.id } });
 
   for (const weekData of academyPhase1Course.weeks) {
     const week = await prisma.week.create({
@@ -183,12 +252,12 @@ async function seedAcademyCourse() {
         videoUrl: weekData.videoUrl,
         published: true,
       },
-    })
+    });
 
     for (let i = 0; i < weekData.facilitators.length; i += 1) {
       const facilitator = await prisma.facilitator.findUniqueOrThrow({
         where: { email: weekData.facilitators[i] },
-      })
+      });
 
       await prisma.weekFacilitator.create({
         data: {
@@ -196,7 +265,7 @@ async function seedAcademyCourse() {
           facilitatorId: facilitator.id,
           position: i + 1,
         },
-      })
+      });
     }
 
     await prisma.weekTopic.createMany({
@@ -205,7 +274,7 @@ async function seedAcademyCourse() {
         title,
         position: index + 1,
       })),
-    })
+    });
 
     await prisma.weekObjective.createMany({
       data: weekData.objectives.map((body, index) => ({
@@ -213,7 +282,7 @@ async function seedAcademyCourse() {
         body,
         position: index + 1,
       })),
-    })
+    });
 
     const slideDeck = await prisma.slideDeck.create({
       data: {
@@ -224,7 +293,7 @@ async function seedAcademyCourse() {
         lastUpdatedAt: new Date(weekData.slideDeck.lastUpdatedAt),
         viewerType: weekData.slideDeck.viewerType as SlideDeckViewerType,
       },
-    })
+    });
 
     await prisma.slideDeckSection.createMany({
       data: weekData.slideDeck.sections.map((label, index) => ({
@@ -232,7 +301,7 @@ async function seedAcademyCourse() {
         label,
         position: index + 1,
       })),
-    })
+    });
 
     await prisma.glossaryTerm.createMany({
       data: weekData.glossary.map((term, index) => ({
@@ -242,7 +311,7 @@ async function seedAcademyCourse() {
         example: term.example ?? null,
         position: index + 1,
       })),
-    })
+    });
 
     await prisma.readingResource.createMany({
       data: weekData.readings.map((reading, index) => ({
@@ -254,7 +323,7 @@ async function seedAcademyCourse() {
         type: reading.type as ReadingResourceType,
         position: index + 1,
       })),
-    })
+    });
 
     const quiz = await prisma.quiz.create({
       data: {
@@ -263,10 +332,14 @@ async function seedAcademyCourse() {
         passMark: weekData.quiz.passMark,
         attemptLimit: 1,
       },
-    })
+    });
 
-    for (let questionIndex = 0; questionIndex < weekData.quiz.questions.length; questionIndex += 1) {
-      const questionData = weekData.quiz.questions[questionIndex]
+    for (
+      let questionIndex = 0;
+      questionIndex < weekData.quiz.questions.length;
+      questionIndex += 1
+    ) {
+      const questionData = weekData.quiz.questions[questionIndex];
       const question = await prisma.quizQuestion.create({
         data: {
           quizId: quiz.id,
@@ -274,7 +347,7 @@ async function seedAcademyCourse() {
           explanation: questionData.explanation,
           position: questionIndex + 1,
         },
-      })
+      });
 
       await prisma.quizOption.createMany({
         data: questionData.options.map((option, optionIndex) => ({
@@ -283,11 +356,15 @@ async function seedAcademyCourse() {
           isCorrect: option.isCorrect,
           position: optionIndex + 1,
         })),
-      })
+      });
     }
 
-    for (let assignmentIndex = 0; assignmentIndex < weekData.assignments.length; assignmentIndex += 1) {
-      const assignmentData = weekData.assignments[assignmentIndex]
+    for (
+      let assignmentIndex = 0;
+      assignmentIndex < weekData.assignments.length;
+      assignmentIndex += 1
+    ) {
+      const assignmentData = weekData.assignments[assignmentIndex];
       const assignment = await prisma.assignment.create({
         data: {
           weekId: week.id,
@@ -298,7 +375,7 @@ async function seedAcademyCourse() {
           allowFileUpload: assignmentData.allowFileUpload,
           position: assignmentIndex + 1,
         },
-      })
+      });
 
       if (assignmentData.choices?.length) {
         await prisma.assignmentChoice.createMany({
@@ -308,7 +385,7 @@ async function seedAcademyCourse() {
             description: choice.description,
             position: choiceIndex + 1,
           })),
-        })
+        });
       }
     }
   }
@@ -316,57 +393,64 @@ async function seedAcademyCourse() {
 
 async function seedSampleGig(adminId: string) {
   const existing = await prisma.gig.findFirst({
-    where: { title: 'Build a DeFi Yield Aggregator Smart Contract', posterId: adminId },
-  })
+    where: {
+      title: "Build a DeFi Yield Aggregator Smart Contract",
+      posterId: adminId,
+    },
+  });
 
-  if (existing) return existing
+  if (existing) return existing;
 
   return prisma.gig.create({
     data: {
-      title: 'Build a DeFi Yield Aggregator Smart Contract',
-      description: 'Production-ready yield aggregator routing funds to highest-yielding Aave/Compound pools.',
+      title: "Build a DeFi Yield Aggregator Smart Contract",
+      description:
+        "Production-ready yield aggregator routing funds to highest-yielding Aave/Compound pools.",
       budget: 4.5,
-      budgetType: 'FIXED',
-      currency: 'ETH',
-      category: 'Smart Contracts',
-      skills: ['Solidity', 'DeFi', 'Aave', 'Foundry'],
-      difficulty: 'SENIOR',
-      deadline: '3 weeks',
+      budgetType: "FIXED",
+      currency: "ETH",
+      category: "Smart Contracts",
+      skills: ["Solidity", "DeFi", "Aave", "Foundry"],
+      difficulty: "SENIOR",
+      deadline: "3 weeks",
       featured: true,
       posterId: adminId,
     },
-  })
+  });
 }
 
 async function main() {
-  console.log('🌱 Seeding database...')
+  console.log("🌱 Seeding database...");
 
-  const { admin, superadmin, demo } = await seedUsers()
-  console.log('✅ Superadmin user:', superadmin.email)
-  console.log('✅ Admin user:', admin.email)
-  console.log('✅ Demo user:', demo.email)
+  const { admin, superadmin, demo } = await seedUsers();
+  console.log("✅ Superadmin user:", superadmin.email);
+  console.log("✅ Admin user:", admin.email);
+  console.log("✅ Demo user:", demo.email);
 
-  await seedLegacyCourse()
-  console.log('✅ Seeded legacy Web3 course')
+  await seedLegacyCourse();
+  console.log("✅ Seeded legacy Web3 course");
 
-  await seedAcademyCourse()
-  console.log(`✅ Seeded academy course: ${academyPhase1Course.title}`)
+  await seedAcademyCourse();
+  console.log(`✅ Seeded academy course: ${academyPhase1Course.title}`);
 
-  const gig = await seedSampleGig(admin.id)
-  console.log('✅ Sample gig:', gig.title)
+  await seedTestimonials();
+  console.log("✅ Seeded testimonials");
 
-  console.log('\n🎉 Seed complete!')
-  console.log('\nTest credentials:')
-  console.log('  Superadmin: superadmin@rubikcon.com / superadmin123456')
-  console.log('  Admin:      admin@rubikcon.com      / admin123456')
-  console.log('  Demo:       demo@rubikcon.com       / demo12345')
+  await seedRichData();
+  console.log("✅ Seeded rich dummy data (20 courses, 5 facilitators, etc.)");
+
+  console.log("\n🎉 Seed complete!");
+  console.log("\nTest credentials:");
+  console.log("  Superadmin: superadmin@rubikcon.com / superadmin123456");
+  console.log("  Admin:      admin@rubikcon.com      / admin123456");
+  console.log("  Demo:       demo@rubikcon.com       / demo12345");
 }
 
 main()
-  .catch(e => {
-    console.error('❌ Seed failed:', e)
-    process.exit(1)
+  .catch((e) => {
+    console.error("❌ Seed failed:", e);
+    process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect()
-  })
+    await prisma.$disconnect();
+  });

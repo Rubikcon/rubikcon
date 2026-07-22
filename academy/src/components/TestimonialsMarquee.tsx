@@ -1,60 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
+import { apiRequest } from "../lib/api";
 
-const TESTIMONIALS = [
-  {
-    image: "/testimonials/pexels-doquyen.jpg",
-    name: "Amara Okafor",
-    role: "Junior Blockchain Developer",
-    location: "Lagos, Nigeria",
-    quote:
-      "The structured week-by-week format made complex blockchain concepts digestible. I shipped my first smart contract by week 3.",
-  },
-  {
-    image: "/testimonials/pexels-john-stephenson.jpg",
-    name: "Kwame Asante",
-    role: "DeFi Analyst",
-    location: "Accra, Ghana",
-    quote:
-      "Coming from traditional finance, this programme bridged the gap between what I knew and what Web3 needs. A genuine game-changer.",
-  },
-  {
-    image: "/testimonials/pexels-kooldark.jpg",
-    name: "Ngozi Adeyemi",
-    role: "Full-Stack Web3 Engineer",
-    location: "Abuja, Nigeria",
-    quote:
-      "The facilitators actually build in production. You get real patterns, not textbook theory. I landed a Web3 role within two months.",
-  },
-  {
-    image: "/testimonials/pexels-layth-mushreq.jpg",
-    name: "Tendai Mutasa",
-    role: "Smart Contract Auditor",
-    location: "Harare, Zimbabwe",
-    quote:
-      "Each assignment built on the last. By the end I had a portfolio project I was genuinely proud to show employers.",
-  },
-  {
-    image: "/testimonials/pexels-nan-thanchanok.jpg",
-    name: "Fatima Al-Hassan",
-    role: "Blockchain Consultant",
-    location: "Nairobi, Kenya",
-    quote:
-      "The quiz and assignment flow kept me accountable. It felt like a real cohort experience even studying asynchronously.",
-  },
-  {
-    image: "/testimonials/pexels-song-kaiyue.jpg",
-    name: "Chidi Eze",
-    role: "Product Manager, Web3",
-    location: "Port Harcourt, Nigeria",
-    quote:
-      "From zero blockchain knowledge to deploying on testnet in five weeks. The pacing is perfect for working professionals.",
-  },
-];
+export type Testimonial = {
+  id: string;
+  name: string;
+  role: string | null;
+  quote: string;
+  photoUrl: string | null;
+};
 
-const COUNT = TESTIMONIALS.length;
 const AUTO_INTERVAL = 5000; // ms between auto-advances
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -85,7 +41,7 @@ function Stars() {
 // ─── Single slide (banner card) ───────────────────────────────────────────────
 
 interface SlideProps {
-  t: (typeof TESTIMONIALS)[number];
+  t: Testimonial;
   active: boolean;
 }
 
@@ -108,7 +64,7 @@ function Slide({ t, active }: SlideProps) {
       {/* ── Left: photo panel ────────────────────────────────────────────── */}
       <div className="relative md:w-[42%] shrink-0 min-h-[260px] md:min-h-[380px] overflow-hidden">
         <img
-          src={t.image}
+          src={t.photoUrl || "/placeholders/testimonial-fallback.jpg"}
           alt={t.name}
           draggable={false}
           loading="lazy"
@@ -118,11 +74,7 @@ function Slide({ t, active }: SlideProps) {
         {/* Gradient overlay so quote bleeds nicely on mobile */}
         <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-[#111111] via-[#111111]/30 to-transparent md:from-transparent md:via-transparent md:to-[#111111]/80" />
 
-        {/* Location pill — desktop */}
-        <div className="absolute bottom-4 left-4 hidden md:inline-flex items-center gap-1.5 bg-black/50 backdrop-blur-sm border border-white/10 text-white/60 text-xs px-3 py-1.5 rounded-full">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#F5C518]" />
-          {t.location}
-        </div>
+        {/* Location pill — omitted or map to role if no location in db */}
       </div>
 
       {/* ── Right: content panel ─────────────────────────────────────────── */}
@@ -144,7 +96,7 @@ function Slide({ t, active }: SlideProps) {
         <div className="flex items-center gap-4">
           {/* Avatar (mobile only — desktop shows the photo panel) */}
           <img
-            src={t.image}
+            src={t.photoUrl || "/placeholders/testimonial-fallback.jpg"}
             alt={t.name}
             draggable={false}
             loading="lazy"
@@ -156,10 +108,6 @@ function Slide({ t, active }: SlideProps) {
               {t.name}
             </p>
             <p className="text-white/40 text-sm">{t.role}</p>
-            {/* Location — mobile */}
-            <p className="md:hidden text-white/30 text-xs mt-0.5">
-              {t.location}
-            </p>
           </div>
         </div>
       </div>
@@ -170,10 +118,19 @@ function Slide({ t, active }: SlideProps) {
 // ─── Main Carousel ────────────────────────────────────────────────────────────
 
 export default function TestimonialsMarquee() {
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [current, setCurrent] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    apiRequest<Testimonial[]>("/academy/testimonials")
+      .then((data) => setTestimonials(data))
+      .catch((err) => console.error("Failed to load testimonials:", err));
+  }, []);
+
+  const COUNT = testimonials.length;
 
   // ── Drag state ────────────────────────────────────────────────────────────
   const drag = useRef({ active: false, startX: 0, deltaX: 0 });
@@ -186,7 +143,7 @@ export default function TestimonialsMarquee() {
       setCurrent(mod(index, COUNT));
       setTimeout(() => setIsTransitioning(false), 700);
     },
-    [isTransitioning],
+    [isTransitioning, COUNT],
   );
 
   const prev = useCallback(() => goTo(current - 1), [goTo, current]);
@@ -195,10 +152,11 @@ export default function TestimonialsMarquee() {
   // ── Auto-advance ─────────────────────────────────────────────────────────
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
+    if (COUNT === 0) return; // safety check
     timerRef.current = setInterval(() => {
       setCurrent((c) => mod(c + 1, COUNT));
     }, AUTO_INTERVAL);
-  }, []);
+  }, [COUNT]);
 
   useEffect(() => {
     if (!isHovered) startTimer();
@@ -229,8 +187,10 @@ export default function TestimonialsMarquee() {
   };
 
   // Precompute which indices are visible (current, prev, next for peek)
-  const prevIdx = mod(current - 1, COUNT);
-  const nextIdx = mod(current + 1, COUNT);
+  const prevIdx = COUNT > 0 ? mod(current - 1, COUNT) : 0;
+  const nextIdx = COUNT > 0 ? mod(current + 1, COUNT) : 0;
+
+  if (COUNT === 0) return null;
 
   return (
     <section
@@ -314,7 +274,7 @@ export default function TestimonialsMarquee() {
                 className="px-3 md:px-5"
                 style={{ width: "33.3333%" }}
               >
-                <Slide t={TESTIMONIALS[idx]} active={pos === 1} />
+                <Slide t={testimonials[idx]} active={pos === 1} />
               </div>
             ))}
           </div>
@@ -341,9 +301,9 @@ export default function TestimonialsMarquee() {
           role="tablist"
           aria-label="Testimonial slides"
         >
-          {TESTIMONIALS.map((t, i) => (
+          {testimonials.map((t, i) => (
             <button
-              key={t.name}
+              key={t.id || t.name}
               role="tab"
               aria-selected={i === current}
               aria-label={`Go to testimonial by ${t.name}`}

@@ -26,6 +26,9 @@ import EmbedFrame from '../components/EmbedFrame'
 import HtmlVideoPlayer from '../components/HtmlVideoPlayer'
 import PreviewBanner from '../components/PreviewBanner'
 import SlideViewer from '../components/SlideViewer'
+import LessonRating from '../components/LessonRating'
+import ModuleFeedback from '../components/ModuleFeedback'
+import RubikconGamesPopup from '../components/RubikconGamesPopup'
 import type { CourseSummary, CourseWeekSummary, ReadingType, WeekDetail } from '../types/academy'
 
 type LessonTab = 'overview' | 'slides' | 'resources' | 'quiz' | 'assignment'
@@ -124,6 +127,7 @@ export default function LessonPage() {
   const [week, setWeek] = useState<WeekDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showGamesPopup, setShowGamesPopup] = useState(false)
   const [activeTab, setActiveTab] = useState<LessonTab>('overview')
   const [glossaryQuery, setGlossaryQuery] = useState('')
   const [resourceFilter, setResourceFilter] = useState<'ALL' | ReadingType>('ALL')
@@ -229,32 +233,6 @@ export default function LessonPage() {
     }
   }
 
-  const [marking, setMarking] = useState(false)
-  async function markLessonComplete() {
-    if (!auth) { window.location.href = '/login'; return }
-    if (!week) return
-    try {
-      setMarking(true)
-      const result = await apiRequest<{ status: string; completedAt: string | null }>(
-        `/academy/weeks/${week.slug}/complete`,
-        { method: 'POST' }
-      )
-      // Reflect locally so the UI flips immediately without a full reload.
-      setWeek(cur => cur ? {
-        ...cur,
-        progress: {
-          ...cur.progress,
-          status: result.status as any,
-          completedAt: result.completedAt,
-        },
-      } : cur)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to mark lesson complete.')
-    } finally {
-      setMarking(false)
-    }
-  }
-
   async function toggleReading(resourceId: string, read: boolean) {
     if (!auth) { window.location.href = '/login'; return }
     try {
@@ -281,12 +259,15 @@ export default function LessonPage() {
     try {
       setQuizSubmitting(true)
       setError(null)
-      await apiRequest(`/academy/quizzes/${week.assignment.quiz.id}/submit`, {
+      const result = await apiRequest<any>(`/academy/quizzes/${week.assignment.quiz.id}/submit`, {
         method: 'POST',
         body: JSON.stringify({ answers }),
       })
       await loadWeekPage()
       setActiveTab('quiz')
+      if (result.passed) {
+        setShowGamesPopup(true)
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Unable to submit quiz.')
     } finally {
@@ -456,25 +437,13 @@ export default function LessonPage() {
 
           {/* Mark complete / completed indicator */}
           <div className="ml-auto flex items-center gap-2 shrink-0">
-            {week.progress.status === 'COMPLETE' ? (
+            {week.progress.status === 'COMPLETE' && (
               <span
                 title={week.progress.completedAt ? `Completed ${new Date(week.progress.completedAt).toLocaleDateString()}` : 'Completed'}
                 className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-300"
               >
                 <CheckCircle2 size={12} /> Completed
               </span>
-            ) : (
-              <button
-                onClick={markLessonComplete}
-                disabled={marking}
-                title="Mark this lesson complete"
-                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-400/20 hover:border-emerald-400/50 transition-colors disabled:opacity-50"
-              >
-                {marking
-                  ? <Loader2 size={12} className="animate-spin" />
-                  : <CheckCircle2 size={12} />}
-                {marking ? 'Saving…' : 'Mark complete'}
-              </button>
             )}
 
             {/* Prev / Next */}
@@ -717,6 +686,18 @@ export default function LessonPage() {
                     <p className="text-sm text-white/50 leading-relaxed">{week.lessonDetails.whatToExpect}</p>
                   </div>
                 )}
+
+                {/* Lesson Rating */}
+                {week.progress && (
+                  <LessonRating weekSlug={week.slug} initialRating={week.progress.rating} />
+                )}
+
+                {/* Module Feedback (only at the end of a module) */}
+                {week.module && 
+                 (!week.navigation.next || week.navigation.next.moduleId !== week.module.id) && 
+                 week.progress?.status === 'COMPLETE' && (
+                  <ModuleFeedback moduleId={week.module.id} moduleTitle={week.module.title} />
+                )}
               </div>
             )}
 
@@ -929,7 +910,6 @@ export default function LessonPage() {
                           return (
                             <button
                               key={option.id}
-                              disabled={!!week.assignment.quiz?.submitted}
                               onClick={() => setQuizSelections(c => ({ ...c, [question.id]: option.id }))}
                               className={`w-full text-left rounded-xl border px-4 py-3 text-sm transition-colors ${optionCls}`}
                             >
@@ -947,19 +927,18 @@ export default function LessonPage() {
                   ))}
                 </div>
 
-                {!week.assignment.quiz.submitted ? (
+                <div className="flex items-center gap-3">
                   <button
                     onClick={() => void submitQuiz()}
                     disabled={quizSubmitting}
                     className="inline-flex items-center gap-2 rounded-full bg-[#F5C518] px-6 py-2.5 text-sm font-bold text-[#0A0A0A] hover:bg-[#FFD020] disabled:opacity-50 transition-colors"
                   >
-                    {quizSubmitting ? <><Loader2 size={14} className="animate-spin" />Submitting…</> : 'Submit quiz'}
+                    {quizSubmitting ? <><Loader2 size={14} className="animate-spin" />Submitting…</> : (week.assignment.quiz.submitted ? 'Retake quiz' : 'Submit quiz')}
                   </button>
-                ) : (
-                  <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-white/45">
-                    Quiz submitted. A retake requires facilitator unlock.
-                  </div>
-                )}
+                  {week.assignment.quiz.submitted && (
+                    <p className="text-xs text-white/45">You can retake this quiz to improve your score.</p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1054,6 +1033,7 @@ export default function LessonPage() {
           </div>
         </div>
       </div>
+      <RubikconGamesPopup open={showGamesPopup} onClose={() => setShowGamesPopup(false)} />
       </div>
     </div>
   )

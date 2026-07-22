@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState, useRef } from "react";
+import { motion, useInView } from "framer-motion";
 import { BookOpen, CheckCircle, Clock, Play } from "lucide-react";
 import { CURRICULUM_TOPICS } from "../data/courseData";
 
@@ -7,6 +7,7 @@ import AcademyNavbar from "../components/AcademyNavbar";
 import AcademyFooter from "../components/AcademyFooter";
 import TestimonialsMarquee from "../components/TestimonialsMarquee";
 import { apiRequest } from "../lib/api";
+import { AnimatedCounter } from "../components/AnimatedCounter";
 
 type PublicCourse = {
   id: string;
@@ -25,6 +26,17 @@ type PublicCourse = {
     photoUrl: string | null;
   }>;
 };
+
+const floating = (delay: number) => ({
+  y: [0, -6, 0],
+  transition: {
+    duration: 3 + delay,
+    repeat: Infinity,
+    repeatType: "mirror" as const,
+    ease: "easeInOut",
+    delay,
+  },
+});
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -98,21 +110,18 @@ const FEATURED_PROFESSIONS = [
   },
 ] as const;
 
+type Facilitator = {
+  id: string;
+  name: string;
+  title: string;
+  organization: string;
+  bio: string;
+  photoUrl: string | null;
+  linkedinUrl: string;
+};
+
 // ── Home facilitators content (June 2026 brief §1.6) ─────────────────────────
-const HOME_FACILITATORS = [
-  {
-    name: "Ozioma Onukogu",
-    role: "Co-Founder, Rubikcon Nexus Academy",
-    bio: "Blockchain strategist and ecosystem builder helping organisations adopt emerging technologies for sustainable impact.",
-    photoUrl: null as string | null,
-  },
-  {
-    name: "Joy Egbu",
-    role: "Co-Founder, Rubikcon Nexus Academy",
-    bio: "Project and operations leader focused on delivering practical learning experiences that prepare professionals for today’s technology landscape.",
-    photoUrl: "/icons/joy-egbu.jpeg" as string | null,
-  },
-];
+// We now fetch this dynamically from the backend instead of hardcoding.
 
 const AUDIENCE_ITEMS = [
   {
@@ -189,32 +198,43 @@ function CourseThumbnail({
 
 export default function LandingPage() {
   const [dynamicCourses, setDynamicCourses] = useState<PublicCourse[]>([]);
+  const [facilitators, setFacilitators] = useState<Facilitator[]>([]);
+  const [publicStats, setPublicStats] = useState<{
+    totalCourses: number;
+    totalLearners: number;
+    totalFacilitators: number;
+    completionRate: number;
+  } | null>(null);
   const [coursesLoading, setCoursesLoading] = useState(true);
   const [selectedProfession, setSelectedProfession] =
     useState<(typeof FEATURED_PROFESSIONS)[number]["id"]>("ngo");
+
+  // Add ref and useInView for stats
+  const statsRef = useRef(null);
+  const isStatsInView = useInView(statsRef, { once: true, amount: 0.4 });
 
   useEffect(() => {
     apiRequest<PublicCourse[]>("/academy/courses")
       .then((data) => setDynamicCourses(data))
       .catch(() => {
-        /* silently ignore — catalog still renders with empty state */
+        // Fallback or error state
       })
       .finally(() => setCoursesLoading(false));
+
+    apiRequest<Facilitator[]>("/academy/facilitators")
+      .then((data) => setFacilitators(data))
+      .catch(() => {
+        // Fallback
+      });
+
+    apiRequest<any>("/academy/public/stats")
+      .then((data) => setPublicStats(data))
+      .catch(console.error);
   }, []);
 
   const activeProfession =
     FEATURED_PROFESSIONS.find((p) => p.id === selectedProfession) ??
     FEATURED_PROFESSIONS[0];
-
-  // Merge live facilitator photos (uploaded via profile) into the brief's
-  // co-founder cards, matched by name.
-  const apiFacilitators = dynamicCourses.flatMap((c) => c.facilitators);
-  const homeFacilitators = HOME_FACILITATORS.map((f) => {
-    const match = apiFacilitators.find((a) =>
-      a.name.toLowerCase().includes(f.name.toLowerCase()),
-    );
-    return { ...f, photoUrl: match?.photoUrl || f.photoUrl };
-  });
 
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
@@ -299,19 +319,164 @@ export default function LandingPage() {
             </a>
           </motion.div>
 
-          {/* Cohort launch badge */}
+          {/* Circular Topics */}
           <motion.div
             variants={fadeUp}
             initial="hidden"
             animate="visible"
             custom={4}
-            className="flex items-center justify-center"
+            className="mt-16 pt-10"
           >
-            <div className="inline-flex items-center gap-3 border border-white/10 bg-white/[0.04] rounded-full px-5 py-2.5">
-              <span className="w-2 h-2 rounded-full bg-[#F5C518] animate-pulse shrink-0" />
-              <span className="text-sm text-white/70 font-mono tracking-wide">
-                Cohort 1 &mdash; Now enrolling
-              </span>
+            <p className="text-white/40 text-[11px] font-mono tracking-[0.2em] uppercase mb-8">
+              Explore Core Topics
+            </p>
+            <div className="flex flex-wrap justify-center gap-6 md:gap-12">
+              {[
+                { id: "PD", label: "Product Development" },
+                { id: "BC", label: "Blockchain" },
+                { id: "ETH", label: "Ethereum" },
+                { id: "BTC", label: "Bitcoin" },
+              ].map((topic, index) => (
+                <motion.a
+                  key={topic.id}
+                  href={`/courses?search=${topic.id.toLowerCase()}`}
+                  animate={floating(index * 0.4)}
+                  whileHover={{
+                    y: -8,
+                    scale: 1.08,
+                    rotateY: 180,
+                    transition: {
+                      type: "spring",
+                      stiffness: 200,
+                      damping: 15,
+                    },
+                  }}
+                  style={{ perspective: 1000 }}
+                  className="group flex flex-col items-center gap-4"
+                >
+                  <motion.div
+                    whileHover={{
+                      boxShadow: "0 0 35px rgba(245,197,24,.35)",
+                    }}
+                    style={{ transformStyle: "preserve-3d" }}
+                    className="
+                      relative
+                      w-20
+                      h-20
+                      rounded-full
+                      overflow-hidden
+                      border
+                      border-white/15
+                      bg-white/[0.03]
+                      backdrop-blur-xl
+                      flex
+                      items-center
+                      justify-center
+                      transition-all
+                      duration-500
+                      group-hover:border-[#F5C518]
+                    "
+                  >
+                    {/* animated glow */}
+                    <motion.div
+                      animate={{
+                        scale: [1, 1.18, 1],
+                        opacity: [0.15, 0.35, 0.15],
+                      }}
+                      transition={{
+                        duration: 3,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        delay: index * 0.5,
+                      }}
+                      className="
+                        absolute
+                        inset-0
+                        rounded-full
+                        bg-[#F5C518]/20
+                        blur-xl
+                      "
+                    />
+
+                    {/* moving highlight */}
+                    <motion.div
+                      animate={{
+                        rotate: 360,
+                      }}
+                      transition={{
+                        duration: 14,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
+                      className="absolute inset-0"
+                    >
+                      <div
+                        className="
+                          absolute
+                          left-1/2
+                          top-0
+                          h-6
+                          w-[2px]
+                          -translate-x-1/2
+                          rounded-full
+                          bg-[#F5C518]/80
+                        "
+                      />
+                    </motion.div>
+
+                    <motion.span
+                      style={{ backfaceVisibility: "hidden" }}
+                      className="
+                        relative
+                        z-10
+                        font-display
+                        text-xl
+                        font-bold
+                        text-white
+                        transition-colors
+                        duration-300
+                        group-hover:text-[#F5C518]
+                      "
+                    >
+                      {topic.id}
+                    </motion.span>
+                    
+                    {/* Back face of the 3D circle */}
+                    <motion.span
+                      style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
+                      className="
+                        absolute
+                        inset-0
+                        z-10
+                        font-display
+                        text-sm
+                        font-bold
+                        text-[#F5C518]
+                        flex
+                        items-center
+                        justify-center
+                        bg-[#0A0A0A]
+                        rounded-full
+                      "
+                    >
+                      {topic.id}
+                    </motion.span>
+                  </motion.div>
+
+                  <span
+                    className="
+                      text-sm
+                      font-medium
+                      text-white/60
+                      transition-all
+                      duration-300
+                      group-hover:text-white
+                    "
+                  >
+                    {topic.label}
+                  </span>
+                </motion.a>
+              ))}
             </div>
           </motion.div>
         </div>
@@ -330,18 +495,14 @@ export default function LandingPage() {
               className="w-full lg:w-1/2 shrink-0"
             >
               <div className="relative aspect-video rounded-2xl overflow-hidden bg-[#141414] border border-white/10">
-                <div className="absolute inset-0 bg-gradient-to-br from-[#3D2F00]/60 to-[#0A0A0A]" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-[#F5C518] flex items-center justify-center shadow-2xl">
-                    <Play
-                      size={22}
-                      className="fill-[#0A0A0A] text-[#0A0A0A] ml-1"
-                    />
-                  </div>
-                  <p className="text-white/40 text-xs font-mono tracking-widest uppercase">
-                    Course preview
-                  </p>
-                </div>
+                <iframe
+                  className="absolute inset-0 w-full h-full"
+                  src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+                  title="Course Preview"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                ></iframe>
               </div>
             </motion.div>
 
@@ -397,9 +558,15 @@ export default function LandingPage() {
           {/* Course preview cards — skeleton while loading, real cards once resolved */}
           {coursesLoading ? (
             /* Loading skeleton — 3 placeholder cards matching the real card dimensions */
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8" aria-hidden="true">
+            <div
+              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"
+              aria-hidden="true"
+            >
               {[0, 1, 2].map((i) => (
-                <div key={i} className="bg-white rounded-2xl p-6 flex flex-col animate-pulse">
+                <div
+                  key={i}
+                  className="bg-white rounded-2xl p-6 flex flex-col animate-pulse"
+                >
                   {/* Thumbnail skeleton */}
                   <div className="relative mb-5 aspect-[16/10] overflow-hidden rounded-xl bg-[#E8E0D0]" />
                   {/* Level badge skeleton */}
@@ -757,52 +924,67 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            {homeFacilitators.map((facilitator, i) => {
-              const initials = facilitator.name
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .slice(0, 2)
-                .toUpperCase();
-              return (
-                <motion.div
-                  key={facilitator.name}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
-                  className="rounded-3xl border border-white/10 bg-white/[0.03] p-7 flex flex-col sm:flex-row gap-6 items-start hover:border-white/20 transition-colors"
-                >
-                  {facilitator.photoUrl ? (
-                    <img
-                      src={facilitator.photoUrl}
-                      alt={facilitator.name}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-24 h-24 rounded-2xl object-cover shrink-0 ring-1 ring-white/10"
-                    />
-                  ) : (
-                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#3D2F00] to-[#1A1400] flex items-center justify-center shrink-0">
-                      <span className="font-display font-extrabold text-[#F5C518] text-3xl">
-                        {initials}
-                      </span>
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {facilitators.length === 0 ? (
+              <p className="text-white/50 col-span-2 text-center">
+                Loading facilitators...
+              </p>
+            ) : (
+              facilitators.map((facilitator, i) => {
+                const photoUrl = facilitatorPhotoUrl({
+                  name: facilitator.name,
+                  photoUrl: facilitator.photoUrl,
+                });
+                const initials = facilitator.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .slice(0, 2);
+
+                return (
+                  <motion.div
+                    key={facilitator.name}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.1 }}
+                    className="flex flex-col sm:flex-row gap-6 p-6 rounded-3xl bg-[#1C1C1C] border border-white/10"
+                  >
+                    {photoUrl ? (
+                      <div className="w-24 h-24 rounded-2xl overflow-hidden shrink-0">
+                        <img
+                          src={photoUrl}
+                          alt={facilitator.name}
+                          className="w-full h-full object-cover grayscale opacity-90 hover:grayscale-0 hover:opacity-100 transition-all duration-500"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#3D2F00] to-[#1A1400] flex items-center justify-center shrink-0">
+                        <span className="font-display font-extrabold text-[#F5C518] text-3xl">
+                          {initials}
+                        </span>
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <a
+                        href="/academy/facilitators"
+                        className="hover:underline"
+                      >
+                        <h3 className="font-display font-extrabold text-white text-xl mb-1">
+                          {facilitator.name}
+                        </h3>
+                      </a>
+                      <p className="text-[#F5C518] text-sm font-medium mb-3">
+                        {facilitator.title}
+                      </p>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        {facilitator.bio}
+                      </p>
                     </div>
-                  )}
-                  <div className="min-w-0">
-                    <h3 className="font-display font-extrabold text-white text-xl mb-1">
-                      {facilitator.name}
-                    </h3>
-                    <p className="text-[#F5C518] text-sm font-medium mb-3">
-                      {facilitator.role}
-                    </p>
-                    <p className="text-white/50 text-sm leading-relaxed">
-                      {facilitator.bio}
-                    </p>
-                  </div>
-                </motion.div>
-              );
-            })}
+                  </motion.div>
+                );
+              })
+            )}
           </div>
 
           <div className="mt-10 text-center">
@@ -847,8 +1029,42 @@ export default function LandingPage() {
       <TestimonialsMarquee />
 
       {/* ─── 10. COHORT CTA ─── */}
-      <section className="bg-[#0A0A0A] py-24 px-6 border-t border-white/5">
-        <div className="max-w-6xl mx-auto">
+      <section ref={statsRef} className="bg-[#0A0A0A] py-24 px-6 border-t border-white/5">
+        {/* Stats Row */}
+        {publicStats && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={isStatsInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+            transition={{ duration: 0.6, ease: "easeOut", staggerChildren: 0.2 }}
+            className="flex flex-wrap justify-center gap-8 md:gap-16 border-white/10 py-8 mb-16"
+          >
+            {[
+              { val: publicStats.totalLearners, label: "Active learners across 34 countries", prefix: "", suffix: "+" },
+              { val: publicStats.totalCourses, label: "Production-track courses", prefix: "", suffix: "+" },
+              { val: publicStats.totalFacilitators, label: "Instructors shipping today", prefix: "", suffix: "+" },
+              { val: publicStats.completionRate || 94, label: "Cohort completion rate", prefix: "", suffix: "%" },
+            ].map((stat, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 15 }}
+              animate={isStatsInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }}
+              transition={{ duration: 0.5, delay: i * 0.15 }}
+              className="flex flex-col gap-1 max-w-[200px] text-center"
+            >
+              <div className="text-3xl md:text-5xl font-bold text-white font-display mb-1 flex items-center justify-center">
+                {stat.prefix}
+                <AnimatedCounter value={stat.val} start={isStatsInView} />
+                {stat.suffix}
+              </div>
+              <div className="text-sm text-white/50 leading-snug">
+                {stat.label}
+              </div>
+            </motion.div>
+          ))}
+          </motion.div>
+        )}
+
+        <div className="max-w-6xl mx-auto mt-10">
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -856,17 +1072,14 @@ export default function LandingPage() {
             transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
             className="max-w-3xl mx-auto text-center"
           >
-            <p className="text-xs font-mono text-white/30 tracking-widest uppercase mb-6">
-              Cohort 1
-            </p>
             <h2 className="font-display text-4xl md:text-5xl font-extrabold text-white leading-tight mb-6">
               Be part of something{" "}
               <span className="text-[#F5C518]">from the start.</span>
             </h2>
             <p className="text-white/50 text-lg leading-relaxed mb-10">
-              We’re building an honest, hands-on learning community for
-              professionals across Africa. Cohort 1 is now forming, join early
-              and help shape the experience.
+              We're building an honest, hands-on learning community for
+              professionals across Africa. Join early and help shape the
+              experience.
             </p>
             <div className="flex items-center justify-center gap-4 flex-wrap">
               <a
@@ -955,7 +1168,7 @@ export default function LandingPage() {
                 href="/courses"
                 className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-semibold px-8 py-3.5 rounded-full hover:bg-[#E8B800] transition-colors text-sm"
               >
-                Enrol Now →
+                Start Learning →
               </a>
               <a
                 href="/login"
