@@ -1,13 +1,23 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, CheckCircle, Clock, Play } from 'lucide-react'
+import { Award, BookOpen, CheckCircle, Clock, Play } from 'lucide-react'
 import {
   COURSE_BLOCKCHAIN,
   CURRICULUM_TOPICS,
 } from '../data/courseData'
 import AcademyNavbar from '../components/AcademyNavbar'
 import AcademyFooter from '../components/AcademyFooter'
+import VideoEmbed from '../components/VideoEmbed'
 import { apiRequest } from '../lib/api'
+
+// ── Swap-in assets ────────────────────────────────────────────────────────────
+// Set this to the real course-preview video URL (YouTube / Vimeo / Loom / Drive)
+// when supplied — the placeholder frame renders until then.
+const COURSE_PREVIEW_VIDEO_URL = ''
+
+// Audience photos: drop real images at /public/images/audience/<slug>.jpg and
+// they replace the generated SVG placeholders automatically (same for learner
+// photos at /public/images/learners/<slug>.jpg).
 
 type PublicCourse = {
   id: string
@@ -30,11 +40,6 @@ const fadeUp = {
 }
 
 const LEVEL_COLORS: Record<string, string> = {
-  'Beginner → Intermediate': 'bg-[#F5C518] text-[#0A0A0A]',
-  'Intermediate': 'bg-[#1C1C1C] text-white border border-white/20',
-  'Beginner → Advanced': 'bg-[#1C1C1C] text-white border border-white/20',
-  'Advanced': 'bg-[#1C1C1C] text-white border border-white/20',
-  'Beginner': 'bg-[#F5C518] text-[#0A0A0A]',
   'BEGINNER': 'bg-[#F5C518] text-[#0A0A0A]',
   'INTERMEDIATE': 'bg-[#E8E0D0] text-[#1C1C1C]',
   'ADVANCED': 'bg-[#1C1C1C] text-white',
@@ -46,65 +51,132 @@ function facilitatorPhotoUrl(facilitator: { name: string; photoUrl: string | nul
   return null
 }
 
-// ── Featured programme: profession → recommendation mapping ──────────────────
-// "We want to help people know which course they should be taking" — pick your
-// profession and the featured card explains why the flagship programme fits.
+/** Prefers a real photo (.jpg) and falls back to the bundled SVG placeholder. */
+function SwappableImage({ base, alt, className }: { base: string; alt: string; className?: string }) {
+  const [src, setSrc] = useState(`${base}.jpg`)
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      onError={() => { if (!src.endsWith('.svg')) setSrc(`${base}.svg`) }}
+      className={className}
+    />
+  )
+}
+
+// ── "Pick what best describes you" — persona → recommendation mapping ─────────
 const FEATURED_PROFESSIONS = [
   {
-    id: 'ngo',
-    label: 'NGO Professional',
-    blurb: 'Bring transparency and donor trust to your programmes. Learn how blockchain strengthens reporting, fundraising, and accountability — no technical background needed.',
+    id: 'students',
+    label: 'Student',
+    emoji: '🎓',
+    blurb: 'Build practical, in-demand tech skills alongside your studies and graduate with a portfolio — not just a certificate. Beginner-friendly, no prior experience needed.',
   },
   {
-    id: 'msme',
-    label: 'MSME Owner',
-    blurb: 'Discover practical ways blockchain improves transparency, payments, and operational efficiency for growing businesses across Africa.',
+    id: 'professionals',
+    label: 'Professional',
+    emoji: '💼',
+    blurb: 'Add emerging-technology skills to your existing expertise. Learn how blockchain, AI, and digital tools apply directly to your industry and role.',
   },
   {
-    id: 'social-entrepreneur',
-    label: 'Social Entrepreneur',
-    blurb: 'Build technology-enabled solutions with real impact. Learn to evaluate when blockchain is the right tool — and when it is not.',
+    id: 'entrepreneurs',
+    label: 'Entrepreneur',
+    emoji: '🚀',
+    blurb: 'Understand the technologies that will power your next venture — so you can validate ideas, lead technical decisions, and build with confidence.',
   },
   {
-    id: 'founder',
-    label: 'Startup Founder',
-    blurb: 'Understand how blockchain products are designed, validated, and brought to market so you can lead technology decisions with confidence.',
+    id: 'blockchain-enthusiasts',
+    label: 'Blockchain Enthusiast',
+    emoji: '⛓️',
+    blurb: "Go beyond the hype. Get a structured, practical understanding of how blockchain actually works and where it creates real value.",
   },
   {
-    id: 'business-leader',
-    label: 'Business Leader',
-    blurb: 'Evaluate emerging technologies for your organisation and collaborate effectively with developers, product teams, and technology partners.',
+    id: 'blockchain-professionals',
+    label: 'Blockchain Professional',
+    emoji: '🧠',
+    blurb: 'Deepen your expertise with real-world product development, social-impact use cases, and the strategic side of building in Web3 and beyond.',
   },
   {
-    id: 'new-to-tech',
-    label: 'New to Tech',
-    blurb: 'A beginner-friendly path into emerging technology. Understand blockchain beyond the hype and build knowledge you can apply anywhere.',
+    id: 'career-changers',
+    label: 'Career Changer',
+    emoji: '🧭',
+    blurb: 'A structured path from complete beginner to job-ready. Learn step by step, build real projects, and transition into tech at your own pace.',
   },
 ] as const
 
-// ── Home facilitators content (June 2026 brief §1.6) ─────────────────────────
+// ── Facilitators (June 2026 brief §1.6 / §3) ─────────────────────────────────
 const HOME_FACILITATORS = [
   {
     name: 'Ozioma Onukogu',
     role: 'Co-Founder, Rubikcon Nexus Academy',
-    bio: 'Blockchain strategist and ecosystem builder helping organisations adopt emerging technologies for sustainable impact.',
+    bio: 'Blockchain strategist and ecosystem builder helping organisations adopt emerging technologies for sustainable impact. Ozioma leads programme design and brings years of hands-on experience across Web3 ecosystems.',
+    expertise: ['Blockchain Education', 'Product Strategy', 'Web3 Ecosystems', 'Social Innovation'],
     photoUrl: null as string | null,
   },
   {
     name: 'Joy Egbu',
     role: 'Co-Founder, Rubikcon Nexus Academy',
-    bio: 'Project and operations leader focused on delivering practical learning experiences that prepare professionals for today’s technology landscape.',
+    bio: 'Project and operations leader focused on delivering practical learning experiences that prepare professionals for today’s technology landscape. Joy ensures every cohort runs smoothly from first lesson to final project.',
+    expertise: ['Product Management', 'Operations', 'AI', 'Technology Education'],
     photoUrl: '/icons/joy-egbu.jpeg' as string | null,
   },
 ]
 
+// ── Who our programmes are for ───────────────────────────────────────────────
 const AUDIENCE_ITEMS = [
-  { icon: '🎓', label: 'Students & Recent Graduates', desc: 'Build tech skills that make you employable from day one.' },
-  { icon: '💼', label: 'Professionals Transitioning into Tech', desc: 'Leverage your existing expertise and add in-demand digital skills.' },
-  { icon: '🚀', label: 'Entrepreneurs & Startup Founders', desc: 'Understand the technologies that will power your next venture.' },
-  { icon: '🌍', label: 'NGOs & Social Impact Organisations', desc: 'Use blockchain, AI, and digital tools to amplify your mission.' },
-  { icon: '🏢', label: 'MSMEs Seeking Digital Transformation', desc: 'Equip your team to compete in an increasingly digital economy.' },
-  { icon: '⚙️', label: 'Developers & Innovators', desc: "Go deeper into emerging technologies and build what's next." },
+  { slug: 'students', label: 'Students', desc: 'Build tech skills that make you employable from day one — while you study.' },
+  { slug: 'professionals', label: 'Professionals', desc: 'Leverage your existing expertise and add in-demand digital skills.' },
+  { slug: 'entrepreneurs', label: 'Entrepreneurs', desc: 'Understand the technologies that will power your next venture.' },
+  { slug: 'blockchain-enthusiasts', label: 'Blockchain Enthusiasts', desc: 'Turn curiosity into real, structured understanding of how blockchain works.' },
+  { slug: 'blockchain-experts', label: 'Blockchain Professionals & Experts', desc: 'Go deeper — product development, real-world use cases, and ecosystem strategy.' },
+]
+
+// ── Learner testimonials ─────────────────────────────────────────────────────
+const TESTIMONIALS = [
+  {
+    quote: 'The structured week-by-week format made complex blockchain concepts digestible. I shipped my first smart contract by week 3.',
+    name: 'Amara Okafor',
+    role: 'Junior Blockchain Dev',
+    org: 'Lagos, Nigeria',
+    photo: '/images/learners/amara-okafor',
+  },
+  {
+    quote: 'Coming from a traditional finance background, this programme bridged the gap between what I knew and what the industry needs. Game-changer.',
+    name: 'Kwame Asante',
+    role: 'DeFi Analyst',
+    org: 'Accra, Ghana',
+    photo: '/images/learners/kwame-asante',
+  },
+  {
+    quote: 'The facilitators actually build in production. You get real patterns, not textbook theory. I landed a Web3 role within two months.',
+    name: 'Ngozi Adeyemi',
+    role: 'Full-Stack Engineer',
+    org: 'Abuja, Nigeria',
+    photo: '/images/learners/ngozi-adeyemi',
+  },
+  {
+    quote: 'I appreciated how each assignment built on the last. By the end I had a portfolio project I was genuinely proud to show employers.',
+    name: 'Tendai Mutasa',
+    role: 'Smart Contract Auditor',
+    org: 'Harare, Zimbabwe',
+    photo: '/images/learners/tendai-mutasa',
+  },
+  {
+    quote: 'The quiz and assignment flow kept me accountable. It felt like a real cohort experience even studying asynchronously.',
+    name: 'Fatima Al-Hassan',
+    role: 'Blockchain Consultant',
+    org: 'Nairobi, Kenya',
+    photo: '/images/learners/fatima-al-hassan',
+  },
+  {
+    quote: 'From zero blockchain knowledge to deploying on testnet in five weeks. The pacing is perfect for working professionals.',
+    name: 'Chidi Eze',
+    role: 'Product Manager',
+    org: 'Port Harcourt, Nigeria',
+    photo: '/images/learners/chidi-eze',
+  },
 ]
 
 function CourseThumbnail({ course, index }: { course: PublicCourse; index: number }) {
@@ -114,7 +186,7 @@ function CourseThumbnail({ course, index }: { course: PublicCourse; index: numbe
   return (
     <div className="relative mb-5 aspect-[16/10] overflow-hidden rounded-xl bg-[#1C1C1C]">
       {course.heroImage ? (
-        <img src={course.heroImage} alt={`${course.title} thumbnail`} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+        <img src={course.heroImage} alt={`${course.title} thumbnail`} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover object-[center_25%]" />
       ) : (
         <>
           <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, #111 0%, ${accent}33 100%)` }} />
@@ -125,7 +197,6 @@ function CourseThumbnail({ course, index }: { course: PublicCourse; index: numbe
           </div>
         </>
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
     </div>
   )
 }
@@ -135,7 +206,7 @@ export default function LandingPage() {
   const totalStudents = main.students
 
   const [dynamicCourses, setDynamicCourses] = useState<PublicCourse[]>([])
-  const [selectedProfession, setSelectedProfession] = useState<typeof FEATURED_PROFESSIONS[number]['id']>('ngo')
+  const [selectedProfession, setSelectedProfession] = useState<typeof FEATURED_PROFESSIONS[number]['id']>('students')
 
   useEffect(() => {
     apiRequest<PublicCourse[]>('/academy/courses')
@@ -158,45 +229,45 @@ export default function LandingPage() {
       <AcademyNavbar dark />
 
       {/* ─── 1. HERO ─── */}
-      <section className="relative min-h-screen flex flex-col justify-center overflow-hidden bg-[#0A0A0A]">
+      <section className="relative flex flex-col justify-center overflow-hidden bg-[#0A0A0A] min-h-[92vh]">
         {/* Atmospheric glows — yellow lower-left, teal upper-right */}
         <div className="absolute -bottom-32 -left-32 w-[700px] h-[700px] rounded-full bg-amber-500/25 blur-[180px] pointer-events-none" />
         <div className="absolute -top-32 -right-32 w-[750px] h-[750px] rounded-full bg-teal-400/20 blur-[180px] pointer-events-none" />
 
-        {/* Dashed orbit ring */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        {/* Dashed orbit ring — decorative, hidden on small screens */}
+        <div className="absolute inset-0 hidden sm:flex items-center justify-center pointer-events-none">
           <div className="w-[680px] h-[680px] rounded-full border border-dashed border-white/[0.12]" />
         </div>
 
-        <div className="relative max-w-5xl mx-auto px-6 text-center pt-28 pb-20">
+        <div className="relative max-w-5xl mx-auto px-5 sm:px-6 text-center pt-28 pb-16 sm:pb-20">
           {/* Badge pill */}
           <motion.div variants={fadeUp} initial="hidden" animate="visible"
-            className="inline-flex items-center gap-2 bg-white/[0.06] border border-white/[0.14] px-4 py-1.5 rounded-full mb-10">
+            className="inline-flex items-center gap-2 bg-white/[0.06] border border-white/[0.14] px-4 py-1.5 rounded-full mb-8 sm:mb-10">
             <span className="w-1.5 h-1.5 bg-[#F5C518] rounded-full" />
             <span className="text-[11px] font-mono text-white/60 tracking-[0.2em] uppercase">Rubikcon Nexus</span>
           </motion.div>
 
           {/* Headline */}
           <motion.h1 variants={fadeUp} initial="hidden" animate="visible" custom={1}
-            className="font-display font-extrabold text-white leading-[1.06] tracking-[-0.025em] mb-7"
-            style={{ fontSize: 'clamp(36px, 5vw, 68px)' }}>
+            className="font-display font-extrabold text-white leading-[1.06] tracking-[-0.025em] mb-6 sm:mb-7"
+            style={{ fontSize: 'clamp(34px, 5vw, 68px)' }}>
             Build{' '}
-            <span className="inline-block bg-[#F5C518] text-[#0A0A0A] px-5 py-1 rounded-full align-middle leading-snug">In-Demand</span>{' '}
+            <span className="inline-block bg-[#F5C518] text-[#0A0A0A] px-4 sm:px-5 py-1 rounded-full align-middle leading-snug">In-Demand</span>{' '}
             Tech Skills. Create Real-World Impact.
           </motion.h1>
 
           {/* Subtitle */}
           <motion.p variants={fadeUp} initial="hidden" animate="visible" custom={2}
-            className="text-white/50 text-[17px] max-w-[620px] mx-auto mb-11 leading-relaxed">
+            className="text-white/50 text-[15px] sm:text-[17px] max-w-[620px] mx-auto mb-9 sm:mb-11 leading-relaxed">
             Rubikcon Nexus Academy equips individuals, startups, businesses, and organisations across Africa with practical, industry-focused training in Artificial Intelligence, Blockchain, Product Management, Software Development, and other emerging technologies — helping learners build careers, solve meaningful problems, and drive innovation.
           </motion.p>
 
           {/* CTAs */}
           <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={3}
-            className="flex items-center justify-center gap-4 mb-20 flex-wrap">
-            <a href="/courses"
+            className="flex items-center justify-center gap-3 sm:gap-4 mb-14 sm:mb-20 flex-wrap">
+            <a href="/login?mode=signup"
               className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-bold px-8 py-3.5 rounded-full hover:bg-[#E8B800] transition-colors text-[15px]">
-              Enrol Now →
+              Sign Up →
             </a>
             <a href="/courses"
               className="inline-flex items-center gap-2 bg-white/[0.07] border border-white/[0.15] text-white px-7 py-3.5 rounded-full hover:bg-white/[0.12] transition-colors text-[15px]">
@@ -206,7 +277,7 @@ export default function LandingPage() {
 
           {/* Stats */}
           <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={4}
-            className="flex items-center justify-center gap-14 flex-wrap">
+            className="grid grid-cols-2 sm:flex sm:items-center sm:justify-center gap-x-8 gap-y-8 sm:gap-14 max-w-xs sm:max-w-none mx-auto">
             {[
               { value: '12', label: 'COURSES' },
               { value: totalStudents.toLocaleString(), label: 'LEARNERS' },
@@ -214,7 +285,7 @@ export default function LandingPage() {
               { value: '4.9★', label: 'AVG. RATING' },
             ].map(stat => (
               <div key={stat.label} className="text-center">
-                <div className="font-display text-[32px] font-extrabold text-white leading-none">{stat.value}</div>
+                <div className="font-display text-[28px] sm:text-[32px] font-extrabold text-white leading-none">{stat.value}</div>
                 <div className="text-[11px] text-white/35 tracking-[0.14em] mt-2 uppercase">{stat.label}</div>
               </div>
             ))}
@@ -223,10 +294,10 @@ export default function LandingPage() {
       </section>
 
       {/* ─── 2. COURSE PREVIEW ─── */}
-      <section className="bg-[#0A0A0A] py-24 px-6 border-t border-white/5">
+      <section className="bg-[#0A0A0A] py-16 sm:py-24 px-5 sm:px-6 border-t border-white/5">
         <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col lg:flex-row items-center gap-12">
-            {/* Video placeholder */}
+          <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-12">
+            {/* Video */}
             <motion.div
               initial={{ opacity: 0, x: -24 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -234,15 +305,24 @@ export default function LandingPage() {
               transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
               className="w-full lg:w-1/2 shrink-0"
             >
-              <div className="relative aspect-video rounded-2xl overflow-hidden bg-[#141414] border border-white/10">
-                <div className="absolute inset-0 bg-gradient-to-br from-[#3D2F00]/60 to-[#0A0A0A]" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-[#F5C518] flex items-center justify-center shadow-2xl">
-                    <Play size={22} className="fill-[#0A0A0A] text-[#0A0A0A] ml-1" />
-                  </div>
-                  <p className="text-white/40 text-xs font-mono tracking-widest uppercase">Course preview</p>
+              {COURSE_PREVIEW_VIDEO_URL ? (
+                <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/40 shadow-[0_24px_80px_rgba(0,0,0,0.5)]">
+                  <VideoEmbed url={COURSE_PREVIEW_VIDEO_URL} title="Rubikcon Nexus Academy — course preview" />
                 </div>
-              </div>
+              ) : (
+                <a
+                  href="/course/blockchain-social-impact/week/week-1-blockchain-fundamentals-history"
+                  className="group block relative aspect-video rounded-2xl overflow-hidden bg-[#141414] border border-white/10 shadow-[0_24px_80px_rgba(0,0,0,0.5)]"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#3D2F00]/60 to-[#0A0A0A]" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-[#F5C518] flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform">
+                      <Play size={22} className="fill-[#0A0A0A] text-[#0A0A0A] ml-1" />
+                    </div>
+                    <p className="text-white/40 text-xs font-mono tracking-widest uppercase">Watch the course preview</p>
+                  </div>
+                </a>
+              )}
             </motion.div>
 
             {/* Copy */}
@@ -254,7 +334,7 @@ export default function LandingPage() {
               className="flex-1"
             >
               <p className="text-xs font-mono text-white/30 tracking-widest uppercase mb-4">Free preview</p>
-              <h2 className="font-display font-extrabold text-white text-4xl md:text-5xl leading-tight mb-5">
+              <h2 className="font-display font-extrabold text-white text-3xl sm:text-4xl md:text-5xl leading-tight mb-5">
                 Experience Learning Before You Commit
               </h2>
               <p className="text-white/50 text-base leading-relaxed mb-8">
@@ -271,8 +351,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── 3. COURSES CATALOG (moved up per admin feedback) ─── */}
-      <section id="courses" className="bg-[#F2EDE2] py-24 px-6">
+      {/* ─── 3. COURSES CATALOG ─── */}
+      <section id="courses" className="bg-[#F2EDE2] py-16 sm:py-24 px-5 sm:px-6">
         <div className="max-w-6xl mx-auto">
           <div className="mb-10">
             <p className="text-xs font-mono text-[#1C1C1C]/50 tracking-widest uppercase mb-3">Catalog</p>
@@ -286,7 +366,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Course preview cards */}
+          {/* Course preview cards — every card clicks through to its course page */}
           {dynamicCourses.length > 0 && (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
               {dynamicCourses.slice(0, 3).map((course, i) => {
@@ -297,16 +377,18 @@ export default function LandingPage() {
                   ? primaryFacilitator.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
                   : '?'
                 return (
-                  <motion.div key={course.id}
+                  <motion.a
+                    key={course.id}
+                    href={`/course/${course.slug}`}
                     initial={{ opacity: 0, y: 16 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.07 }}
-                    className="bg-white rounded-2xl p-6 hover:shadow-md transition-shadow flex flex-col"
+                    className="bg-white rounded-2xl p-6 hover:shadow-lg hover:-translate-y-0.5 transition-all flex flex-col"
                   >
                     <CourseThumbnail course={course} index={i} />
                     <div className="mb-4">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${levelClass || 'bg-[#E8E0D0] text-[#1C1C1C]'}`}>
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${levelClass}`}>
                         {level || 'COURSE'}
                       </span>
                     </div>
@@ -324,26 +406,26 @@ export default function LandingPage() {
                           ) : (
                             <div className="w-7 h-7 rounded-full bg-[#0A0A0A] flex items-center justify-center text-[#F5C518] font-display font-extrabold text-[10px]">{initials}</div>
                           )}
-                          <span className="text-xs text-[#1C1C1C]/60 truncate max-w-[100px]">{primaryFacilitator.name}</span>
+                          <span className="text-xs font-semibold text-[#1C1C1C]/70 truncate max-w-[110px]">{primaryFacilitator.name}</span>
                         </div>
                       ) : <div />}
-                      <a href="/courses" className="text-xs font-semibold text-[#1C1C1C] underline underline-offset-2 hover:text-[#C49A00]">View →</a>
+                      <span className="text-xs font-semibold text-[#1C1C1C] underline underline-offset-2 hover:text-[#C49A00]">View course →</span>
                     </div>
-                  </motion.div>
+                  </motion.a>
                 )
               })}
             </div>
           )}
 
           {/* Browse all CTA */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-[#1C1C1C] px-7 py-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl bg-[#1C1C1C] px-6 sm:px-7 py-5">
             <div>
               <p className="text-white font-display font-extrabold text-lg">
                 {dynamicCourses.length > 0
                   ? `${dynamicCourses.length} course${dynamicCourses.length !== 1 ? 's' : ''} available now`
                   : 'Courses launching soon'}
               </p>
-              <p className="text-white/40 text-sm">Browse the full catalog, filter by level, and enrol in minutes.</p>
+              <p className="text-white/40 text-sm">Browse the full catalog, filter by level and topic, and sign up in minutes.</p>
             </div>
             <a
               href="/courses"
@@ -356,7 +438,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── 4. CURRICULUM OVERVIEW ─── */}
-      <section className="bg-[#F2EDE2] py-24 px-6 border-t border-black/5">
+      <section className="bg-[#F2EDE2] py-16 sm:py-24 px-5 sm:px-6 border-t border-black/5">
         <div className="max-w-6xl mx-auto">
           <div className="mb-12">
             <p className="text-xs font-mono text-[#1C1C1C]/50 tracking-widest uppercase mb-3">What you'll learn</p>
@@ -389,7 +471,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── 5. WHO OUR PROGRAMMES ARE FOR ─── */}
-      <section className="bg-[#F2EDE2] py-24 px-6 border-t border-black/5">
+      <section className="bg-[#F2EDE2] py-16 sm:py-24 px-5 sm:px-6 border-t border-black/5">
         <div className="max-w-6xl mx-auto">
           <div className="mb-12">
             <p className="text-xs font-mono text-[#1C1C1C]/50 tracking-widest uppercase mb-3">Our learners</p>
@@ -401,66 +483,70 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="flex flex-col lg:flex-row gap-10 items-center">
-            {/* Audience cards */}
-            <div className="grid sm:grid-cols-2 gap-4 flex-1">
-              {AUDIENCE_ITEMS.map((item, i) => (
-                <motion.div
-                  key={item.label}
-                  initial={{ opacity: 0, y: 16 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.07 }}
-                  className="bg-white rounded-2xl p-6 hover:shadow-md transition-shadow flex flex-col gap-2.5"
-                >
-                  <span className="text-2xl">{item.icon}</span>
-                  <h3 className="font-display font-extrabold text-[#1C1C1C] text-base leading-snug">{item.label}</h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+            {AUDIENCE_ITEMS.map((item, i) => (
+              <motion.div
+                key={item.slug}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.07 }}
+                className="bg-white rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all flex flex-col"
+              >
+                <SwappableImage
+                  base={`/images/audience/${item.slug}`}
+                  alt={item.label}
+                  className="w-full aspect-[4/3] object-cover"
+                />
+                <div className="p-5 sm:p-6 flex flex-col gap-2 flex-1">
+                  <h3 className="font-display font-extrabold text-[#1C1C1C] text-lg leading-snug">{item.label}</h3>
                   <p className="text-[#1C1C1C]/55 text-sm leading-relaxed">{item.desc}</p>
-                </motion.div>
-              ))}
-            </div>
+                </div>
+              </motion.div>
+            ))}
 
-            {/* Community visual */}
-            <motion.div
-              initial={{ opacity: 0, x: 24 }}
-              whileInView={{ opacity: 1, x: 0 }}
+            {/* "Not sure?" card completes the grid */}
+            <motion.a
+              href="#featured"
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-              className="w-full lg:w-[42%] shrink-0"
+              transition={{ delay: AUDIENCE_ITEMS.length * 0.07 }}
+              className="rounded-2xl bg-[#1C1C1C] p-6 sm:p-7 flex flex-col justify-center gap-3 hover:bg-[#0A0A0A] transition-colors"
             >
-              <img
-                src="/images/who-programmes-are-for.svg"
-                alt="A diverse community of learners — students, professionals, founders, NGOs, MSMEs, and developers"
-                loading="lazy"
-                decoding="async"
-                className="w-full rounded-3xl"
-              />
-            </motion.div>
+              <span className="text-3xl">🤔</span>
+              <h3 className="font-display font-extrabold text-white text-lg leading-snug">Not sure where you fit?</h3>
+              <p className="text-white/50 text-sm leading-relaxed">Pick what best describes you and we'll recommend a starting point.</p>
+              <span className="text-[#F5C518] text-sm font-semibold">Find my course →</span>
+            </motion.a>
           </div>
         </div>
       </section>
 
-      {/* ─── 6. FEATURED PROGRAMME ─── */}
-      <section className="bg-[#0A0A0A] py-24 px-6">
+      {/* ─── 6. FEATURED PROGRAMME / PICK WHAT DESCRIBES YOU ─── */}
+      <section id="featured" className="bg-[#0A0A0A] py-16 sm:py-24 px-5 sm:px-6 scroll-mt-16">
         <div className="max-w-6xl mx-auto">
           <p className="text-xs font-mono text-white/30 tracking-widest uppercase mb-3">Featured programme</p>
-          <p className="text-white/45 text-sm mb-5 max-w-xl">
-            Not sure which course fits? Pick what best describes you and we'll show you why this programme is the right starting point.
+          <h2 className="font-display font-extrabold text-white text-3xl sm:text-4xl leading-tight mb-3">
+            Pick what best describes you
+          </h2>
+          <p className="text-white/45 text-sm mb-7 max-w-xl">
+            Not sure which course fits? Choose your profile and we'll show you why this programme is the right starting point.
           </p>
 
-          {/* Profession buttons */}
+          {/* Persona buttons */}
           <div className="flex flex-wrap gap-2.5 mb-8">
             {FEATURED_PROFESSIONS.map(p => (
               <button
                 key={p.id}
                 onClick={() => setSelectedProfession(p.id)}
-                className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
+                className={`inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition-all ${
                   selectedProfession === p.id
                     ? 'bg-[#F5C518] border-[#F5C518] text-[#0A0A0A] font-semibold shadow-[0_0_24px_rgba(245,197,24,0.25)]'
                     : 'border-white/15 text-white/55 hover:border-white/30 hover:text-white/80'
                 }`}
               >
-                {p.label}
+                <span aria-hidden>{p.emoji}</span> {p.label}
               </button>
             ))}
           </div>
@@ -469,23 +555,23 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 md:p-12 flex flex-col md:flex-row gap-10 items-start"
+            className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 sm:p-8 md:p-12 flex flex-col md:flex-row gap-10 items-start"
           >
             <div className="flex-1">
               <div className="inline-flex items-center gap-2 bg-[#F5C518]/10 border border-[#F5C518]/30 px-3 py-1 rounded-full mb-6">
                 <span className="w-1.5 h-1.5 bg-[#F5C518] rounded-full" />
                 <span className="text-[#F5C518] text-xs font-mono tracking-widest uppercase">Blockchain for Social Impact</span>
               </div>
-              <h2 className="font-display font-extrabold text-white text-3xl md:text-4xl leading-tight mb-5">
+              <h3 className="font-display font-extrabold text-white text-2xl sm:text-3xl md:text-4xl leading-tight mb-5">
                 Harness blockchain to build transparent, accountable, and future-ready organisations.
-              </h2>
+              </h3>
               <p className="text-white/50 text-base leading-relaxed mb-4">
                 Learn how blockchain can improve transparency, accountability, fundraising, digital identity, and operational efficiency for businesses and organisations creating social impact.
               </p>
               {/* Personalised recommendation */}
               <div className="rounded-2xl border border-[#F5C518]/20 bg-[#F5C518]/[0.06] px-5 py-4 mb-8">
                 <p className="text-[11px] font-mono uppercase tracking-widest text-[#F5C518] mb-1.5">
-                  Recommended for: {activeProfession.label}
+                  Recommended for: {activeProfession.label}s
                 </p>
                 <p className="text-white/60 text-sm leading-relaxed">{activeProfession.blurb}</p>
               </div>
@@ -497,28 +583,36 @@ export default function LandingPage() {
                   <CheckCircle size={13} className="text-[#F5C518]" /> 3 Comprehensive Modules
                 </span>
                 <span className="inline-flex items-center gap-1.5 bg-white/[0.07] border border-white/10 text-white/70 text-sm px-4 py-2 rounded-full">
-                  <CheckCircle size={13} className="text-[#F5C518]" /> Beginner-Friendly
+                  <Award size={13} className="text-[#F5C518]" /> Certificate of Completion
                 </span>
               </div>
-              <a
-                href="/course/blockchain-social-impact"
-                className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-bold px-7 py-3.5 rounded-full hover:bg-[#E8B800] transition-colors text-[15px]"
-              >
-                Enrol Now →
-              </a>
+              <div className="flex flex-wrap items-center gap-3">
+                <a
+                  href="/login?mode=signup&redirect=/course/blockchain-social-impact"
+                  className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-bold px-7 py-3.5 rounded-full hover:bg-[#E8B800] transition-colors text-[15px]"
+                >
+                  Sign Up →
+                </a>
+                <a
+                  href="/course/blockchain-social-impact"
+                  className="inline-flex items-center gap-2 border border-white/20 text-white px-6 py-3.5 rounded-full hover:border-white/40 transition-colors text-sm"
+                >
+                  View programme
+                </a>
+              </div>
             </div>
           </motion.div>
         </div>
       </section>
 
       {/* ─── 7. MEET YOUR FACILITATORS ─── */}
-      <section id="instructors" className="bg-[#0A0A0A] py-24 px-6 border-t border-white/5">
+      <section id="instructors" className="bg-[#0A0A0A] py-16 sm:py-24 px-5 sm:px-6 border-t border-white/5">
         <div className="max-w-6xl mx-auto">
           <div className="mb-12">
-            <p className="text-xs font-mono text-white/30 tracking-widest uppercase mb-3">Meet Your Facilitators</p>
+            <p className="text-xs font-mono text-white/30 tracking-widest uppercase mb-3">Your guides</p>
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
               <h2 className="font-display text-4xl md:text-5xl font-extrabold text-white leading-tight">
-                Builders, not theorists
+                Meet Your Facilitators
               </h2>
               <p className="text-white/40 text-sm max-w-sm leading-relaxed md:text-right">
                 Learn from experienced technology leaders passionate about building Africa's next generation of innovators.
@@ -536,25 +630,37 @@ export default function LandingPage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
-                  className="rounded-3xl border border-white/10 bg-white/[0.03] p-7 flex flex-col sm:flex-row gap-6 items-start hover:border-white/20 transition-colors"
+                  className="rounded-3xl border border-white/10 bg-white/[0.03] overflow-hidden hover:border-white/20 transition-colors flex flex-col"
                 >
+                  {/* Large portrait */}
                   {facilitator.photoUrl ? (
                     <img
                       src={facilitator.photoUrl}
                       alt={facilitator.name}
                       loading="lazy"
                       decoding="async"
-                      className="w-24 h-24 rounded-2xl object-cover shrink-0 ring-1 ring-white/10"
+                      className="w-full aspect-[16/11] object-cover object-[center_20%]"
                     />
                   ) : (
-                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#3D2F00] to-[#1A1400] flex items-center justify-center shrink-0">
-                      <span className="font-display font-extrabold text-[#F5C518] text-3xl">{initials}</span>
+                    <div className="w-full aspect-[16/11] bg-gradient-to-br from-[#3D2F00] to-[#141414] flex items-center justify-center">
+                      <div className="w-28 h-28 rounded-full border-2 border-[#F5C518]/40 bg-[#F5C518]/10 flex items-center justify-center">
+                        <span className="font-display font-extrabold text-[#F5C518] text-4xl">{initials}</span>
+                      </div>
                     </div>
                   )}
-                  <div className="min-w-0">
-                    <h3 className="font-display font-extrabold text-white text-xl mb-1">{facilitator.name}</h3>
-                    <p className="text-[#F5C518] text-sm font-medium mb-3">{facilitator.role}</p>
-                    <p className="text-white/50 text-sm leading-relaxed">{facilitator.bio}</p>
+                  <div className="p-6 sm:p-8 flex flex-col gap-4 flex-1">
+                    <div>
+                      <h3 className="font-display font-extrabold text-white text-2xl mb-1">{facilitator.name}</h3>
+                      <p className="text-[#F5C518] text-sm font-semibold">{facilitator.role}</p>
+                    </div>
+                    <p className="text-white/55 text-[15px] leading-relaxed flex-1">{facilitator.bio}</p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {facilitator.expertise.map(tag => (
+                        <span key={tag} className="text-[11px] font-medium text-white/60 border border-white/12 bg-white/[0.04] px-3 py-1.5 rounded-full">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </motion.div>
               )
@@ -570,7 +676,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── 8. OUR MISSION ─── */}
-      <section className="bg-[#F2EDE2] py-24 px-6">
+      <section className="bg-[#F2EDE2] py-16 sm:py-24 px-5 sm:px-6">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -589,95 +695,51 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── 9. TESTIMONIALS ─── */}
-      <section className="bg-[#0D0D0D] py-24 px-6 border-t border-white/5">
+      {/* ─── 9. LEARNER STORIES ─── */}
+      <section className="bg-[#0D0D0D] py-16 sm:py-28 px-5 sm:px-6 border-t border-white/5">
         <div className="max-w-6xl mx-auto">
-          <div className="mb-12 text-center">
+          <div className="mb-12 sm:mb-16 text-center">
             <p className="text-xs font-mono text-white/30 tracking-widest uppercase mb-3">Learner stories</p>
-            <h2 className="font-display text-4xl md:text-5xl font-extrabold text-white leading-tight">
+            <h2 className="font-display text-4xl md:text-6xl font-extrabold text-white leading-tight mb-4">
               What our learners say
             </h2>
+            <p className="text-white/40 text-base max-w-lg mx-auto leading-relaxed">
+              Real stories from learners who turned structured lessons into new skills, new roles, and new ventures.
+            </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-5">
-            {[
-              {
-                quote: "The structured week-by-week format made complex blockchain concepts digestible. I shipped my first smart contract by week 3.",
-                name: "Amara Okafor",
-                role: "Junior Blockchain Dev",
-                org: "Lagos, Nigeria",
-                initials: "AO",
-                color: "from-[#3D2F00] to-[#1A1400]",
-              },
-              {
-                quote: "Coming from a traditional finance background, this programme bridged the gap between what I knew and what Web3 needs. Game-changer.",
-                name: "Kwame Asante",
-                role: "DeFi Analyst",
-                org: "Accra, Ghana",
-                initials: "KA",
-                color: "from-[#002D2D] to-[#001515]",
-              },
-              {
-                quote: "The facilitators actually build in production. You get real patterns, not textbook theory. I landed a Web3 role within two months.",
-                name: "Ngozi Adeyemi",
-                role: "Full-Stack Web3 Engineer",
-                org: "Abuja, Nigeria",
-                initials: "NA",
-                color: "from-[#1A0030] to-[#0A0018]",
-              },
-              {
-                quote: "I appreciated how each assignment built on the last. By the end I had a portfolio project I was genuinely proud to show employers.",
-                name: "Tendai Mutasa",
-                role: "Smart Contract Auditor",
-                org: "Harare, Zimbabwe",
-                initials: "TM",
-                color: "from-[#002A00] to-[#001200]",
-              },
-              {
-                quote: "The quiz and assignment flow kept me accountable. It felt like a real cohort experience even studying asynchronously.",
-                name: "Fatima Al-Hassan",
-                role: "Blockchain Consultant",
-                org: "Nairobi, Kenya",
-                initials: "FA",
-                color: "from-[#2D0015] to-[#150009]",
-              },
-              {
-                quote: "From zero blockchain knowledge to deploying on testnet in five weeks. The pacing is perfect for working professionals.",
-                name: "Chidi Eze",
-                role: "Product Manager, Web3",
-                org: "Port Harcourt, Nigeria",
-                initials: "CE",
-                color: "from-[#2A1800] to-[#130B00]",
-              },
-            ].map((t, i) => (
+          <div className="grid md:grid-cols-2 gap-5 sm:gap-6">
+            {TESTIMONIALS.map((t, i) => (
               <motion.div
                 key={t.name}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.08 }}
-                className="rounded-[24px] border border-white/8 bg-white/[0.03] p-6 flex flex-col gap-4 hover:border-white/15 transition-colors"
+                transition={{ delay: i * 0.06 }}
+                className="rounded-[28px] border border-white/8 bg-white/[0.03] p-6 sm:p-8 flex flex-col gap-5 hover:border-white/15 transition-colors"
               >
                 {/* Stars */}
                 <div className="flex gap-1">
                   {[...Array(5)].map((_, s) => (
-                    <svg key={s} className="w-3.5 h-3.5 text-[#F5C518] fill-current" viewBox="0 0 20 20">
+                    <svg key={s} className="w-4 h-4 text-[#F5C518] fill-current" viewBox="0 0 20 20">
                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                     </svg>
                   ))}
                 </div>
 
-                <p className="text-white/70 text-sm leading-relaxed flex-1">
+                <p className="text-white/75 text-[15px] sm:text-base leading-relaxed flex-1">
                   &ldquo;{t.quote}&rdquo;
                 </p>
 
-                <div className="flex items-center gap-3 pt-4 border-t border-white/8">
-                  <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${t.color} flex items-center justify-center shrink-0`}>
-                    <span className="font-display font-extrabold text-[#F5C518] text-xs">{t.initials}</span>
-                  </div>
+                <div className="flex items-center gap-4 pt-5 border-t border-white/8">
+                  <SwappableImage
+                    base={t.photo}
+                    alt={t.name}
+                    className="w-14 h-14 rounded-full object-cover ring-2 ring-white/10 shrink-0"
+                  />
                   <div>
-                    <p className="text-sm font-semibold text-white">{t.name}</p>
-                    <p className="text-xs text-white/35">{t.role} &middot; {t.org}</p>
+                    <p className="text-base font-bold text-white">{t.name}</p>
+                    <p className="text-sm text-white/40">{t.role} &middot; {t.org}</p>
                   </div>
                 </div>
               </motion.div>
@@ -687,7 +749,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── 10. STATS BANNER ─── */}
-      <section className="bg-[#0A0A0A] py-20 px-6">
+      <section className="bg-[#0A0A0A] py-16 sm:py-20 px-5 sm:px-6">
         <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
           {[
             { value: `${totalStudents.toLocaleString()}.`, sub: 'Active learners across 34 countries' },
@@ -696,7 +758,7 @@ export default function LandingPage() {
             { value: '94%', sub: 'Cohort completion rate', yellow: true },
           ].map(stat => (
             <div key={stat.sub}>
-              <div className={`font-display text-5xl font-extrabold mb-2 ${stat.yellow ? '' : 'text-white'}`}>
+              <div className={`font-display text-4xl sm:text-5xl font-extrabold mb-2 ${stat.yellow ? '' : 'text-white'}`}>
                 {stat.yellow
                   ? <><span className="text-white">94</span><span className="text-[#F5C518]">%</span></>
                   : stat.value}
@@ -708,7 +770,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── 11. CTA ─── */}
-      <section className="relative bg-[#0A0A0A] py-28 px-6 overflow-hidden">
+      <section className="relative bg-[#0A0A0A] py-20 sm:py-28 px-5 sm:px-6 overflow-hidden">
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-64 bg-yellow-500/8 rounded-full blur-3xl pointer-events-none" />
         <div className="max-w-3xl mx-auto text-center relative">
           <motion.div
@@ -728,9 +790,9 @@ export default function LandingPage() {
               Whether you're building your first tech skill, advancing your career, or preparing your organisation for the future, your learning journey starts here.
             </p>
             <div className="flex items-center justify-center gap-4 flex-wrap">
-              <a href="/courses"
+              <a href="/login?mode=signup"
                 className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-semibold px-8 py-3.5 rounded-full hover:bg-[#E8B800] transition-colors text-sm">
-                Enrol Now →
+                Sign Up →
               </a>
               <a href="/login"
                 className="inline-flex items-center gap-2 border border-white/20 text-white px-7 py-3.5 rounded-full hover:border-white/40 transition-colors text-sm">

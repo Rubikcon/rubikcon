@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'wouter'
 import { motion } from 'framer-motion'
-import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, Clock3, Loader2, PlayCircle, Users } from 'lucide-react'
+import { ArrowRight, Award, BookOpen, CheckCircle2, ChevronDown, Clock3, Loader2, PlayCircle, Users } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
 import PreviewBanner from '../components/PreviewBanner'
 import VideoEmbed from '../components/VideoEmbed'
@@ -429,7 +429,20 @@ export default function CoursePage() {
                 {course.level || 'Programme'}{course.estimatedDuration ? ` · ${course.estimatedDuration}` : ''}
               </p>
               <h2 className="font-display text-3xl md:text-4xl font-extrabold text-white leading-tight mb-3">{course.title}</h2>
-              <p className="text-white/55 leading-relaxed mb-6">{course.description}</p>
+              <p className="text-white/55 leading-relaxed mb-5">{course.description}</p>
+
+              {/* Certificate of Completion highlight */}
+              <div className="mb-6 flex items-start gap-3.5 rounded-2xl border border-[#F5C518]/25 bg-[#F5C518]/[0.07] px-5 py-4">
+                <div className="w-10 h-10 rounded-xl bg-[#F5C518]/15 border border-[#F5C518]/30 flex items-center justify-center shrink-0">
+                  <Award size={20} className="text-[#F5C518]" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white mb-0.5">Certificate of Completion</p>
+                  <p className="text-xs text-white/55 leading-relaxed">
+                    Earn a certificate after completing this course — finish every lesson, assignment, and quiz to unlock it, then showcase it on LinkedIn and your CV.
+                  </p>
+                </div>
+              </div>
 
               {course.heroImage && (
                 <div className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-black/40">

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight,
+  Award,
   BookOpen,
   CheckCircle2,
   ChevronLeft,
@@ -11,7 +12,6 @@ import {
   Play,
   Search,
   Sparkles,
-  Star,
   TrendingUp,
   Zap,
 } from 'lucide-react'
@@ -48,19 +48,19 @@ function PriceTag({ course, size = 'sm' }: { course: PublicCourse; size?: 'sm' |
   const price = coursePriceInfo(course)
   if (!price) {
     return (
-      <span className={`inline-flex items-center rounded-full border border-emerald-400/25 bg-emerald-400/10 text-emerald-300 font-semibold ${size === 'lg' ? 'px-3 py-1 text-xs' : 'px-2 py-0.5 text-[10px]'}`}>
+      <span className={`inline-flex items-center rounded-full border border-emerald-400/25 bg-emerald-400/10 text-emerald-300 font-bold ${size === 'lg' ? 'px-3.5 py-1 text-sm' : 'px-2.5 py-0.5 text-[12px]'}`}>
         Free
       </span>
     )
   }
   return (
-    <span className={`inline-flex items-baseline gap-1.5 flex-wrap ${size === 'lg' ? 'text-sm' : 'text-[11px]'}`}>
+    <span className={`inline-flex items-baseline gap-1.5 flex-wrap ${size === 'lg' ? 'text-base' : 'text-[13px]'}`}>
       {price.discounted && (
-        <span className="text-white/30 line-through decoration-white/40">{price.original}</span>
+        <span className="text-white/35 line-through decoration-white/40">{price.original}</span>
       )}
-      <span className="text-[#F5C518] font-bold">{price.current}</span>
+      <span className="text-[#F5C518] font-extrabold">{price.current}</span>
       {price.discounted && (
-        <span className={`rounded-full bg-[#F5C518]/15 border border-[#F5C518]/25 text-[#F5C518] font-semibold ${size === 'lg' ? 'px-2 py-0.5 text-[10px]' : 'px-1.5 py-px text-[9px]'}`}>
+        <span className={`rounded-full bg-[#F5C518]/15 border border-[#F5C518]/25 text-[#F5C518] font-semibold ${size === 'lg' ? 'px-2 py-0.5 text-[11px]' : 'px-1.5 py-px text-[10px]'}`}>
           −{price.discountPercent}%
         </span>
       )}
@@ -98,7 +98,29 @@ function facilitatorPhotoUrl(facilitator: { name: string; photoUrl: string | nul
 const LEVEL_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
   BEGINNER:     { color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/25', label: 'Beginner' },
   INTERMEDIATE: { color: 'text-amber-400',   bg: 'bg-amber-400/10 border-amber-400/25',     label: 'Intermediate' },
-  ADVANCED:     { color: 'text-red-400',      bg: 'bg-red-400/10 border-red-400/25',         label: 'Advanced' },
+  ADVANCED:     { color: 'text-red-400',      bg: 'bg-red-400/10 border-red-400/25',         label: 'Advanced / Expert' },
+}
+
+// ── Topic filters ──────────────────────────────────────────────────────────────
+// Courses don't carry a topic field yet, so topics are inferred from the title
+// and tagline. When a `topics` column lands on the backend, swap the matcher
+// for the real data and keep the same chips.
+const TOPICS: Array<{ id: string; label: string; match: RegExp }> = [
+  { id: 'blockchain', label: 'Blockchain', match: /blockchain|distributed ledger/i },
+  { id: 'bitcoin', label: 'Bitcoin', match: /bitcoin|\bbtc\b/i },
+  { id: 'ethereum', label: 'Ethereum', match: /ethereum|\beth\b|solidity|evm/i },
+  { id: 'ai', label: 'AI', match: /\bai\b|artificial intelligence|machine learning|\bllm\b/i },
+  { id: 'design', label: 'Design', match: /design|\bux\b|\bui\b/i },
+  { id: 'product', label: 'Product Management', match: /product manage|product development|\bpm\b/i },
+  { id: 'career', label: 'Career Development', match: /career|employab|job[- ]ready|professional growth/i },
+  { id: 'web3', label: 'Web3', match: /web3|defi|\bnft\b|dapp|smart contract|crypto/i },
+  { id: 'other', label: 'Other', match: /$^/ }, // matches nothing — handled as "no topic matched"
+]
+
+function courseTopics(course: { title: string; tagline: string | null }): string[] {
+  const haystack = `${course.title} ${course.tagline ?? ''}`
+  const matched = TOPICS.filter(t => t.id !== 'other' && t.match.test(haystack)).map(t => t.id)
+  return matched.length > 0 ? matched : ['other']
 }
 
 // ── Compact progress bar ───────────────────────────────────────────────────────
@@ -147,25 +169,27 @@ function CourseCard({
       className="group relative flex flex-col rounded-[20px] border border-white/[0.08] bg-[#111217] hover:border-white/20 hover:shadow-[0_8px_48px_rgba(0,0,0,0.6)] transition-all duration-300 overflow-hidden cursor-pointer"
       onClick={() => { window.location.href = `/course/${course.slug}` }}
     >
-      {/* ── Thumbnail ── */}
+      {/* ── Thumbnail — full-opacity image, faces kept in frame ── */}
       <div
         className="relative h-44 overflow-hidden"
         style={{ background: `linear-gradient(135deg, ${grad.from}, ${grad.to})` }}
       >
-        {course.heroImage && (
-          <img src={course.heroImage} alt={course.title} className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:opacity-50 transition-opacity duration-500" />
+        {course.heroImage ? (
+          <img src={course.heroImage} alt={course.title} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover object-[center_25%]" />
+        ) : (
+          <>
+            {/* Orb glow (placeholder art only) */}
+            <div
+              className="absolute -top-6 -right-6 w-32 h-32 rounded-full opacity-25 blur-2xl"
+              style={{ background: grad.accent }}
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
+                <Play size={18} className="text-white ml-0.5" fill="currentColor" />
+              </div>
+            </div>
+          </>
         )}
-        {/* Orb glow */}
-        <div
-          className="absolute -top-6 -right-6 w-32 h-32 rounded-full opacity-20 blur-2xl group-hover:opacity-35 transition-opacity duration-500"
-          style={{ background: grad.accent }}
-        />
-        {/* Play button */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <div className="w-12 h-12 rounded-full bg-white/15 backdrop-blur-sm border border-white/20 flex items-center justify-center">
-            <Play size={18} className="text-white ml-0.5" fill="currentColor" />
-          </div>
-        </div>
         {/* Enrolled badge */}
         {course.enrolled && (
           <div className="absolute top-3 left-3 flex items-center gap-1.5 rounded-full bg-[#F5C518] px-2.5 py-1 text-[10px] font-bold text-[#0A0A0A]">
@@ -174,59 +198,63 @@ function CourseCard({
           </div>
         )}
         {/* Week count */}
-        <div className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 px-2.5 py-1 text-[10px] text-white/60">
+        <div className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-black/60 border border-white/10 px-2.5 py-1 text-[10px] font-medium text-white/80">
           <BookOpen size={9} />
           {course.weekCount} {course.contentUnit.toLowerCase()}s
         </div>
-        {/* Shimmer at bottom */}
-        <div className="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-[#111217] to-transparent" />
       </div>
 
       {/* ── Body ── */}
-      <div className="flex flex-col flex-1 p-4 pt-3">
+      <div className="flex flex-col flex-1 p-5 pt-4">
         {/* Level badge */}
         {cfg && (
-          <span className={`self-start inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-mono font-semibold uppercase tracking-wider mb-2 ${cfg.color} ${cfg.bg}`}>
+          <span className={`self-start inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-mono font-semibold uppercase tracking-wider mb-2.5 ${cfg.color} ${cfg.bg}`}>
             {cfg.label}
           </span>
         )}
 
         {/* Title */}
-        <h3 className="font-display font-extrabold text-white text-[14px] leading-snug mb-1 line-clamp-2 group-hover:text-[#F5C518] transition-colors duration-200">
+        <h3 className="font-display font-extrabold text-white text-[17px] leading-snug mb-1.5 line-clamp-2 group-hover:text-[#F5C518] transition-colors duration-200">
           {course.title}
         </h3>
 
         {/* Tagline */}
         {course.tagline && (
-          <p className="text-white/38 text-[11px] leading-relaxed mb-3 line-clamp-2">{course.tagline}</p>
+          <p className="text-white/50 text-[12px] leading-relaxed mb-3 line-clamp-2">{course.tagline}</p>
         )}
 
         {/* Instructor */}
         {primary && (
           <div className="flex items-center gap-2 mb-3">
             {primaryPhoto ? (
-              <img src={primaryPhoto} alt={primary.name} className="w-5 h-5 rounded-full object-cover shrink-0 ring-1 ring-white/10" />
+              <img src={primaryPhoto} alt={primary.name} className="w-6 h-6 rounded-full object-cover shrink-0 ring-1 ring-white/15" />
             ) : (
               <div
-                className="w-5 h-5 rounded-full flex items-center justify-center text-[7px] font-extrabold shrink-0"
+                className="w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-extrabold shrink-0"
                 style={{ background: `linear-gradient(135deg, ${grad.from}, ${grad.accent}30)`, color: grad.accent, border: `1px solid ${grad.accent}40` }}
               >
                 {initials}
               </div>
             )}
-            <span className="text-[11px] text-white/40 truncate">{primary.name}</span>
+            <span className="text-[13px] font-semibold text-white/75 truncate">{primary.name}</span>
             {course.facilitators.length > 1 && (
-              <span className="text-[10px] text-white/20 shrink-0">+{course.facilitators.length - 1}</span>
+              <span className="text-[11px] text-white/30 shrink-0">+{course.facilitators.length - 1}</span>
             )}
           </div>
         )}
 
         {/* Meta */}
-        <div className="flex items-center justify-between gap-3 text-[10px] text-white/28 mb-3">
+        <div className="flex items-center justify-between gap-3 text-[11px] text-white/40 mb-2">
           {course.estimatedDuration ? (
-            <span className="flex items-center gap-1"><Clock size={9} />{course.estimatedDuration}</span>
+            <span className="flex items-center gap-1"><Clock size={10} />{course.estimatedDuration}</span>
           ) : <span />}
           <PriceTag course={course} />
+        </div>
+
+        {/* Certificate */}
+        <div className="flex items-center gap-1.5 text-[11px] text-white/45 mb-3">
+          <Award size={11} className="text-[#F5C518]" />
+          Certificate of Completion included
         </div>
 
         {/* Progress */}
@@ -337,16 +365,17 @@ function ContinueRail({ courses, onSelect }: { courses: PublicCourse[]; onSelect
               className="flex-shrink-0 w-60 rounded-[18px] border border-white/[0.08] bg-[#111217] hover:border-[#F5C518]/30 hover:shadow-[0_4px_24px_rgba(245,197,24,0.08)] transition-all overflow-hidden text-left group"
             >
               <div
-                className="h-20 relative overflow-hidden"
+                className="h-28 relative overflow-hidden"
                 style={{ background: `linear-gradient(135deg, ${grad.from}, ${grad.to})` }}
               >
-                {course.heroImage && (
-                  <img src={course.heroImage} alt="" className="w-full h-full object-cover opacity-35 group-hover:opacity-50 transition-opacity" />
+                {course.heroImage ? (
+                  <img src={course.heroImage} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover object-[center_25%]" />
+                ) : (
+                  <div
+                    className="absolute -top-4 -right-4 w-20 h-20 rounded-full opacity-25 blur-2xl"
+                    style={{ background: grad.accent }}
+                  />
                 )}
-                <div
-                  className="absolute -top-4 -right-4 w-20 h-20 rounded-full opacity-20 blur-2xl"
-                  style={{ background: grad.accent }}
-                />
                 {/* Progress overlay bar */}
                 <div className="absolute bottom-0 inset-x-0 h-1 bg-white/10">
                   <div
@@ -355,11 +384,11 @@ function ContinueRail({ courses, onSelect }: { courses: PublicCourse[]; onSelect
                   />
                 </div>
               </div>
-              <div className="p-3">
-                <p className="text-[12px] font-semibold text-white line-clamp-2 group-hover:text-[#F5C518] transition-colors mb-1 leading-snug">{course.title}</p>
-                {primary && <p className="text-[10px] text-white/30 truncate mb-2">{primary.name}</p>}
+              <div className="p-3.5">
+                <p className="text-[14px] font-bold text-white line-clamp-2 group-hover:text-[#F5C518] transition-colors mb-1 leading-snug">{course.title}</p>
+                {primary && <p className="text-[11px] font-medium text-white/50 truncate mb-2">{primary.name}</p>}
                 <div className="flex items-center justify-between">
-                  <span className="text-[9px] text-white/25">{progress}% complete</span>
+                  <span className="text-[10px] text-white/35">{progress}% complete</span>
                   <span className="text-[11px] text-[#F5C518] font-semibold flex items-center gap-0.5">
                     {progress > 0 ? 'Continue' : 'Start'} <ArrowRight size={10} />
                   </span>
@@ -397,14 +426,15 @@ function FeaturedSpotlight({ course, onEnroll, enrolling }: { course: PublicCour
         style={{ background: `linear-gradient(135deg, ${grad.from} 0%, ${grad.to} 100%)` }}
       />
       {course.heroImage && (
-        <img src={course.heroImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-25 group-hover:opacity-35 transition-opacity duration-500" />
+        <img src={course.heroImage} alt="" className="absolute inset-0 w-full h-full object-cover object-[center_25%]" />
       )}
       {/* Orb */}
       <div
         className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-15 blur-3xl"
         style={{ background: grad.accent }}
       />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
+      {/* Left-side scrim keeps the copy readable over the full-opacity image */}
+      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/10" />
 
       <div className="relative p-7 md:p-10 flex flex-col md:flex-row gap-6 items-start md:items-end">
         <div className="flex-1">
@@ -486,6 +516,7 @@ export default function CoursesPage() {
   const [enrollingId, setEnrollingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [levelFilter, setLevelFilter] = useState('')
+  const [topicFilter, setTopicFilter] = useState('')
   const auth = getStoredAuth()
 
   async function load() {
@@ -517,19 +548,26 @@ export default function CoursesPage() {
   }
 
   const enrolledCourses = useMemo(() => courses.filter(c => c.enrolled), [courses])
-  const levels = useMemo(() => [...new Set(courses.map(c => levelKey(c.level)).filter(Boolean))], [courses])
   const featured = useMemo(() => courses.find(c => !c.enrolled) ?? courses[0], [courses])
+
+  // Only offer topic chips that actually have courses behind them
+  const availableTopics = useMemo(() => {
+    const present = new Set(courses.flatMap(c => courseTopics(c)))
+    return TOPICS.filter(t => present.has(t.id))
+  }, [courses])
 
   const filtered = useMemo(() => courses.filter(c => {
     const matchSearch = !search ||
       c.title.toLowerCase().includes(search.toLowerCase()) ||
       (c.tagline ?? '').toLowerCase().includes(search.toLowerCase())
     const matchLevel = !levelFilter || levelKey(c.level) === levelFilter
-    return matchSearch && matchLevel
-  }), [courses, search, levelFilter])
+    const matchTopic = !topicFilter || courseTopics(c).includes(topicFilter)
+    return matchSearch && matchLevel && matchTopic
+  }), [courses, search, levelFilter, topicFilter])
 
+  const LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED']
   const LEVEL_LABELS: Record<string, string> = {
-    BEGINNER: 'Beginner', INTERMEDIATE: 'Intermediate', ADVANCED: 'Advanced',
+    BEGINNER: 'Beginner', INTERMEDIATE: 'Intermediate', ADVANCED: 'Advanced / Expert',
   }
 
   return (
@@ -547,16 +585,16 @@ export default function CoursesPage() {
           <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <div className="inline-flex items-center gap-2 rounded-full border border-[#F5C518]/20 bg-[#F5C518]/8 px-4 py-1.5 text-xs font-mono text-[#F5C518]/80 mb-5 uppercase tracking-widest">
               <Sparkles size={11} />
-              Rubikcon Academy
+              Rubikcon Nexus Academy
             </div>
             <h1 className="font-display text-4xl md:text-6xl font-extrabold text-white leading-[1.1] mb-4">
-              Learn Web3.<br />
+              Learn in-demand skills.<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F5C518] via-[#FFD060] to-[#F5C518]">
-                Build the future.
+                Build what's next.
               </span>
             </h1>
-            <p className="text-white/40 text-base md:text-lg mb-8 max-w-lg mx-auto leading-relaxed">
-              Structured, practical courses from people shipping real products on-chain.
+            <p className="text-white/40 text-base md:text-lg mb-8 max-w-xl mx-auto leading-relaxed">
+              Practical, structured courses in AI, blockchain, product management, design, and more — taught by people building real products.
             </p>
 
             {/* Stats */}
@@ -590,30 +628,51 @@ export default function CoursesPage() {
         </div>
 
         {/* Level filters */}
-        {levels.length > 0 && (
-          <div className="max-w-6xl mx-auto px-4 md:px-6 pb-5">
-            <div className="flex items-center gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+        <div className="max-w-6xl mx-auto px-4 md:px-6 pb-3">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            <span className="hidden sm:inline flex-shrink-0 text-[10px] font-mono uppercase tracking-widest text-white/25 mr-1">Level</span>
+            <button
+              onClick={() => setLevelFilter('')}
+              className={`flex-shrink-0 rounded-full border px-4 py-2 text-xs font-medium transition-all ${
+                !levelFilter
+                  ? 'bg-[#F5C518] border-[#F5C518] text-[#0A0A0A] font-semibold shadow-[0_0_20px_rgba(245,197,24,0.2)]'
+                  : 'border-white/10 text-white/45 hover:border-white/20 hover:text-white/70'
+              }`}
+            >
+              All courses
+            </button>
+            {LEVELS.map(l => (
               <button
-                onClick={() => setLevelFilter('')}
-                className={`flex-shrink-0 rounded-full border px-4 py-1.5 text-xs font-medium transition-all ${
-                  !levelFilter
+                key={l}
+                onClick={() => setLevelFilter(levelFilter === l ? '' : l)}
+                className={`flex-shrink-0 rounded-full border px-4 py-2 text-xs font-medium transition-all ${
+                  levelFilter === l
                     ? 'bg-[#F5C518] border-[#F5C518] text-[#0A0A0A] font-semibold shadow-[0_0_20px_rgba(245,197,24,0.2)]'
                     : 'border-white/10 text-white/45 hover:border-white/20 hover:text-white/70'
                 }`}
               >
-                All courses
+                {LEVEL_LABELS[l] ?? l}
               </button>
-              {levels.map(l => (
+            ))}
+          </div>
+        </div>
+
+        {/* Topic filters */}
+        {availableTopics.length > 0 && (
+          <div className="max-w-6xl mx-auto px-4 md:px-6 pb-5">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+              <span className="hidden sm:inline flex-shrink-0 text-[10px] font-mono uppercase tracking-widest text-white/25 mr-1">Topic</span>
+              {availableTopics.map(t => (
                 <button
-                  key={l}
-                  onClick={() => setLevelFilter(levelFilter === l ? '' : l)}
-                  className={`flex-shrink-0 rounded-full border px-4 py-1.5 text-xs font-medium transition-all ${
-                    levelFilter === l
-                      ? 'bg-[#F5C518] border-[#F5C518] text-[#0A0A0A] font-semibold shadow-[0_0_20px_rgba(245,197,24,0.2)]'
+                  key={t.id}
+                  onClick={() => setTopicFilter(topicFilter === t.id ? '' : t.id)}
+                  className={`flex-shrink-0 rounded-full border px-4 py-2 text-xs font-medium transition-all ${
+                    topicFilter === t.id
+                      ? 'bg-white border-white text-[#0A0A0A] font-semibold'
                       : 'border-white/10 text-white/45 hover:border-white/20 hover:text-white/70'
                   }`}
                 >
-                  {LEVEL_LABELS[l] ?? l}
+                  {t.label}
                 </button>
               ))}
             </div>
@@ -646,7 +705,7 @@ export default function CoursesPage() {
         )}
 
         {/* Featured spotlight — only when not searching/filtering */}
-        {!loading && !search && !levelFilter && featured && courses.length > 1 && (
+        {!loading && !search && !levelFilter && !topicFilter && featured && courses.length > 1 && (
           <FeaturedSpotlight
             course={featured}
             onEnroll={handleEnroll}
@@ -654,15 +713,44 @@ export default function CoursesPage() {
           />
         )}
 
+        {/* Certificate of Completion highlight */}
+        {!loading && courses.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-10 rounded-[24px] border border-[#F5C518]/20 bg-gradient-to-r from-[#F5C518]/[0.08] via-[#F5C518]/[0.04] to-transparent p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center gap-5"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-[#F5C518]/15 border border-[#F5C518]/30 flex items-center justify-center shrink-0">
+              <Award size={26} className="text-[#F5C518]" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-display text-lg font-extrabold text-white mb-1">Earn a Certificate of Completion</h3>
+              <p className="text-white/50 text-sm leading-relaxed max-w-2xl">
+                Every course includes a Certificate of Completion. Finish your lessons, assignments, and quizzes to earn a certificate you can showcase on LinkedIn and your CV.
+              </p>
+            </div>
+            {!auth && (
+              <a
+                href="/login?mode=signup"
+                className="shrink-0 inline-flex items-center gap-2 rounded-full bg-[#F5C518] px-6 py-2.5 text-sm font-bold text-[#0A0A0A] hover:bg-[#FFD020] transition-colors"
+              >
+                Sign Up <ArrowRight size={13} />
+              </a>
+            )}
+          </motion.div>
+        )}
+
         {/* Section header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="font-display text-xl font-extrabold text-white">
-              {levelFilter
-                ? `${LEVEL_LABELS[levelFilter] ?? levelFilter} courses`
-                : search
-                  ? 'Search results'
-                  : 'All courses'}
+              {topicFilter
+                ? `${TOPICS.find(t => t.id === topicFilter)?.label ?? topicFilter} courses`
+                : levelFilter
+                  ? `${LEVEL_LABELS[levelFilter] ?? levelFilter} courses`
+                  : search
+                    ? 'Search results'
+                    : 'All courses'}
             </h2>
             {!loading && (
               <p className="text-sm text-white/30 mt-0.5">
@@ -696,9 +784,9 @@ export default function CoursesPage() {
               <p className="text-white/18 text-sm mb-4">
                 {courses.length === 0 ? 'Check back soon!' : 'Try a different search or clear your filters.'}
               </p>
-              {(search || levelFilter) && (
+              {(search || levelFilter || topicFilter) && (
                 <button
-                  onClick={() => { setSearch(''); setLevelFilter('') }}
+                  onClick={() => { setSearch(''); setLevelFilter(''); setTopicFilter('') }}
                   className="text-sm text-[#F5C518] hover:text-[#FFE070] transition-colors"
                 >
                   Clear filters
@@ -737,15 +825,15 @@ export default function CoursesPage() {
                 Get started
               </div>
               <h3 className="font-display text-3xl md:text-4xl font-extrabold text-white mb-3 leading-tight">
-                Start your Web3 journey<br />
+                Start your learning journey<br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F5C518] to-[#FFD060]">today.</span>
               </h3>
               <p className="text-white/38 mb-8 max-w-sm mx-auto text-sm leading-relaxed">
-                Join thousands of learners building on-chain. Track progress, submit assignments, and earn recognition.
+                Join thousands of learners building real skills. Track progress, submit assignments, and earn a Certificate of Completion.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <a href="/login?mode=signup" className="inline-flex items-center gap-2 rounded-full bg-[#F5C518] px-7 py-3 text-sm font-bold text-[#0A0A0A] hover:bg-[#FFD020] transition-colors shadow-[0_4px_32px_rgba(245,197,24,0.25)]">
-                  Create account <ArrowRight size={14} />
+                  Sign Up <ArrowRight size={14} />
                 </a>
                 <a href="/login" className="inline-flex items-center gap-2 rounded-full border border-white/12 px-7 py-3 text-sm text-white/60 hover:border-white/25 hover:text-white transition-colors">
                   Log in

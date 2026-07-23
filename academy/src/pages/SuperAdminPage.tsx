@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import {
   BookOpen,
+  Camera,
   CheckCircle2,
   ChevronDown,
   ClipboardList,
@@ -14,12 +15,14 @@ import {
   ShieldCheck,
   Tag,
   Trash2,
+  UserCog,
   Users,
   XCircle,
 } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
+import { compressImageToBase64 } from '../lib/imageCompress'
 import type { AdminSubmission, CourseStatus } from '../types/academy'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -95,7 +98,22 @@ const STATUS_FILTERS = [
   { value: 'DRAFT', label: 'Draft' },
 ]
 
-type Tab = 'overview' | 'courses' | 'submissions' | 'learners' | 'users'
+type Tab = 'overview' | 'courses' | 'submissions' | 'learners' | 'users' | 'facilitators'
+
+// ─── Facilitator management types (matches GET /superadmin/facilitators) ──
+
+type SuperAdminFacilitator = {
+  id: string
+  name: string
+  title: string
+  organization: string
+  email: string
+  linkedinUrl: string
+  photoUrl: string | null
+  bio: string | null
+  createdAt: string
+  _count: { courses: number; weeks: number; lessons: number }
+}
 
 // ─── Learner activity types (matches GET /superadmin/learners response) ───
 
@@ -240,6 +258,17 @@ export default function SuperAdminPage() {
   const [deletingFeedbackId, setDeletingFeedbackId] = useState<string | null>(null)
   const [submissionStatusFilter, setSubmissionStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'REVIEWED'>('ALL')
 
+  // Facilitators
+  const [facilitators, setFacilitators] = useState<SuperAdminFacilitator[]>([])
+  const [facilitatorsLoading, setFacilitatorsLoading] = useState(false)
+  const [editingFacilitator, setEditingFacilitator] = useState<SuperAdminFacilitator | null>(null)
+  const [facilitatorForm, setFacilitatorForm] = useState({ name: '', title: '', organization: '', email: '', linkedinUrl: '', bio: '' })
+  const [savingFacilitator, setSavingFacilitator] = useState(false)
+  const [uploadingFacilitatorPhoto, setUploadingFacilitatorPhoto] = useState(false)
+  const [facilitatorModalError, setFacilitatorModalError] = useState<string | null>(null)
+  const [facilitatorModalMessage, setFacilitatorModalMessage] = useState<string | null>(null)
+  const facilitatorFileInputRef = useRef<HTMLInputElement>(null)
+
   const [error, setError] = useState<string | null>(null)
 
   const currentAuth = getStoredAuth()
@@ -265,6 +294,10 @@ export default function SuperAdminPage() {
   useEffect(() => {
     if (activeTab === 'learners') void loadLearners()
   }, [activeTab, learnerSearch])
+
+  useEffect(() => {
+    if (activeTab === 'facilitators') void loadFacilitators()
+  }, [activeTab])
 
   async function loadOverview() {
     try {
@@ -393,6 +426,125 @@ export default function SuperAdminPage() {
   function closeLearner() {
     setOpenLearnerId(null)
     setTimeout(() => setLearnerDetail(null), 200)
+  }
+
+  // ─── Facilitator management (super admin can edit anyone's profile) ─────
+
+  async function loadFacilitators() {
+    try {
+      setFacilitatorsLoading(true)
+      setError(null)
+      const data = await apiRequest<SuperAdminFacilitator[]>('/academy/superadmin/facilitators')
+      setFacilitators(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load facilitators.')
+    } finally {
+      setFacilitatorsLoading(false)
+    }
+  }
+
+  function openFacilitatorEditor(facilitator: SuperAdminFacilitator) {
+    setEditingFacilitator(facilitator)
+    setFacilitatorForm({
+      name: facilitator.name,
+      title: facilitator.title,
+      organization: facilitator.organization,
+      email: facilitator.email,
+      linkedinUrl: facilitator.linkedinUrl,
+      bio: facilitator.bio ?? '',
+    })
+    setFacilitatorModalError(null)
+    setFacilitatorModalMessage(null)
+  }
+
+  function closeFacilitatorEditor() {
+    setEditingFacilitator(null)
+    setTimeout(() => {
+      setFacilitatorModalError(null)
+      setFacilitatorModalMessage(null)
+    }, 200)
+  }
+
+  async function saveFacilitatorFields() {
+    if (!editingFacilitator) return
+    const payload: Record<string, string> = {}
+    const name = facilitatorForm.name.trim()
+    const title = facilitatorForm.title.trim()
+    const organization = facilitatorForm.organization.trim()
+    const email = facilitatorForm.email.trim()
+    const linkedinUrl = facilitatorForm.linkedinUrl.trim()
+    const bio = facilitatorForm.bio.trim()
+    if (name && name !== editingFacilitator.name) payload.name = name
+    if (title && title !== editingFacilitator.title) payload.title = title
+    if (organization && organization !== editingFacilitator.organization) payload.organization = organization
+    if (email && email.toLowerCase() !== editingFacilitator.email.toLowerCase()) payload.email = email
+    if (linkedinUrl && linkedinUrl !== editingFacilitator.linkedinUrl) payload.linkedinUrl = linkedinUrl
+    if (bio !== (editingFacilitator.bio ?? '')) payload.bio = bio
+    if (Object.keys(payload).length === 0) {
+      setFacilitatorModalMessage('No changes to save.')
+      return
+    }
+    setSavingFacilitator(true)
+    setFacilitatorModalError(null)
+    setFacilitatorModalMessage(null)
+    try {
+      const updated = await apiRequest<SuperAdminFacilitator>(`/academy/superadmin/facilitators/${editingFacilitator.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      })
+      setEditingFacilitator(updated)
+      setFacilitators(cur => cur.map(f => f.id === updated.id ? { ...f, ...updated } : f))
+      setFacilitatorModalMessage('Profile updated.')
+    } catch (err) {
+      setFacilitatorModalError(err instanceof Error ? err.message : 'Unable to save profile.')
+    } finally {
+      setSavingFacilitator(false)
+    }
+  }
+
+  async function handleFacilitatorPhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !editingFacilitator) return
+
+    setUploadingFacilitatorPhoto(true)
+    setFacilitatorModalError(null)
+    setFacilitatorModalMessage(null)
+    try {
+      const dataUrl = await compressImageToBase64(file, { maxBase64KB: 100 })
+      const updated = await apiRequest<SuperAdminFacilitator>(`/academy/superadmin/facilitators/${editingFacilitator.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ photoUrl: dataUrl }),
+      })
+      setEditingFacilitator(updated)
+      setFacilitators(cur => cur.map(f => f.id === updated.id ? { ...f, ...updated } : f))
+      setFacilitatorModalMessage('Profile photo updated.')
+    } catch (err) {
+      setFacilitatorModalError(err instanceof Error ? err.message : 'Unable to update photo.')
+    } finally {
+      setUploadingFacilitatorPhoto(false)
+    }
+  }
+
+  async function removeFacilitatorPhoto() {
+    if (!editingFacilitator) return
+    if (!confirm('Remove this facilitator\'s profile photo? Course pages will fall back to their initials.')) return
+    setUploadingFacilitatorPhoto(true)
+    setFacilitatorModalError(null)
+    setFacilitatorModalMessage(null)
+    try {
+      const updated = await apiRequest<SuperAdminFacilitator>(`/academy/superadmin/facilitators/${editingFacilitator.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ photoUrl: null }),
+      })
+      setEditingFacilitator(updated)
+      setFacilitators(cur => cur.map(f => f.id === updated.id ? { ...f, ...updated } : f))
+      setFacilitatorModalMessage('Profile photo removed.')
+    } catch (err) {
+      setFacilitatorModalError(err instanceof Error ? err.message : 'Unable to remove photo.')
+    } finally {
+      setUploadingFacilitatorPhoto(false)
+    }
   }
 
   async function createCourse(e: FormEvent) {

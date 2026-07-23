@@ -4577,6 +4577,88 @@ router.delete('/superadmin/courses/:courseId', requireAuth, requireSuperAdmin, a
   }
 })
 
+// ─── Super admin: edit any facilitator's profile ───────────────────────────
+//
+// Unlike PATCH /admin/facilitators/me (which only lets an admin edit their
+// own linked Facilitator record), these let a SUPER_ADMIN manage anyone's
+// facilitator profile card — name, title, org, email, LinkedIn, bio, photo.
+
+router.get('/superadmin/facilitators', requireAuth, requireSuperAdmin, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const facilitators = await prisma.facilitator.findMany({
+      orderBy: { name: 'asc' },
+      select: {
+        id: true, name: true, title: true, organization: true, email: true,
+        linkedinUrl: true, photoUrl: true, bio: true, createdAt: true,
+        _count: { select: { courses: true, weeks: true, lessons: true } },
+      },
+    })
+    return sendSuccess(res, facilitators)
+  } catch (err) {
+    next(err)
+  }
+})
+
+const superAdminUpdateFacilitatorSchema = z.object({
+  name: z.string().trim().min(2).max(200).optional(),
+  title: z.string().trim().min(2).max(200).optional(),
+  organization: z.string().trim().min(2).max(200).optional(),
+  email: z.string().email().optional(),
+  linkedinUrl: z.string().url().optional(),
+  bio: z.string().trim().max(2000).optional().nullable(),
+  // Accept either a `data:image/...;base64,...` URL, an https URL, or null to clear.
+  photoUrl: z
+    .string()
+    .nullable()
+    .refine(
+      val => {
+        if (val === null) return true
+        if (val.startsWith('https://') || val.startsWith('http://')) return true
+        return /^data:image\/(jpeg|jpg|png|webp);base64,[a-zA-Z0-9+/=]+$/.test(val)
+      },
+      { message: 'photoUrl must be a base64 data URL (jpeg, png, or webp) or an https URL.' }
+    )
+    .refine(
+      val => val === null || val.length <= PHOTO_MAX_KB_ENCODED * 1024,
+      { message: `Image too large — keep it under ${PHOTO_MAX_KB_ENCODED} KB after encoding.` }
+    )
+    .optional(),
+})
+
+router.patch('/superadmin/facilitators/:id', requireAuth, requireSuperAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = superAdminUpdateFacilitatorSchema.safeParse(req.body)
+    if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+
+    const facilitator = await prisma.facilitator.findUnique({ where: { id: req.params.id } })
+    if (!facilitator) return sendError(res, 'Facilitator not found.', 404)
+
+    const data: Record<string, string | null> = {}
+    if (parsed.data.name !== undefined) data.name = parsed.data.name
+    if (parsed.data.title !== undefined) data.title = parsed.data.title
+    if (parsed.data.organization !== undefined) data.organization = parsed.data.organization
+    if (parsed.data.linkedinUrl !== undefined) data.linkedinUrl = parsed.data.linkedinUrl
+    if (parsed.data.bio !== undefined) data.bio = parsed.data.bio
+    if (parsed.data.photoUrl !== undefined) data.photoUrl = parsed.data.photoUrl
+
+    if (parsed.data.email !== undefined) {
+      const normalizedEmail = parsed.data.email.trim().toLowerCase()
+      if (normalizedEmail !== facilitator.email.toLowerCase()) {
+        const existing = await prisma.facilitator.findFirst({
+          where: { email: { equals: normalizedEmail, mode: 'insensitive' }, id: { not: facilitator.id } },
+        })
+        if (existing) return sendError(res, 'Another facilitator already uses this email.', 409)
+      }
+      data.email = normalizedEmail
+    }
+
+    const updated = await prisma.facilitator.update({ where: { id: facilitator.id }, data })
+    return sendSuccess(res, updated, 'Facilitator profile updated.')
+  } catch (err) {
+    next(err)
+  }
+})
+
 // ─── GET /admin/courses/:courseId/enrollments ──────────────────────────────────
 
 router.get('/admin/courses/:courseId/enrollments', requireAuth, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
