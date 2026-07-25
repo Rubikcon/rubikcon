@@ -1,0 +1,53 @@
+// --- Testimonials ---
+
+
+model Testimonial {
+  id        String   @id @default(uuid())
+  name      String
+  role      String?
+  quote     String
+  photoUrl  String?
+  isActive  Boolean  @default(true)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("testimonials")
+}
+
+enum ReadingResourceType {
+  ARTICLE
+  COURSE
+  DOCUMENTATION
+  WHITEPAPER
+  VIDEO
+  INTERACTIVE
+}
+
+enum QuizAttemptStatus {
+  SUBMITTED
+}
+
+enum AssignmentSubmissionStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+}
+
+enum WeekProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETE
+}
+
+enum CourseStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum ApprovalAction {
+  APPROVED
+  REJECTED
+}

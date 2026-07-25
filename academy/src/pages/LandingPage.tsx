@@ -440,10 +440,13 @@ export default function LandingPage() {
                     >
                       {topic.id}
                     </motion.span>
-                    
+
                     {/* Back face of the 3D circle */}
                     <motion.span
-                      style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
+                      style={{
+                        backfaceVisibility: "hidden",
+                        transform: "rotateY(180deg)",
+                      }}
                       className="
                         absolute
                         inset-0
@@ -1029,38 +1032,69 @@ export default function LandingPage() {
       <TestimonialsMarquee />
 
       {/* ─── 10. COHORT CTA ─── */}
-      <section ref={statsRef} className="bg-[#0A0A0A] py-24 px-6 border-t border-white/5">
+      <section
+        ref={statsRef}
+        className="bg-[#0A0A0A] py-24 px-6 border-t border-white/5"
+      >
         {/* Stats Row */}
         {publicStats && (
           <motion.div
             initial={{ opacity: 0, y: 24 }}
-            animate={isStatsInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
-            transition={{ duration: 0.6, ease: "easeOut", staggerChildren: 0.2 }}
+            animate={
+              isStatsInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }
+            }
+            transition={{
+              duration: 0.6,
+              ease: "easeOut",
+              staggerChildren: 0.2,
+            }}
             className="flex flex-wrap justify-center gap-8 md:gap-16 border-white/10 py-8 mb-16"
           >
             {[
-              { val: publicStats.totalLearners, label: "Active learners across 34 countries", prefix: "", suffix: "+" },
-              { val: publicStats.totalCourses, label: "Production-track courses", prefix: "", suffix: "+" },
-              { val: publicStats.totalFacilitators, label: "Instructors shipping today", prefix: "", suffix: "+" },
-              { val: publicStats.completionRate || 94, label: "Cohort completion rate", prefix: "", suffix: "%" },
+              {
+                val: publicStats.totalLearners,
+                label: "Active learners across 34 countries",
+                prefix: "",
+                suffix: "",
+              },
+              {
+                val: publicStats.totalCourses,
+                label: "Production-track courses",
+                prefix: "",
+                suffix: "",
+              },
+              {
+                val: publicStats.totalFacilitators,
+                label: "Instructors shipping today",
+                prefix: "",
+                suffix: "",
+              },
+              {
+                val: publicStats.completionRate || 94,
+                label: "Cohort completion rate",
+                prefix: "",
+                suffix: "%",
+              },
             ].map((stat, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 15 }}
-              animate={isStatsInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }}
-              transition={{ duration: 0.5, delay: i * 0.15 }}
-              className="flex flex-col gap-1 max-w-[200px] text-center"
-            >
-              <div className="text-3xl md:text-5xl font-bold text-white font-display mb-1 flex items-center justify-center">
-                {stat.prefix}
-                <AnimatedCounter value={stat.val} start={isStatsInView} />
-                {stat.suffix}
-              </div>
-              <div className="text-sm text-white/50 leading-snug">
-                {stat.label}
-              </div>
-            </motion.div>
-          ))}
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 15 }}
+                animate={
+                  isStatsInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }
+                }
+                transition={{ duration: 0.5, delay: i * 0.15 }}
+                className="flex flex-col gap-1 max-w-[200px] text-center"
+              >
+                <div className="text-3xl md:text-5xl font-bold text-white font-display mb-1 flex items-center justify-center">
+                  {stat.prefix}
+                  <AnimatedCounter value={stat.val} start={isStatsInView} />
+                  {stat.suffix}
+                </div>
+                <div className="text-sm text-white/50 leading-snug">
+                  {stat.label}
+                </div>
+              </motion.div>
+            ))}
           </motion.div>
         )}
 

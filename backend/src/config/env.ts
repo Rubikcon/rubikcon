@@ -1,4 +1,5 @@
 import dotenv from 'dotenv'
+import { z } from 'zod'
 dotenv.config()
 
 const defaultAllowedOrigins = [
@@ -12,26 +13,41 @@ const defaultAllowedOrigins = [
   'https://rubikcon-blockgigs.vercel.app',
 ]
 
-const configuredAllowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+const envSchema = z.object({
+  PORT: z.string().default('4000').transform((val) => parseInt(val, 10)),
+  NODE_ENV: z.string().default('development'),
+  JWT_SECRET: z.string().trim().min(1).default('rubikcon-dev-secret'),
+  JWT_EXPIRES_IN: z.string().trim().default('30d'),
+  ALLOWED_ORIGINS: z.string().optional(),
+  RESEND_API_KEY: z.string().trim().default(''),
+  EMAIL_FROM: z.string().trim().default('Rubikcon Academy <noreply@rubikconacademy.xyz>'),
+  ACADEMY_URL: z.string().trim().default('https://www.rubikconacademy.xyz'),
+})
+
+const _env = envSchema.safeParse(process.env)
+
+if (!_env.success) {
+  console.error('❌ Invalid environment variables:')
+  console.error(JSON.stringify(_env.error.format(), null, 2))
+  process.exit(1)
+}
+
+const parsedEnv = _env.data
+
+const configuredAllowedOrigins = (parsedEnv.ALLOWED_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean)
 
 export const config = {
-  port: parseInt(process.env.PORT || '4000', 10),
-  nodeEnv: process.env.NODE_ENV || 'development',
-  jwtSecret: process.env.JWT_SECRET?.trim() || 'rubikcon-dev-secret',
-  // JWT lifetime matches the session row's 30-day expiry so tokens and DB
-  // sessions live and die together. The auth middleware slides the session
-  // window on activity, so active users effectively never have to re-login.
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN?.trim() || '30d',
+  port: parsedEnv.PORT,
+  nodeEnv: parsedEnv.NODE_ENV,
+  jwtSecret: parsedEnv.JWT_SECRET,
+  jwtExpiresIn: parsedEnv.JWT_EXPIRES_IN,
   allowedOrigins: [...new Set([...defaultAllowedOrigins, ...configuredAllowedOrigins])],
-  isDev: process.env.NODE_ENV !== 'production',
+  isDev: parsedEnv.NODE_ENV !== 'production',
 
-  // Email (Resend). If RESEND_API_KEY is unset, the mailer no-ops and just logs,
-  // so the app keeps running locally / before email is configured.
-  resendApiKey: process.env.RESEND_API_KEY?.trim() || '',
-  emailFrom: process.env.EMAIL_FROM?.trim() || 'Rubikcon Academy <noreply@rubikconacademy.xyz>',
-  // Public academy URL used to build deep links in emails
-  academyUrl: process.env.ACADEMY_URL?.trim() || 'https://www.rubikconacademy.xyz',
+  resendApiKey: parsedEnv.RESEND_API_KEY,
+  emailFrom: parsedEnv.EMAIL_FROM,
+  academyUrl: parsedEnv.ACADEMY_URL,
 }

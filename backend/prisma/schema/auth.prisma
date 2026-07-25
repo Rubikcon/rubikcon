@@ -1,0 +1,15 @@
+// --- Session (anonymous + authenticated) ---
+
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  scores Score[]
+
+  @@index([userId])
+  @@map("sessions")
+}

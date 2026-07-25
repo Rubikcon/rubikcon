@@ -1,0 +1,68 @@
+// --- Auth & Users ---
+
+
+model User {
+  id                        String   @id @default(uuid())
+  email                     String   @unique
+  password                  String
+  name                      String?
+  role                      Role     @default(USER)
+  passwordResetToken        String?
+  passwordResetExpiresAt    DateTime?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  // Relations
+  sessions     Session[]
+  progress     Progress[]
+  scores       Score[]
+  applications Application[]
+  gigs         Gig[]
+  savedTerms   SavedGlossaryTerm[]
+  readingItems ReadingProgress[]
+  quizAttempts QuizAttempt[]
+  quizRetakeAccess QuizRetakeUnlock[] @relation("QuizRetakeLearner")
+  quizRetakeUnlocksGranted QuizRetakeUnlock[] @relation("QuizRetakeAdmin")
+  assignmentSubmissions AssignmentSubmission[]
+  assignmentFeedbackGiven AssignmentFeedback[] @relation("AssignmentFeedbackReviewer")
+  weekProgress WeekProgress[]
+  coursesCreated  Course[]         @relation("CourseCreator")
+  courseApprovals CourseApproval[] @relation("CourseApprovalReviewer")
+  courseEnrollments CourseEnrollment[]
+  moduleFeedbacks ModuleFeedback[]
+  profile      UserProfile?
+
+  @@index([email])
+  @@map("users")
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+
+// --- User Profile (onboarding data) ---
+
+
+model UserProfile {
+  id                  String    @id @default(uuid())
+  userId              String    @unique
+  userRole            String?
+  gender              String?
+  country             String?
+  experienceLevel     String?
+  motivation          String?
+  learningInterests   String[]  @default([])
+  telegramHandle      String?
+  twitterHandle       String?
+  onboardingCompleted Boolean   @default(false)
+  completedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}

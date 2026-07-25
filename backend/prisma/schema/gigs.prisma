@@ -1,0 +1,89 @@
+// --- BlockGigs ---
+
+
+model Gig {
+  id          String      @id @default(uuid())
+  title       String
+  description String
+  budget      Float
+  budgetType  BudgetType  @default(FIXED)
+  currency    Currency    @default(USDC)
+  category    String
+  skills      String[]
+  difficulty  Difficulty  @default(MID)
+  deadline    String
+  remote      Boolean     @default(true)
+  featured    Boolean     @default(false)
+  status      GigStatus   @default(OPEN)
+  posterId    String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  poster       User          @relation(fields: [posterId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@index([posterId])
+  @@index([status])
+  @@index([category])
+  @@map("gigs")
+}
+
+model Application {
+  id        String            @id @default(uuid())
+  gigId     String
+  userId    String
+  proposal  String
+  rate      Float?
+  status    ApplicationStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  gig  Gig  @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gigId, userId])
+  @@index([gigId])
+  @@index([userId])
+  @@map("applications")
+}
+
+enum BudgetType {
+  FIXED
+  HOURLY
+}
+
+enum Currency {
+  ETH
+  USDC
+  MATIC
+}
+
+enum Difficulty {
+  ENTRY
+  MID
+  SENIOR
+}
+
+enum GigStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum WeekDifficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum SlideDeckViewerType {
+  MODAL
+  EXTERNAL
+}
