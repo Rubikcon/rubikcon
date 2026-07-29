@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 /**
- * Site-wide footer. Channels come from the June 2026 content brief (§4.6) —
+ * Site-wide footer. Channels come from the June 2026 content brief (§4.6) -
  * company-owned links only; facilitators' personal LinkedIn profiles live on
  * the Facilitators page. Every external link opens in a new tab.
  */
@@ -58,13 +58,6 @@ const ACCOUNT_LINKS = [
   { href: "/course/blockchain-social-impact", label: "Featured Programme" },
 ];
 
-const SOCIALS = [
-  { href: CONTACT.telegram, label: "Telegram", Icon: MessageCircle },
-  { href: CONTACT.linkedin, label: "LinkedIn", Icon: Linkedin },
-  { href: CONTACT.instagram, label: "Instagram", Icon: Instagram },
-  { href: CONTACT.x, label: "X (Twitter)", Icon: Twitter },
-];
-
 export default function AcademyFooter() {
   return (
     <footer className="bg-[#050505] border-t border-white/8">
@@ -105,24 +98,9 @@ export default function AcademyFooter() {
             </a>
             <p className="text-white/45 text-sm leading-relaxed max-w-sm mb-6">
               Practical, industry-focused training in AI, blockchain, product
-              management, and emerging technologies — helping Africans build
+              management, and emerging technologies - helping Africans build
               careers, solve meaningful problems, and drive innovation.
             </p>
-            <div className="flex items-center gap-3">
-              {SOCIALS.map(({ href, label, Icon }) => (
-                <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={label}
-                  aria-label={label}
-                  className="w-10 h-10 rounded-full border border-white/12 flex items-center justify-center text-white/50 hover:text-[#F5C518] hover:border-[#F5C518]/40 hover:bg-[#F5C518]/5 transition-colors"
-                >
-                  <Icon size={16} />
-                </a>
-              ))}
-            </div>
           </div>
 
           {/* Explore */}
