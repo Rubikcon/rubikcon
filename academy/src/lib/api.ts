@@ -145,6 +145,79 @@ async function apiRequestOnce<T>(path: string, init?: RequestInit): Promise<T> {
   return payload.data
 }
 
+export type PaginationMeta = {
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+  hasNext: boolean
+  hasPrev: boolean
+}
+
+type PaginatedApiEnvelope<T> = ApiEnvelope<T> & {
+  pagination: PaginationMeta
+}
+
+export async function apiPaginatedRequest<T>(path: string, init?: RequestInit): Promise<{ data: T; pagination: PaginationMeta }> {
+  const method = (init?.method || 'GET').toUpperCase()
+  const maxAttempts = method === 'GET' ? RETRY_DELAYS_MS.length + 1 : 1
+
+  let lastError: ApiError = new ApiError('Request failed.', 0)
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) await sleep(RETRY_DELAYS_MS[attempt - 1])
+    try {
+      return await apiPaginatedRequestOnce<T>(path, init)
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err
+      const retryable = err.status === 0 || RETRYABLE_STATUS.has(err.status)
+      if (!retryable || attempt === maxAttempts - 1) throw err
+      lastError = err
+    }
+  }
+  throw lastError
+}
+
+async function apiPaginatedRequestOnce<T>(path: string, init?: RequestInit): Promise<{ data: T; pagination: PaginationMeta }> {
+  const headers = new Headers(init?.headers || {})
+  headers.set('Content-Type', 'application/json')
+
+  const token = getAuthToken()
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  let response: Response
+  try {
+    response = await fetch(`${URLS.api}${path}`, { ...init, headers })
+  } catch (err) {
+    throw new ApiError(networkFriendlyMessage(err), 0)
+  }
+
+  if (response.status === 401 && token && !path.startsWith('/auth/')) {
+    handleSessionExpired()
+  }
+
+  let payload: PaginatedApiEnvelope<T>
+  try {
+    payload = (await response.json()) as PaginatedApiEnvelope<T>
+  } catch {
+    throw new ApiError(
+      response.status >= 500
+        ? `Server error (${response.status}). The backend might be restarting — try again in a minute.`
+        : `Request failed (${response.status}).`,
+      response.status,
+    )
+  }
+
+  if (!response.ok || !payload.success) {
+    const baseMessage = payload.message || 'Request failed.'
+    const friendly = formatFieldErrors(baseMessage, payload.errors)
+    throw new ApiError(friendly, response.status, payload.errors)
+  }
+
+  return { data: payload.data, pagination: payload.pagination }
+}
+
 type LoginOptions = {
   /** When true and the user is at the device limit, expire other sessions before issuing this login. */
   forceLogoutOthers?: boolean

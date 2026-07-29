@@ -46,6 +46,39 @@ export default function AcademyNavbar({
     };
   }, []);
 
+  // Handle scroll state
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    // Initialize state
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Handle mobile menu side effects (scroll lock and Escape key)
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+
+    if (menuOpen) {
+      document.body.style.overflow = "hidden";
+      window.addEventListener("keydown", handleEscape);
+    } else {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleEscape);
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [menuOpen]);
+
   const textColor = dark ? "text-white" : "text-[#1C1C1C]";
   const borderColor = scrolled
     ? dark
@@ -57,13 +90,20 @@ export default function AcademyNavbar({
   // where the navbar is always opaque). Otherwise transition on scroll.
   const bg = solid
     ? "bg-[#0A0A0A]/95 backdrop-blur-md"
-    : dark
-      ? "bg-transparent"
-      : "bg-[#F2EDE2]";
+    : scrolled
+      ? "bg-[#0A0A0A]/95 backdrop-blur-md"
+      : dark
+        ? "bg-transparent"
+        : "bg-[#F2EDE2]";
   const hoverColor = dark ? "hover:text-[#F5C518]" : "hover:text-[#C49A00]";
   const secondaryButton = dark
     ? "border-white/30 text-white hover:border-white"
     : "border-black/30 text-[#1C1C1C] hover:border-black";
+
+  const isActive = (href: string) => {
+    if (href === '/') return location === '/';
+    return location === href || location.startsWith(`${href}/`);
+  };
 
   // Active link style for desktop nav
   const desktopLinkClass = (href: string) => {

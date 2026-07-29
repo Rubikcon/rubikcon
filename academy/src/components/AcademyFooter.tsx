@@ -44,9 +44,9 @@ function XLogo({ size = 15 }: { size?: number }) {
   );
 }
 
-const NAV_LINKS = [
-  { href: "/courses", label: "Courses" },
-  { href: "/about", label: "About" },
+const EXPLORE_LINKS = [
+  { href: "/courses", label: "All Courses" },
+  { href: "/about", label: "About Us" },
   { href: "/facilitators", label: "Facilitators" },
   { href: "/contact", label: "Contact" },
 ];

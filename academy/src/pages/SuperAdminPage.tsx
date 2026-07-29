@@ -126,7 +126,8 @@ type Tab =
   | "submissions"
   | "learners"
   | "users"
-  | "facilitators";
+  | "facilitators"
+  | "content";
 
 // ─── Facilitator management types (matches GET /superadmin/facilitators) ──
 

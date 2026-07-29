@@ -13,13 +13,13 @@ export type Testimonial = {
 
 const AUTO_INTERVAL = 5000; // ms between auto-advances
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 
 function mod(n: number, m: number) {
   return ((n % m) + m) % m;
 }
 
-// ─── Star row ─────────────────────────────────────────────────────────────────
+
 
 function Stars() {
   return (
@@ -38,7 +38,7 @@ function Stars() {
   );
 }
 
-// ─── Single slide (banner card) ───────────────────────────────────────────────
+
 
 interface SlideProps {
   t: Testimonial;
@@ -115,7 +115,7 @@ function Slide({ t, active }: SlideProps) {
   );
 }
 
-// ─── Main Carousel ────────────────────────────────────────────────────────────
+
 
 export default function TestimonialsMarquee() {
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
@@ -132,10 +132,10 @@ export default function TestimonialsMarquee() {
 
   const COUNT = testimonials.length;
 
-  // ── Drag state ────────────────────────────────────────────────────────────
+
   const drag = useRef({ active: false, startX: 0, deltaX: 0 });
 
-  // ── Navigate ─────────────────────────────────────────────────────────────
+
   const goTo = useCallback(
     (index: number) => {
       if (isTransitioning) return;
@@ -149,7 +149,7 @@ export default function TestimonialsMarquee() {
   const prev = useCallback(() => goTo(current - 1), [goTo, current]);
   const next = useCallback(() => goTo(current + 1), [goTo, current]);
 
-  // ── Auto-advance ─────────────────────────────────────────────────────────
+
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (COUNT === 0) return; // safety check
@@ -169,7 +169,7 @@ export default function TestimonialsMarquee() {
     };
   }, [isHovered, startTimer]);
 
-  // ── Drag / swipe ─────────────────────────────────────────────────────────
+
   const onPointerDown = (e: React.PointerEvent) => {
     drag.current = { active: true, startX: e.clientX, deltaX: 0 };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);

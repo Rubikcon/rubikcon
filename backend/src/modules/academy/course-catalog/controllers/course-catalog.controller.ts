@@ -47,8 +47,11 @@ export class CourseCatalogController {
 
   async getFacilitators(req: Request, res: Response, next: NextFunction) {
     try {
-      const facilitators = await courseCatalogService.getFacilitators()
-      return sendSuccess(res, facilitators)
+      const page = Math.max(1, parseInt(req.query.page as string) || 1)
+      const limit = Math.min(50, parseInt(req.query.limit as string) || 12)
+      
+      const { facilitators, total } = await courseCatalogService.getFacilitators(page, limit)
+      return sendPaginated(res, facilitators, total, page, limit)
     } catch (err) {
       next(err)
     }

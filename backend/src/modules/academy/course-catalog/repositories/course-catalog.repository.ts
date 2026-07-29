@@ -9,26 +9,31 @@ export class CourseCatalogRepository {
     })
   }
 
-  async findPublicFacilitators() {
-    return prisma.facilitator.findMany({
-      orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        name: true,
-        title: true,
-        organization: true,
-        bio: true,
-        photoUrl: true,
-        linkedinUrl: true,
-        courses: {
-          select: {
-            course: {
-              select: { id: true, slug: true, title: true, published: true },
+  async findPublicFacilitators(skip: number, limit: number) {
+    return Promise.all([
+      prisma.facilitator.findMany({
+        orderBy: { name: 'asc' },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          name: true,
+          title: true,
+          organization: true,
+          bio: true,
+          photoUrl: true,
+          linkedinUrl: true,
+          courses: {
+            select: {
+              course: {
+                select: { id: true, slug: true, title: true, published: true },
+              },
             },
           },
         },
-      },
-    })
+      }),
+      prisma.facilitator.count(),
+    ])
   }
 
   async checkFacilitatorAccess(user: { userId: string; email: string; role: string }, courseId: string) {

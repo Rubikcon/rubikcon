@@ -10,9 +10,10 @@ export class CourseCatalogService {
     return courseCatalogRepository.findActiveTestimonials()
   }
 
-  async getFacilitators() {
-    const facilitators = await courseCatalogRepository.findPublicFacilitators()
-    return facilitators.map(f => ({
+  async getFacilitators(page: number, limit: number) {
+    const skip = (page - 1) * limit
+    const [facilitators, total] = await courseCatalogRepository.findPublicFacilitators(skip, limit)
+    const result = facilitators.map(f => ({
       id: f.id,
       name: f.name,
       title: f.title,
@@ -24,6 +25,7 @@ export class CourseCatalogService {
         .filter(cf => cf.course.published)
         .map(cf => ({ id: cf.course.id, slug: cf.course.slug, title: cf.course.title })),
     }))
+    return { facilitators: result, total }
   }
 
   async contactUs(params: { fullName: string; email: string; subject: string; message: string }) {
