@@ -17,9 +17,10 @@ type Props = {
   src: string
   title?: string
   className?: string
+  onEnded?: () => void
 }
 
-export default function HtmlVideoPlayer({ src, title, className = '' }: Props) {
+export default function HtmlVideoPlayer({ src, title, className = '', onEnded }: Props) {
   type State = 'loading' | 'loaded' | 'error'
   const [state, setState] = useState<State>('loading')
   const [reloadKey, setReloadKey] = useState(0)
@@ -120,6 +121,7 @@ export default function HtmlVideoPlayer({ src, title, className = '' }: Props) {
           controlsList="nodownload"
           onCanPlay={handleCanPlay}
           onError={handleError}
+          onEnded={onEnded}
           className="absolute inset-0 w-full h-full"
           style={{ background: '#000' }}
         >

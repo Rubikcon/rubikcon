@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Route, Switch } from 'wouter'
+import ScrollToTopButton from './components/ScrollToTopButton'
 
 // ─── Eagerly-loaded routes (small, frequently visited) ────────────────────
 import LandingPage from './pages/LandingPage'
@@ -10,9 +11,10 @@ import LandingPage from './pages/LandingPage'
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
-const CoursesPage = lazy(() => import('./pages/CoursesPage'))
 const CoursePage = lazy(() => import('./pages/CoursePage'))
+const CoursesListPage = lazy(() => import('./pages/CoursesListPage'))
 const LessonPage = lazy(() => import('./pages/LessonPage'))
+const SharedVideoPage = lazy(() => import('./pages/SharedVideoPage'))
 const AdminAcademyPage = lazy(() => import('./pages/AdminAcademyPage'))
 const CourseBuilderWizard = lazy(() =>
   import('./pages/CourseBuilderWizard').then(m => ({ default: m.CourseBuilderWizard }))
@@ -24,6 +26,7 @@ const SuperAdminCourseDetailPage = lazy(() => import('./pages/SuperAdminCourseDe
 const FacilitatorsPage = lazy(() => import('./pages/FacilitatorsPage'))
 const AboutPage = lazy(() => import('./pages/AboutPage'))
 const ContactPage = lazy(() => import('./pages/ContactPage'))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 function RouteFallback() {
   return (
@@ -38,27 +41,45 @@ function RouteFallback() {
 
 export default function App() {
   return (
-    <Suspense fallback={<RouteFallback />}>
-      <Switch>
-        <Route path="/" component={LandingPage} />
-        <Route path="/onboarding" component={OnboardingPage} />
-        <Route path="/login" component={LoginPage} />
-        <Route path="/dashboard" component={DashboardPage} />
-        <Route path="/admin" component={AdminAcademyPage} />
-        <Route path="/admin/academy" component={AdminAcademyPage} />
-        <Route path="/admin/courses/:courseId" component={CourseBuilderWizard} />
-        <Route path="/admin/courses/:courseId/lessons/:lessonId" component={LessonEditorPage} />
-        <Route path="/admin/courses/:courseId/weeks/:weekId" component={WeekEditorPage} />
-        <Route path="/admin/superadmin" component={SuperAdminPage} />
-        <Route path="/admin/superadmin/courses/:courseId" component={SuperAdminCourseDetailPage} />
-        <Route path="/facilitators" component={FacilitatorsPage} />
-        <Route path="/about" component={AboutPage} />
-        <Route path="/contact" component={ContactPage} />
-        <Route path="/courses" component={CoursesPage} />
-        <Route path="/course" component={CoursePage} />
-        <Route path="/course/:slug" component={CoursePage} />
-        <Route path="/course/:slug/week/:weekSlug" component={LessonPage} />
-      </Switch>
-    </Suspense>
+    <>
+      <Suspense fallback={<RouteFallback />}>
+        <Switch>
+          {/* ─── Public pages ───────────────────────────────────────────── */}
+          <Route path="/" component={LandingPage} />
+          <Route path="/courses" component={CoursesListPage} />
+          <Route path="/course" component={CoursePage} />
+          <Route path="/course/:slug" component={CoursePage} />
+          <Route path="/course/:slug/week/:weekSlug" component={LessonPage} />
+          <Route path="/share/course/:courseSlug/week/:weekSlug/video/:videoId" component={SharedVideoPage} />
+          <Route path="/facilitators" component={FacilitatorsPage} />
+          <Route path="/about" component={AboutPage} />
+          <Route path="/contact" component={ContactPage} />
+
+          {/* ─── Auth ───────────────────────────────────────────────────── */}
+          <Route path="/login" component={LoginPage} />
+          <Route path="/onboarding" component={OnboardingPage} />
+
+          {/* ─── Learner ────────────────────────────────────────────────── */}
+          <Route path="/dashboard" component={DashboardPage} />
+
+          {/* ─── Facilitator admin ──────────────────────────────────────── */}
+          <Route path="/admin" component={AdminAcademyPage} />
+          <Route path="/admin/academy" component={AdminAcademyPage} />
+          <Route path="/admin/courses/:courseId" component={CourseBuilderWizard} />
+          <Route path="/admin/courses/:courseId/lessons/:lessonId" component={LessonEditorPage} />
+          <Route path="/admin/courses/:courseId/weeks/:weekId" component={WeekEditorPage} />
+
+          {/* ─── Super admin ────────────────────────────────────────────── */}
+          <Route path="/admin/superadmin" component={SuperAdminPage} />
+          <Route path="/admin/superadmin/courses/:courseId" component={SuperAdminCourseDetailPage} />
+
+          {/* ─── 404 catch-all ──────────────────────────────────────────── */}
+          <Route component={NotFoundPage} />
+        </Switch>
+      </Suspense>
+
+      {/* Global floating UI — rendered above all page content */}
+      <ScrollToTopButton />
+    </>
   )
 }

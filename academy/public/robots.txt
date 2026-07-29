@@ -1,0 +1,13 @@
+# robots.txt — Rubikcon Nexus Academy
+# https://www.rubikconacademy.xyz/
+
+User-agent: *
+Allow: /
+
+# Block admin and authenticated routes from indexing
+Disallow: /admin
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /onboarding
+
+Sitemap: https://www.rubikconacademy.xyz/sitemap.xml

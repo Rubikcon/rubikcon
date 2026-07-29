@@ -19,6 +19,7 @@ import LearnerProfileModal from '../components/LearnerProfileModal'
 import AcademyNavbar from '../components/AcademyNavbar'
 import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
+import { AnimatedCounter } from '../components/AnimatedCounter'
 import type { AdminCourse, AdminLearnerProgress, AdminSubmission, CourseStatus } from '../types/academy'
 
 const STATUS_COLORS: Record<CourseStatus, string> = {
@@ -48,7 +49,7 @@ type CourseEnrollment = {
 function StatCard({ icon: Icon, label, value, sub }: {
   icon: typeof BookOpen
   label: string
-  value: number | string
+  value: React.ReactNode
   sub?: string
 }) {
   return (
@@ -70,6 +71,16 @@ export default function AdminAcademyPage() {
   const [progress, setProgress] = useState<AdminLearnerProgress>([])
   const [submissions, setSubmissions] = useState<AdminSubmission>([])
   const [courses, setCourses] = useState<AdminCourse[]>([])
+  const [platformStats, setPlatformStats] = useState<{
+    totalCourses: number;
+    totalLearners: number;
+    totalFacilitators: number;
+    totalLessons: number;
+    totalAssignments: number;
+    totalQuizzes: number;
+    totalTestimonials: number;
+    totalEnrollments: number;
+  } | null>(null)
   const [enrollments, setEnrollments] = useState<Record<string, CourseEnrollment[]>>({})
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
   const [loadingEnrollments, setLoadingEnrollments] = useState(false)
@@ -114,21 +125,35 @@ export default function AdminAcademyPage() {
 
   const auth = getStoredAuth()
 
+  // ─ Synchronous proactive role check ─────────────────────────────────────────
+  // Reading localStorage is synchronous, so we can gate the entire render
+  // before React paints anything. This eliminates the flash of admin UI that
+  // appeared between the first render and the useEffect redirect.
+  if (!auth) { window.location.replace('/login'); return null }
+  if (auth.user.role !== 'ADMIN' && auth.user.role !== 'SUPER_ADMIN') {
+    window.location.replace('/dashboard'); return null
+  }
+
   async function loadAdminData() {
-    const [progressData, submissionData, coursesData] = await Promise.all([
+    const [progressData, submissionData, coursesData, statsData] = await Promise.all([
       apiRequest<AdminLearnerProgress>('/academy/admin/learners/progress'),
       apiRequest<AdminSubmission>('/academy/admin/assignments/submissions'),
       apiRequest<AdminCourse[]>('/academy/admin/courses'),
+      apiRequest<any>('/academy/admin/stats'),
     ])
     setProgress(progressData)
     setSubmissions(submissionData)
     setCourses(coursesData)
+    setPlatformStats(statsData)
   }
 
   useEffect(() => {
-    if (!auth) { window.location.href = '/login'; return }
+    // useEffect guard kept as a belt-and-suspenders fallback in case
+    // the synchronous check above is somehow bypassed (e.g. auth state
+    // changes while the user is already on the page).
+    if (!auth) { window.location.replace('/login'); return }
     if (auth.user.role !== 'ADMIN' && auth.user.role !== 'SUPER_ADMIN') {
-      window.location.href = '/dashboard'; return
+      window.location.replace('/dashboard'); return
     }
     let cancelled = false
     async function load() {
@@ -492,10 +517,43 @@ export default function AdminAcademyPage() {
 
           {/* Stats row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <StatCard icon={BookOpen}      label="Courses"            value={courses.length}         sub={`${courses.filter(c => c.status === 'APPROVED').length} published`} />
-            <StatCard icon={Users}         label="Learner records"    value={progress.length}        sub={`${completedLearners} with completions`} />
-            <StatCard icon={ClipboardList} label="Submissions"        value={submissions.length}     sub={`${pendingSubmissions.length} pending review`} />
-            <StatCard icon={MessageSquare} label="Content units taught" value={new Set(progress.map(p => p.week.id)).size} />
+            <StatCard 
+              icon={BookOpen}      
+              label="Total Courses"            
+              value={platformStats ? <AnimatedCounter value={platformStats.totalCourses} /> : '-'}         
+              sub="Platform-wide" 
+            />
+            <StatCard 
+              icon={Users}         
+              label="Total Learners"    
+              value={platformStats ? <AnimatedCounter value={platformStats.totalLearners} /> : '-'}        
+              sub="Platform-wide" 
+            />
+            <StatCard 
+              icon={CheckCircle2} label="Enrollments"        
+              value={platformStats ? <AnimatedCounter value={platformStats.totalEnrollments} /> : '-'}     
+              sub="Active & Completed" 
+            />
+            <StatCard 
+              icon={ClipboardList} label="Assignments" value={platformStats ? <AnimatedCounter value={platformStats.totalAssignments} /> : '-'} 
+              sub="Platform-wide"
+            />
+            <StatCard 
+              icon={BookOpen} label="Lessons" value={platformStats ? <AnimatedCounter value={platformStats.totalLessons} /> : '-'} 
+              sub="Content Units"
+            />
+            <StatCard 
+              icon={CheckCircle2} label="Quizzes" value={platformStats ? <AnimatedCounter value={platformStats.totalQuizzes} /> : '-'} 
+              sub="Assessments"
+            />
+            <StatCard 
+              icon={Users} label="Facilitators" value={platformStats ? <AnimatedCounter value={platformStats.totalFacilitators} /> : '-'} 
+              sub="Instructors"
+            />
+            <StatCard 
+              icon={MessageSquare} label="Testimonials" value={platformStats ? <AnimatedCounter value={platformStats.totalTestimonials} /> : '-'} 
+              sub="Learner feedback"
+            />
           </div>
 
           {error && (

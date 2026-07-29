@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, ExternalLink, Linkedin, Loader2 } from 'lucide-react'
+import { BookOpen, ExternalLink, Linkedin, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
 import AcademyFooter from '../components/AcademyFooter'
-import { apiRequest } from '../lib/api'
+import { apiRequest, apiPaginatedRequest } from '../lib/api'
 
 type FacilitatorCourse = {
   id: string
@@ -22,9 +22,10 @@ type Facilitator = {
   courses: FacilitatorCourse[]
 }
 
-function Avatar({ facilitator }: { facilitator: Facilitator }) {
-  const src = facilitator.photoUrl ?? null
-  const [imgFailed, setImgFailed] = useState(false)
+function FacilitatorCard({ facilitator, index }: { facilitator: Facilitator; index: number }) {
+  const [expanded, setExpanded] = useState(false)
+  const bioTruncated = facilitator.bio && facilitator.bio.length > 160
+
   const initials = facilitator.name
     .split(' ')
     .slice(0, 2)
@@ -32,97 +33,97 @@ function Avatar({ facilitator }: { facilitator: Facilitator }) {
     .join('')
     .toUpperCase()
 
-  if (src && !imgFailed) {
-    return (
-      <img
-        src={src}
-        alt={facilitator.name}
-        className="w-20 h-20 rounded-full object-cover ring-2 ring-white/10"
-        onError={() => setImgFailed(true)}
-      />
-    )
-  }
-
-  return (
-    <div className="w-20 h-20 rounded-full bg-[#F5C518]/15 ring-2 ring-[#F5C518]/30 flex items-center justify-center">
-      <span className="text-[#F5C518] font-bold text-xl">{initials}</span>
-    </div>
-  )
-}
-
-function FacilitatorCard({ facilitator, index }: { facilitator: Facilitator; index: number }) {
-  const [expanded, setExpanded] = useState(false)
-  const bioTruncated = facilitator.bio && facilitator.bio.length > 160
-
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.07, ease: 'easeOut' }}
-      className="bg-white/[0.04] border border-white/10 rounded-2xl p-6 flex flex-col gap-5 hover:border-white/20 transition-colors"
+      transition={{ delay: index * 0.1 }}
+      className="rounded-3xl border border-white/10 bg-white/[0.03] overflow-hidden hover:border-white/20 transition-colors flex flex-col"
     >
-      {/* Header */}
-      <div className="flex items-start gap-4">
-        <Avatar facilitator={facilitator} />
-        <div className="min-w-0 flex-1 pt-1">
-          <h3 className="text-white font-semibold text-base leading-tight truncate">{facilitator.name}</h3>
-          <p className="text-[#F5C518] text-sm font-medium mt-0.5 truncate">{facilitator.title}</p>
+      <div className="block w-full">
+        {facilitator.photoUrl ? (
+          <img
+            src={facilitator.photoUrl}
+            alt={facilitator.name}
+            loading="lazy"
+            decoding="async"
+            className="w-full aspect-[16/11] object-cover object-[center_20%]"
+          />
+        ) : (
+          <div className="w-full aspect-[16/11] bg-gradient-to-br from-[#3D2F00] to-[#141414] flex items-center justify-center">
+            <div className="w-28 h-28 rounded-full border-2 border-[#F5C518]/40 bg-[#F5C518]/10 flex items-center justify-center">
+              <span className="font-display font-extrabold text-[#F5C518] text-4xl">
+                {initials}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      <div className="p-6 sm:p-8 flex flex-col gap-4 flex-1">
+        <div>
+          <h3 className="font-display font-extrabold text-white text-2xl mb-1">
+            {facilitator.name}
+          </h3>
+          <p className="text-[#F5C518] text-sm font-semibold truncate">
+            {facilitator.title}
+          </p>
           <p className="text-white/45 text-xs mt-0.5 truncate">{facilitator.organization}</p>
         </div>
-      </div>
 
-      {/* Bio */}
-      {facilitator.bio && (
-        <div>
-          <p className="text-white/60 text-sm leading-relaxed">
-            {expanded || !bioTruncated
-              ? facilitator.bio
-              : `${facilitator.bio.slice(0, 160)}…`}
-          </p>
-          {bioTruncated && (
-            <button
-              onClick={() => setExpanded(v => !v)}
-              className="text-[#F5C518]/80 text-xs mt-1.5 hover:text-[#F5C518] transition-colors"
-            >
-              {expanded ? 'Show less' : 'Read more'}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Courses */}
-      {facilitator.courses.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <p className="text-white/30 text-xs uppercase tracking-widest font-semibold">Teaching</p>
-          <div className="flex flex-col gap-1.5">
-            {facilitator.courses.map(course => (
-              <a
-                key={course.id}
-                href={`/course/${course.slug}`}
-                className="flex items-center gap-2 group"
+        {/* Bio */}
+        {facilitator.bio && (
+          <div>
+            <p className="text-white/55 text-[15px] leading-relaxed">
+              {expanded || !bioTruncated
+                ? facilitator.bio
+                : `${facilitator.bio.slice(0, 160)}…`}
+            </p>
+            {bioTruncated && (
+              <button
+                onClick={() => setExpanded(v => !v)}
+                className="text-[#F5C518]/80 text-xs mt-1.5 hover:text-[#F5C518] transition-colors font-medium"
               >
-                <BookOpen size={12} className="text-white/30 shrink-0 group-hover:text-[#F5C518] transition-colors" />
-                <span className="text-white/55 text-xs leading-snug group-hover:text-white/90 transition-colors truncate">
-                  {course.title}
-                </span>
-              </a>
-            ))}
+                {expanded ? 'Show less' : 'Read more'}
+              </button>
+            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Footer */}
-      <div className="mt-auto pt-2 border-t border-white/8">
-        <a
-          href={facilitator.linkedinUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-[#F5C518] transition-colors"
-        >
-          <Linkedin size={13} />
-          LinkedIn
-          <ExternalLink size={10} className="opacity-60" />
-        </a>
+        {/* Courses */}
+        {facilitator.courses.length > 0 && (
+          <div className="flex flex-col gap-2 mt-2">
+            <p className="text-white/30 text-[11px] uppercase tracking-widest font-semibold">Teaching</p>
+            <div className="flex flex-col gap-1.5">
+              {facilitator.courses.map(course => (
+                <a
+                  key={course.id}
+                  href={`/course/${course.slug}`}
+                  className="flex items-center gap-2 group"
+                >
+                  <BookOpen size={12} className="text-white/30 shrink-0 group-hover:text-[#F5C518] transition-colors" />
+                  <span className="text-white/55 text-xs leading-snug group-hover:text-white/90 transition-colors truncate">
+                    {course.title}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="mt-auto pt-5 border-t border-white/8">
+          <a
+            href={facilitator.linkedinUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-[#F5C518] transition-colors"
+          >
+            <Linkedin size={13} />
+            LinkedIn
+            <ExternalLink size={10} className="opacity-60" />
+          </a>
+        </div>
       </div>
     </motion.div>
   )
@@ -132,15 +133,27 @@ export default function FacilitatorsPage() {
   const [facilitators, setFacilitators] = useState<Facilitator[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
 
   useEffect(() => {
     let cancelled = false
-    apiRequest<Facilitator[]>('/academy/facilitators')
-      .then(data => { if (!cancelled) setFacilitators(data) })
-      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load facilitators.') })
-      .finally(() => { if (!cancelled) setLoading(false) })
+    setLoading(true)
+    apiPaginatedRequest<Facilitator[]>(`/academy/facilitators?page=${page}&limit=6`)
+      .then(res => {
+        if (!cancelled) {
+          setFacilitators(res.data)
+          setTotalPages(res.pagination.totalPages || 1)
+        }
+      })
+      .catch(err => { 
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load facilitators.') 
+      })
+      .finally(() => { 
+        if (!cancelled) setLoading(false) 
+      })
     return () => { cancelled = true }
-  }, [])
+  }, [page])
 
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
@@ -157,7 +170,7 @@ export default function FacilitatorsPage() {
           <span className="inline-block text-[#F5C518] text-xs font-semibold uppercase tracking-[0.18em] mb-4">
             Our Team
           </span>
-          <h1 className="text-white font-bold text-4xl sm:text-5xl leading-tight mb-4">
+          <h1 className="text-white font-bold text-4xl sm:text-5xl leading-tight mb-4 font-display">
             Meet Our Facilitators
           </h1>
           <p className="text-white/50 text-lg max-w-2xl leading-relaxed">
@@ -194,10 +207,35 @@ export default function FacilitatorsPage() {
 
         {/* Grid */}
         {!loading && !error && facilitators.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {facilitators.map((f, i) => (
               <FacilitatorCard key={f.id} facilitator={f} index={i} />
             ))}
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {!loading && !error && totalPages > 1 && (
+          <div className="flex items-center justify-center gap-4 mt-12">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="inline-flex items-center gap-2 border border-white/15 bg-white/[0.03] text-white w-10 h-10 justify-center rounded-full hover:border-white/30 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              aria-label="Previous page"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-white/50 text-sm font-medium">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="inline-flex items-center gap-2 border border-white/15 bg-white/[0.03] text-white w-10 h-10 justify-center rounded-full hover:border-white/30 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              aria-label="Next page"
+            >
+              <ChevronRight size={16} />
+            </button>
           </div>
         )}
 
@@ -206,10 +244,11 @@ export default function FacilitatorsPage() {
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mt-14 rounded-2xl border border-white/10 bg-white/[0.03] p-7"
+          className="mt-16 rounded-3xl border border-white/10 bg-white/[0.03] p-8 sm:p-10"
         >
-          <p className="text-xs font-mono uppercase tracking-widest text-white/30 mb-3">Guest Facilitators</p>
-          <p className="text-white/55 text-sm leading-relaxed max-w-3xl">
+          <p className="text-xs font-mono uppercase tracking-widest text-white/30 mb-4">Guest Facilitators</p>
+          <h3 className="font-display font-extrabold text-white text-2xl mb-4">Expert perspectives for every cohort</h3>
+          <p className="text-white/55 text-[15px] leading-relaxed max-w-3xl">
             Each cohort may include guest facilitators — industry experts, founders, researchers, and technology
             leaders who bring specialised knowledge and real-world perspectives to selected sessions. Guest
             facilitators are announced before each cohort begins.
@@ -221,11 +260,12 @@ export default function FacilitatorsPage() {
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mt-6 rounded-2xl border border-[#F5C518]/20 bg-[#F5C518]/[0.06] p-7 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
+          className="mt-8 rounded-3xl border border-[#F5C518]/20 bg-[#F5C518]/[0.06] p-8 sm:p-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-8"
         >
           <div>
-            <p className="text-xs font-mono uppercase tracking-widest text-[#F5C518] mb-3">Partner With Our Facilitators</p>
-            <p className="text-white/55 text-sm leading-relaxed max-w-2xl">
+            <p className="text-xs font-mono uppercase tracking-widest text-[#F5C518] mb-4">Partner With Our Facilitators</p>
+            <h3 className="font-display font-extrabold text-white text-2xl mb-4">Bring Rubikcon Nexus to your team</h3>
+            <p className="text-white/60 text-[15px] leading-relaxed max-w-2xl">
               Interested in bringing Rubikcon Nexus Academy to your organisation? We welcome opportunities to
               collaborate on corporate training, funded learning programmes, university partnerships, workshops,
               speaking engagements, and technology capacity-building initiatives across Africa.
@@ -233,7 +273,7 @@ export default function FacilitatorsPage() {
           </div>
           <a
             href="/contact"
-            className="shrink-0 inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-bold px-6 py-3 rounded-full hover:bg-[#E8B800] transition-colors text-sm whitespace-nowrap"
+            className="shrink-0 inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-bold px-7 py-3.5 rounded-full hover:bg-[#E8B800] transition-colors text-[15px] whitespace-nowrap"
           >
             Contact Us →
           </a>
@@ -243,3 +283,4 @@ export default function FacilitatorsPage() {
     </div>
   )
 }
+

@@ -5,16 +5,21 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "npx prisma generate && npx prisma migrate deploy && tsc",
+    "test": "vitest",
+    "lint": "eslint \"src/**/*.ts\"",
+    "find-deadcode": "ts-prune",
     "start": "node dist/index.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "tsx prisma/seeds/seed.ts",
     "create-superadmin": "tsx scripts/create-superadmin.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.9.0",
+    "@asteasolutions/zod-to-openapi": "^7.3.4",
+    "@prisma/adapter-pg": "^7.9.0",
+    "@prisma/client": "^7.9.0",
     "@supabase/supabase-js": "^2.103.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/compression": "^1.8.1",
@@ -29,13 +34,35 @@
     "dotenv": "^16.4.0",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
-    "prisma": "^5.9.0",
+    "pg": "^8.22.0",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
     "resend": "^6.12.4",
+    "swagger-ui-express": "^5.0.1",
     "typescript": "^5.3.3",
     "uuid": "^9.0.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "tsx": "^4.7.0"
+    "@eslint/js": "^10.0.1",
+    "@faker-js/faker": "^10.5.0",
+    "@types/pg": "^8.20.0",
+    "@types/pino-http": "^5.8.4",
+    "@types/supertest": "^7.2.1",
+    "@types/swagger-ui-express": "^4.1.8",
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.65.0",
+    "eslint": "^10.8.0",
+    "pino-pretty": "^13.1.3",
+    "prisma": "^7.9.0",
+    "supertest": "^7.2.2",
+    "ts-morph": "^28.0.0",
+    "ts-prune": "^0.10.3",
+    "tsx": "^4.7.0",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seeds/seed.ts"
   }
 }

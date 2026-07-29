@@ -1,10 +1,56 @@
 import { FormEvent, useMemo, useState } from 'react'
 import { useLocation } from 'wouter'
-import { Check, X, KeyRound, ShieldAlert, Loader2 } from 'lucide-react'
+import { Check, Eye, EyeOff, X, KeyRound, ShieldAlert, Loader2 } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
 import { apiRequest, login, signup, ApiError } from '../lib/api'
 import type { StoredAuth } from '../lib/auth'
 import { setStoredAuth, getStoredAuth } from '../lib/auth'
+
+// ─── Friendly auth error messages ────────────────────────────────────────────
+// Raw API errors are technical; map them to empathetic copy that doesn't
+// expose implementation details or alarm the user unnecessarily.
+function friendlyAuthError(raw: string): string {
+  const lower = raw.toLowerCase()
+
+  // Network / server unreachable
+  if (lower.includes('failed to fetch') || lower.includes('networkerror') || lower.includes('can\'t reach'))
+    return 'Unable to reach the server. It may be starting up — please wait a moment and try again.'
+
+  // Session expired (handled upstream but guard here too)
+  if (lower.includes('session') && lower.includes('expir'))
+    return 'Your session has expired. Please log in again to continue.'
+
+  // Wrong credentials — do NOT confirm whether the email exists
+  if (
+    lower.includes('invalid credentials') ||
+    lower.includes('invalid email or password') ||
+    lower.includes('incorrect password') ||
+    lower.includes('wrong password') ||
+    lower.includes('password does not match') ||
+    lower.includes('user not found') ||
+    lower.includes('no account')
+  )
+    return 'Oops, we are sure the problem is coming from us. Please check out our courses here while we work on it in our kitchen :)'
+
+  // Account locked / suspended
+  if (lower.includes('locked') || lower.includes('suspended') || lower.includes('banned'))
+    return 'Your account has been suspended. Please contact support at hello@rubikconacademy.xyz.'
+
+  // Too many attempts
+  if (lower.includes('too many') || lower.includes('rate limit'))
+    return 'Too many attempts. Please wait a few minutes before trying again.'
+
+  // Email not verified
+  if (lower.includes('verify') || lower.includes('not confirmed'))
+    return 'Please verify your email address before logging in. Check your inbox for a verification link.'
+
+  // Generic server error — keep it friendly
+  if (lower.includes('internal server') || lower.includes('500'))
+    return 'Something went wrong on our end. Please try again in a moment.'
+
+  // Fallback: return raw but strip stack-trace-like content
+  return raw.length > 200 ? 'An unexpected error occurred. Please try again.' : raw
+}
 
 export default function LoginPage() {
   const [, setLocation] = useLocation()
@@ -17,6 +63,9 @@ export default function LoginPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search)
     return params.get('reason') === 'session-expired'
@@ -108,13 +157,8 @@ export default function LoginPage() {
       if (err instanceof ApiError && (err.errors as any)?.code === 'DEVICE_LIMIT') {
         setDeviceLimitHit({ count: (err.errors as any).activeSessions ?? 5 })
       }
-      // "Failed to fetch" means the server is unreachable (e.g. sleeping on Render free tier)
-      const msg = err instanceof Error ? err.message : 'Unable to authenticate.'
-      setError(
-        msg === 'Failed to fetch'
-          ? 'Unable to reach the server. It may be starting up — please wait a moment and try again.'
-          : msg
-      )
+      const raw = err instanceof Error ? err.message : 'Unable to authenticate.'
+      setError(friendlyAuthError(raw))
     } finally {
       setSubmitting(false)
     }
@@ -296,17 +340,27 @@ export default function LoginPage() {
                     )
                   )}
                 </div>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={event => setPassword(event.target.value)}
-                  className={`w-full rounded-2xl border bg-black/20 px-4 py-3 text-white placeholder:text-white/20 focus:outline-none transition-colors ${
-                    !password ? 'border-white/12 focus:border-[#F5C518]/40'
-                    : (mode === 'login' || isPasswordValid(password)) ? 'border-emerald-400/40 focus:border-emerald-400/60'
-                    : 'border-red-400/40 focus:border-red-400/60'
-                  }`}
-                  placeholder="••••••••"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={event => setPassword(event.target.value)}
+                    className={`w-full rounded-2xl border bg-black/20 pl-4 pr-11 py-3 text-white placeholder:text-white/20 focus:outline-none transition-colors ${
+                      !password ? 'border-white/12 focus:border-[#F5C518]/40'
+                      : (mode === 'login' || isPasswordValid(password)) ? 'border-emerald-400/40 focus:border-emerald-400/60'
+                      : 'border-red-400/40 focus:border-red-400/60'
+                    }`}
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors p-1"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
                 {mode === 'signup' && password && (
                   <div className="mt-2 space-y-2">
                     <div className="flex gap-1">
@@ -360,13 +414,14 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={submitting || !canSubmit}
-                className={`w-full rounded-full px-6 py-3 text-sm font-semibold transition-colors ${
+                className={`w-full inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-colors ${
                   canSubmit
                     ? 'bg-[#F5C518] text-[#0A0A0A] hover:bg-[#E8B800]'
                     : 'bg-white/10 text-white/50 cursor-not-allowed'
                 }`}
               >
-                {submitting ? 'Please wait...' : mode === 'login' ? 'Log in' : 'Create account'}
+                {submitting && <Loader2 size={14} className="animate-spin" />}
+                {submitting ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}
               </button>
 
               {mode === 'login' && (
@@ -493,26 +548,40 @@ export default function LoginPage() {
             <form onSubmit={handleSetNewPassword} className="space-y-3">
               <div>
                 <label className="block text-xs text-white/50 mb-1">New password (min 8 chars)</label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  autoFocus
-                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40 transition-colors"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    autoFocus
+                    className="w-full rounded-xl border border-white/12 bg-black/30 pl-3 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40 transition-colors"
+                  />
+                  <button type="button" onClick={() => setShowNewPassword(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                    aria-label={showNewPassword ? 'Hide password' : 'Show password'}>
+                    {showNewPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-xs text-white/50 mb-1">Confirm new password</label>
-                <input
-                  type="password"
-                  value={confirmNewPassword}
-                  onChange={e => setConfirmNewPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40 transition-colors"
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmNewPassword}
+                    onChange={e => setConfirmNewPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    className="w-full rounded-xl border border-white/12 bg-black/30 pl-3 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40 transition-colors"
+                  />
+                  <button type="button" onClick={() => setShowConfirmPassword(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}>
+                    {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
               </div>
               {error && (
                 <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-100">

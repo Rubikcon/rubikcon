@@ -1,0 +1,19 @@
+// --- Games ---
+
+
+model Score {
+  id        String   @id @default(uuid())
+  sessionId String
+  gameId    String
+  score     Int
+  createdAt DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId  String?
+
+  @@index([sessionId])
+  @@index([gameId])
+  @@index([userId])
+  @@map("scores")
+}

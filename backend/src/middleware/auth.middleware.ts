@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express'
 import { verifyToken, sendError, JWTPayload } from '../utils/response'
-import prisma from '../config/database'
+import { authRepository } from '../modules/auth/repositories/auth.repository'
 
 // Extend Express Request to carry user
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       user?: JWTPayload
@@ -37,10 +38,7 @@ async function validateSession(payload: JWTPayload): Promise<{ ok: true } | { ok
     // Legacy token (signed before this change). Accept until it expires.
     return { ok: true }
   }
-  const session = await prisma.session.findUnique({
-    where: { id: payload.sessionId },
-    select: { id: true, userId: true, expiresAt: true },
-  })
+  const session = await authRepository.findSessionById(payload.sessionId)
   if (!session) return { ok: false, reason: 'Session not found. Please log in again.' }
   if (session.userId !== payload.userId) {
     // Should never happen unless something is tampered with.
@@ -54,10 +52,7 @@ async function validateSession(payload: JWTPayload): Promise<{ ok: true } | { ok
   const msUntilExpiry = session.expiresAt.getTime() - now.getTime()
   const thresholdMs = SLIDE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000
   if (msUntilExpiry < thresholdMs) {
-    await prisma.session.update({
-      where: { id: session.id },
-      data: { expiresAt: addDays(now, SESSION_DURATION_DAYS) },
-    })
+    await authRepository.extendSession(session.id, addDays(now, SESSION_DURATION_DAYS))
   }
   return { ok: true }
 }

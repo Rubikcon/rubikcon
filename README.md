@@ -6,7 +6,7 @@ A production-ready monorepo containing 4 independent frontend applications and a
 
 ## 📁 Project Structure
 
-```
+```bash
 rubikcon/
 ├── landing/          → rubikcon.com                    (port 3000)
 ├── academy/          → www.rubikconacademy.xyz        (port 3001)
@@ -19,19 +19,20 @@ rubikcon/
 
 ## ⚙️ Tech Stack
 
-| Layer      | Technology                                        |
-|------------|---------------------------------------------------|
-| Frontend   | React 18, Vite, TypeScript, TailwindCSS, Framer Motion, Wouter |
-| Backend    | Node.js, Express, TypeScript                      |
-| Database   | PostgreSQL + Prisma ORM                           |
-| Auth       | JWT (access tokens, 7d expiry)                    |
-| Sessions   | Anonymous session support (no login required for Games) |
+| Layer    | Technology                                                     |
+| -------- | -------------------------------------------------------------- |
+| Frontend | React 18, Vite, TypeScript, TailwindCSS, Framer Motion, Wouter |
+| Backend  | Node.js, Express, TypeScript                                   |
+| Database | PostgreSQL + Prisma ORM                                        |
+| Auth     | JWT (access tokens, 7d expiry)                                 |
+| Sessions | Anonymous session support (no login required for Games)        |
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js 18+
 - PostgreSQL 14+
 - npm or pnpm
@@ -66,10 +67,11 @@ npm run dev
 ```
 
 **Seed credentials:**
-| Role  | Email                  | Password      |
-|-------|------------------------|---------------|
-| Admin | admin@rubikcon.com     | admin123456   |
-| Demo  | demo@rubikcon.com      | demo12345     |
+
+| Role  | Email              | Password    |
+| ----- | ------------------ | ----------- |
+| Admin | admin@rubikcon.com | admin123456 |
+| Demo  | demo@rubikcon.com  | demo12345   |
 
 ---
 
@@ -100,11 +102,13 @@ cd blockgigs && npm install && npm run dev
 The main marketing site for Rubikcon.
 
 **Pages:**
+
 - `/` — Full homepage (Hero, Products, Features, Testimonials, CTA, Footer)
 - `/login` — JWT login form
 - `/signup` — Account creation form
 
 **Features:**
+
 - Parallax hero with animated mesh background
 - Product showcase cards (Academy, Games, BlockGigs)
 - Mobile-responsive nav with dropdown
@@ -117,11 +121,13 @@ The main marketing site for Rubikcon.
 Full learning management system.
 
 **Pages:**
+
 - `/` — Course landing with enroll CTA
 - `/course` — Module browser with progress tracking
 - `/lesson/:id` — Full lesson experience
 
 **Features:**
+
 - 4 modules, 10+ lessons (static data — wire to backend to persist)
 - Expandable module sidebar
 - Embedded YouTube video player
@@ -136,15 +142,18 @@ Full learning management system.
 Session-based gaming platform. **No login required.**
 
 **Pages:**
+
 - `/` — Game lobby with leaderboard
 - `/play/:id` — Active play screen
 
 **Games implemented:**
+
 - **Hash Runner** — Type block numbers to score combos (30s timer)
 - **Block Blast** — Tap colored tiles before they vanish (45s timer)
 - All other games: Hash Runner engine (extend to add new games)
 
 **Features:**
+
 - Anonymous session via `localStorage` (UUID-based)
 - Personal high score tracking per game
 - Live leaderboard sidebar
@@ -157,11 +166,13 @@ Session-based gaming platform. **No login required.**
 Decentralized talent marketplace.
 
 **Pages:**
+
 - `/` — Gig + Freelancer marketplace with filters
 - `/gig/:id` — Full gig detail with application form
 - `/freelancer/:id` — Freelancer profile with reviews
 
 **Features:**
+
 - Filter by category, currency, difficulty
 - Featured gig highlighting
 - Apply with proposal form (requires auth on backend)
@@ -174,14 +185,16 @@ Decentralized talent marketplace.
 Base URL: `http://localhost:4000`
 
 ### Auth
-```
+
+```bash
 POST   /auth/signup          Register new user
 POST   /auth/login           Login, receive JWT
 GET    /auth/me              Get current user (requires token)
 ```
 
 ### Academy
-```
+
+```bash
 GET    /academy/course           List all courses
 GET    /academy/course/:slug     Single course with modules + lessons
 GET    /academy/lesson/:id       Single lesson
@@ -190,7 +203,8 @@ GET    /academy/progress         Get my progress (auth required)
 ```
 
 ### Games
-```
+
+```bash
 POST   /games/session/start       Start a new session (anon or auth)
 GET    /games/session/:id         Get session + scores
 POST   /games/score               Submit a score
@@ -199,7 +213,8 @@ GET    /games/leaderboard/:gameId Top scores for one game
 ```
 
 ### Gigs
-```
+
+```bash
 GET    /gigs                      List gigs (paginated, filterable)
 GET    /gigs/:id                  Single gig detail
 POST   /gigs                      Post a gig (auth required)
@@ -208,11 +223,13 @@ GET    /gigs/:id/applications     View applications (poster only)
 ```
 
 ### Auth Header
+
 ```
 Authorization: Bearer <jwt_token>
 ```
 
 ### Response Format
+
 ```json
 {
   "success": true,
@@ -226,7 +243,7 @@ Authorization: Bearer <jwt_token>
 
 ## 🗄️ Database Schema
 
-```
+```bash
 User         → id, email, password, name, role
 Session      → id, userId (nullable), expiresAt
 Course       → id, title, slug, published
@@ -254,8 +271,10 @@ Application  → id, gigId, userId, proposal, rate, status
 ## 🚢 Deployment
 
 ### Frontend (Vercel)
+
 Each app deploys independently to Vercel. Set environment build commands:
-```
+
+```bash
 Build: npm run build
 Output: dist
 ```
@@ -263,6 +282,7 @@ Output: dist
 Update `APPS` URLs in each frontend from `localhost` to production domains.
 
 ### Backend (Railway / Render)
+
 ```bash
 # Set these environment variables in your deployment:
 DATABASE_URL=postgresql://...
@@ -273,36 +293,40 @@ NODE_ENV=production
 ```
 
 ### Database
+
 Use Railway PostgreSQL, Supabase, or Neon.tech for managed PostgreSQL.
 
 ---
 
 ## 📜 Scripts Reference
 
-| App       | Command          | Description                    |
-|-----------|------------------|--------------------------------|
-| all       | `npm install`    | Install dependencies           |
-| all       | `npm run dev`    | Start dev server               |
-| all       | `npm run build`  | Production build               |
-| backend   | `npm run db:generate` | Generate Prisma client    |
-| backend   | `npm run db:migrate`  | Run DB migrations         |
-| backend   | `npm run db:seed`     | Seed demo data            |
-| backend   | `npm run db:studio`   | Open Prisma Studio        |
+| App     | Command               | Description            |
+| ------- | --------------------- | ---------------------- |
+| all     | `npm install`         | Install dependencies   |
+| all     | `npm run dev`         | Start dev server       |
+| all     | `npm run build`       | Production build       |
+| backend | `npm run db:generate` | Generate Prisma client |
+| backend | `npm run db:migrate`  | Run DB migrations      |
+| backend | `npm run db:seed`     | Seed demo data         |
+| backend | `npm run db:studio`   | Open Prisma Studio     |
 
 ---
 
 ## 🛠 Extending the Platform
 
 ### Add a new game to Games app
+
 1. Create a new game component in `games/src/pages/PlayPage.tsx`
 2. Add its entry to `games/src/data/gamesData.ts`
 3. Add a case in `renderGame()` inside `PlayPage`
 
 ### Add a new course to Academy
+
 1. Add modules/lessons to `academy/src/data/courseData.ts`  
    OR seed via `backend/prisma/seed.ts` and wire the API
 
 ### Add a new API module to Backend
+
 1. Create `backend/src/modules/<name>/<name>.routes.ts`
 2. Add `prisma.model` to `schema.prisma`
 3. Run `npm run db:migrate`
