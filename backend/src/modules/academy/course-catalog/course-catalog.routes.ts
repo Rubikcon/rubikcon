@@ -11,11 +11,14 @@ router.get('/testimonials', courseCatalogController.getTestimonials)
 router.get('/facilitators', courseCatalogController.getFacilitators)
 router.post('/contact', courseCatalogController.contactUs)
 router.get('/public/stats', courseCatalogController.getPlatformStats)
+router.get('/public/courses/:courseSlug/weeks/:weekSlug/videos/:videoId', courseCatalogController.getPublicSharedVideo)
 
 // Public course catalog endpoints
+router.get('/courses/meta', courseCatalogController.getFilterMeta)
 router.get('/courses', optionalAuth, courseCatalogController.getPublicCourses)
 router.get('/courses/:slug', optionalAuth, courseCatalogController.getCourseDetails)
 router.get('/courses/:slug/weeks', optionalAuth, courseCatalogController.getCourseWeeks)
+router.post('/courses/:slug/enroll', requireAuth, courseCatalogController.enroll)
 
 // --- Admin Course Management ---
 

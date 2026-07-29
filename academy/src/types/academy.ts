@@ -274,6 +274,8 @@ export type WeekDetail = {
     objectives: string[]
     whatToExpect: string
     summary: string
+    lessonContent: string | null
+    images: Array<{ id: string; url: string; alt: string | null; caption: string | null; position: number }>
   }
   resources: {
     /** Primary/first slide deck (kept for backwards compatibility). */

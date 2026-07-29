@@ -116,7 +116,7 @@ export default function CoursePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0A0A0A]">
-        <AcademyNavbar showBack backHref="/courses" backLabel="All Courses" solid />
+        <AcademyNavbar showBack backHref="/" backLabel="Home" solid />
         <div className="pt-32 flex flex-col items-center justify-center text-center px-6">
           <Loader2 className="animate-spin text-[#F5C518] mb-4" size={28} />
           <p className="text-white/60">Loading course...</p>
@@ -128,7 +128,7 @@ export default function CoursePage() {
   if (error || !course) {
     return (
       <div className="min-h-screen bg-[#0A0A0A]">
-        <AcademyNavbar showBack backHref="/courses" backLabel="All Courses" solid />
+        <AcademyNavbar showBack backHref="/" backLabel="Home" solid />
         <div className="pt-32 max-w-xl mx-auto px-6 text-center">
           <h1 className="font-display text-3xl font-extrabold text-white mb-3">Course unavailable</h1>
           <p className="text-white/55 mb-8">{error || 'We could not load this course right now.'}</p>
@@ -150,7 +150,7 @@ export default function CoursePage() {
   if (!course.enrolled) {
     return (
       <div className="min-h-screen bg-[#0A0A0A]">
-        <AcademyNavbar showBack backHref="/courses" backLabel="All Courses" solid />
+        <AcademyNavbar showBack backHref="/" backLabel="Home" solid />
         <main className="pt-24 pb-20 px-4 md:px-6">
           <div className="max-w-4xl mx-auto">
 
@@ -242,8 +242,8 @@ export default function CoursePage() {
                   {enrolling ? 'Enrolling...' : 'Enrol now'}
                   {!enrolling && <ArrowRight size={16} />}
                 </button>
-                <a href="/courses" className="text-sm text-white/40 hover:text-white/60 transition-colors">
-                  Back to catalog
+                <a href="/" className="text-sm text-white/40 hover:text-white/60 transition-colors">
+                  Back to Home
                 </a>
               </div>
             </motion.div>
@@ -290,7 +290,6 @@ export default function CoursePage() {
                     )}
                     <div className="space-y-2">
                       {group.weeks.map((week, i) => {
-                        const isFirst = gi === 0 && i === 0
                         return (
                           <div key={week.id} className="flex items-center gap-4 rounded-2xl border border-white/8 bg-black/20 px-5 py-4">
                             <div className="font-display text-2xl font-extrabold text-[#F5C518]/40 w-10 shrink-0">
@@ -300,11 +299,6 @@ export default function CoursePage() {
                               <p className="text-sm font-medium text-white/70">{week.title}</p>
                               <p className="text-xs text-white/30 mt-0.5">{week.durationLabel} · {week.estimatedCompletionMinutes} min</p>
                             </div>
-                            {isFirst && (
-                              <span className="text-[11px] text-emerald-400 border border-emerald-400/25 rounded-full px-2 py-0.5 shrink-0">
-                                Preview
-                              </span>
-                            )}
                           </div>
                         )
                       })}
@@ -342,7 +336,7 @@ export default function CoursePage() {
           contextMessage="You're seeing this course exactly as learners will. Unpublished weeks are included."
         />
       )}
-      <AcademyNavbar showBack backHref="/courses" backLabel="All Courses" solid />
+      <AcademyNavbar showBack backHref="/" backLabel="Home" solid />
 
       <main className="pt-24 pb-16 px-6">
         <div className="max-w-6xl mx-auto grid gap-8 lg:grid-cols-[300px_minmax(0,1fr)]">

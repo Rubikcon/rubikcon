@@ -11,9 +11,10 @@ import LandingPage from './pages/LandingPage'
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
-const CoursesPage = lazy(() => import('./pages/CoursesPage'))
 const CoursePage = lazy(() => import('./pages/CoursePage'))
+const CoursesListPage = lazy(() => import('./pages/CoursesListPage'))
 const LessonPage = lazy(() => import('./pages/LessonPage'))
+const SharedVideoPage = lazy(() => import('./pages/SharedVideoPage'))
 const AdminAcademyPage = lazy(() => import('./pages/AdminAcademyPage'))
 const CourseBuilderWizard = lazy(() =>
   import('./pages/CourseBuilderWizard').then(m => ({ default: m.CourseBuilderWizard }))
@@ -45,10 +46,11 @@ export default function App() {
         <Switch>
           {/* ─── Public pages ───────────────────────────────────────────── */}
           <Route path="/" component={LandingPage} />
-          <Route path="/courses" component={CoursesPage} />
+          <Route path="/courses" component={CoursesListPage} />
           <Route path="/course" component={CoursePage} />
           <Route path="/course/:slug" component={CoursePage} />
           <Route path="/course/:slug/week/:weekSlug" component={LessonPage} />
+          <Route path="/share/course/:courseSlug/week/:weekSlug/video/:videoId" component={SharedVideoPage} />
           <Route path="/facilitators" component={FacilitatorsPage} />
           <Route path="/about" component={AboutPage} />
           <Route path="/contact" component={ContactPage} />

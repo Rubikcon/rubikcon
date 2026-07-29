@@ -56,9 +56,13 @@ export class CourseCatalogService {
     }
   }
 
-  async getPublicCourses(page: number, limit: number, userId?: string) {
+  async getFilterMeta() {
+    return courseCatalogRepository.findFilterMeta()
+  }
+
+  async getPublicCourses(page: number, limit: number, userId?: string, q?: string, level?: string, phaseLabel?: string) {
     const skip = (page - 1) * limit
-    const [courses, total] = await courseCatalogRepository.findMany(skip, limit, userId)
+    const [courses, total] = await courseCatalogRepository.findMany(skip, limit, userId, q, level, phaseLabel)
     
     const result = courses.map(c => ({
       id: c.id,
@@ -721,6 +725,52 @@ export class CourseCatalogService {
 
     await courseCatalogRepository.rejectCourse(course.id, userId, notes)
     return { id: course.id, status: 'REJECTED' }
+  }
+
+  async getPublicSharedVideo(courseSlug: string, weekSlug: string, videoId: string) {
+    const context = await courseCatalogRepository.getPublicVideoContext(courseSlug, weekSlug)
+    if (!context) {
+      throw new AppError('Video not found or course is not public.', 404)
+    }
+
+    const allVideos = [
+      ...(context.videoUrl
+        ? [{ id: 'legacy', title: context.videoTitle ?? context.title, url: context.videoUrl, description: null, position: 0 }]
+        : []),
+      ...context.videos,
+    ]
+
+    const targetVideo = allVideos.find(v => v.id === videoId)
+    if (!targetVideo) {
+      throw new AppError('Video not found in this lesson.', 404)
+    }
+
+    return {
+      course: {
+        id: context.course.id,
+        slug: context.course.slug,
+        title: context.course.title,
+      },
+      week: {
+        title: context.title,
+        slug: context.slug,
+        number: context.number,
+      },
+      module: context.module ? { title: context.module.title } : null,
+      video: {
+        id: targetVideo.id,
+        title: targetVideo.title,
+        url: targetVideo.url,
+        description: targetVideo.description,
+        position: targetVideo.position,
+      },
+      facilitators: context.facilitators.map(f => ({
+        name: f.facilitator.name,
+        title: f.facilitator.title,
+        organization: f.facilitator.organization,
+        photoUrl: f.facilitator.photoUrl,
+      })),
+    }
   }
 }
 

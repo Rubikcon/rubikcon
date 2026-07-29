@@ -71,10 +71,25 @@ export class CourseCatalogRepository {
     ])
   }
 
-  async findMany(skip: number, limit: number, userId?: string) {
+  async findMany(skip: number, limit: number, userId?: string, q?: string, level?: string, phaseLabel?: string) {
+    const andClauses: object[] = [{ published: true }]
+    if (q) {
+      andClauses.push({
+        OR: [
+          { title: { contains: q, mode: 'insensitive' as const } },
+          { tagline: { contains: q, mode: 'insensitive' as const } },
+          { description: { contains: q, mode: 'insensitive' as const } },
+          { level: { contains: q, mode: 'insensitive' as const } },
+          { phaseLabel: { contains: q, mode: 'insensitive' as const } },
+        ],
+      })
+    }
+    if (level) andClauses.push({ level: { equals: level, mode: 'insensitive' as const } })
+    if (phaseLabel) andClauses.push({ phaseLabel: { equals: phaseLabel, mode: 'insensitive' as const } })
+    const where = andClauses.length === 1 ? andClauses[0] : { AND: andClauses }
     return Promise.all([
       prisma.course.findMany({
-        where: { published: true },
+        where,
         select: {
           id: true,
           slug: true,
@@ -106,8 +121,29 @@ export class CourseCatalogRepository {
         take: limit,
         skip,
       }),
-      prisma.course.count({ where: { published: true } }),
+      prisma.course.count({ where }),
     ])
+  }
+
+  async findFilterMeta() {
+    const [levels, phaseLabels] = await Promise.all([
+      prisma.course.findMany({
+        where: { published: true },
+        select: { level: true },
+        distinct: ['level'],
+        orderBy: { level: 'asc' },
+      }),
+      prisma.course.findMany({
+        where: { published: true },
+        select: { phaseLabel: true },
+        distinct: ['phaseLabel'],
+        orderBy: { phaseLabel: 'asc' },
+      }),
+    ])
+    return {
+      levels: levels.map(c => c.level).filter((v): v is string => v !== null),
+      phaseLabels: phaseLabels.map(c => c.phaseLabel).filter((v): v is string => v !== null),
+    }
   }
 
   async findBySlug(slug: string, userId?: string) {
@@ -800,6 +836,59 @@ export class CourseCatalogRepository {
   legacyCreateCourseFacilitator = async (args: any): Promise<any> => { return prisma.courseFacilitator.create(args); }
   // Justification for any: Legacy wrapper waiting for phased removal
   legacyDeleteCourseFacilitator = async (args: any): Promise<any> => { return prisma.courseFacilitator.delete(args); }
+
+  async getPublicVideoContext(courseSlug: string, weekSlug: string) {
+    return prisma.week.findFirst({
+      where: {
+        slug: weekSlug,
+        course: { slug: courseSlug, published: true },
+        published: true,
+      },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        number: true,
+        videoUrl: true,
+        videoTitle: true,
+        course: {
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+          }
+        },
+        module: {
+          select: {
+            title: true,
+          }
+        },
+        videos: {
+          select: {
+            id: true,
+            title: true,
+            url: true,
+            description: true,
+            position: true,
+          },
+          orderBy: { position: 'asc' }
+        },
+        facilitators: {
+          select: {
+            facilitator: {
+              select: {
+                name: true,
+                title: true,
+                organization: true,
+                photoUrl: true,
+              }
+            }
+          },
+          orderBy: { position: 'asc' }
+        }
+      }
+    })
+  }
 }
 
 export const courseCatalogRepository = new CourseCatalogRepository();

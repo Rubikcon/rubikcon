@@ -16,6 +16,7 @@ import {
   Mail,
   Play,
   Presentation,
+  Share2,
   Search,
   X,
 } from 'lucide-react'
@@ -138,8 +139,39 @@ export default function LessonPage() {
   const [activeVideoIdx, setActiveVideoIdx] = useState(0)
   // Active slide-deck id when the modal viewer is open (null = closed)
   const [activeSlideDeckId, setActiveSlideDeckId] = useState<string | null>(null)
+  const [isCompleting, setIsCompleting] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   const auth = getStoredAuth()
+
+  async function handleMarkComplete() {
+    if (!week || !auth || isCompleting || week.progress.status === 'COMPLETE') return
+    try {
+      setIsCompleting(true)
+      await apiRequest(`/academy/weeks/${week.slug}/complete`, { method: 'POST' })
+      setWeek(cur => cur ? {
+        ...cur,
+        progress: { ...cur.progress, status: 'COMPLETE', completedAt: new Date().toISOString() },
+      } : cur)
+      setCourse(cur => cur ? {
+        ...cur,
+        completedCount: cur.completedCount + 1,
+        progressPercent: Math.round(((cur.completedCount + 1) / cur.totalWeeks) * 100),
+      } : cur)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to mark lesson complete.')
+    } finally {
+      setIsCompleting(false)
+    }
+  }
+
+  function copyShareLink(videoId: string) {
+    const url = `${window.location.origin}/share/course/${courseSlug}/week/${weekSlug}/video/${videoId}`
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    })
+  }
 
   async function loadWeekPage() {
     const [courseData, weekData] = await Promise.all([
@@ -435,15 +467,39 @@ export default function LessonPage() {
             <span className="text-white/70">{week.title}</span>
           </p>
 
-          {/* Mark complete / completed indicator */}
+          {/* Progress controls */}
           <div className="ml-auto flex items-center gap-2 shrink-0">
-            {week.progress.status === 'COMPLETE' && (
+            {activeVideo && (
+              <button
+                onClick={() => copyShareLink(activeVideo.id)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                title="Copy share link"
+              >
+                {linkCopied ? (
+                  <CheckCircle2 size={13} className="text-emerald-400" />
+                ) : (
+                  <Share2 size={13} />
+                )}
+              </button>
+            )}
+
+            {week.progress.status === 'COMPLETE' ? (
               <span
                 title={week.progress.completedAt ? `Completed ${new Date(week.progress.completedAt).toLocaleDateString()}` : 'Completed'}
                 className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-300"
               >
                 <CheckCircle2 size={12} /> Completed
               </span>
+            ) : (
+              <button
+                onClick={() => void handleMarkComplete()}
+                disabled={isCompleting || !auth}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.05] px-3 py-1.5 text-xs font-semibold text-white/70 hover:border-white/25 hover:text-white transition-colors disabled:opacity-40"
+                title={auth ? 'Mark this lesson as complete' : 'Sign in to track progress'}
+              >
+                {isCompleting ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                Mark complete
+              </button>
             )}
 
             {/* Prev / Next */}
@@ -470,75 +526,133 @@ export default function LessonPage() {
         {/* Scrollable area */}
         <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
 
-          {/* ── Video Player + side playlist (when lesson has multiple videos) ── */}
+          {/* ── Video Player (with horizontal tabs for ≤4 videos, sidebar for >4) ── */}
           {week.videos.length > 0 && (
-            <div className="bg-black flex flex-col lg:flex-row">
-              {/* Primary player */}
-              <div className="flex-1 min-w-0">
-                {activeVideo && (
-                  embedSrc ? (
-                    <EmbedFrame
-                      key={activeVideo.id}
-                      src={embedSrc}
-                      title={activeVideo.title}
-                      fallbackUrl={activeVideo.url}
-                      className="rounded-none"
-                    />
-                  ) : (
-                    <HtmlVideoPlayer
-                      key={activeVideo.id}
-                      src={activeVideo.url}
-                      title={activeVideo.title}
-                    />
-                  )
-                )}
-              </div>
-
-              {/* Video playlist sidebar — sits BESIDE the player on lg+ screens, stacks below on smaller */}
-              {week.videos.length > 1 && (
-                <aside className="lg:w-[320px] lg:flex-shrink-0 lg:border-l border-t lg:border-t-0 border-white/[0.07] bg-black/60 lg:max-h-[56.25vw] lg:overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
-                  <div className="sticky top-0 z-10 bg-black/95 backdrop-blur-sm px-4 py-3 border-b border-white/[0.07]">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-[#F5C518] text-[#0A0A0A] flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-                        {week.videos.length}
-                      </div>
-                      <p className="text-sm font-semibold text-white">
-                        Videos in this lesson
-                      </p>
-                    </div>
-                    <p className="text-[11px] text-white/40 mt-0.5 ml-8">Click any video to play</p>
-                  </div>
-                  <div className="p-3 space-y-1.5">
+            <div className="bg-black">
+              {/* Horizontal video tab strip — shown only when 2–4 videos */}
+              {week.videos.length > 1 && week.videos.length <= 4 && (
+                <div className="border-b border-white/[0.07] bg-black/80 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+                  <div className="flex items-stretch min-w-max">
                     {week.videos.map((v, i) => (
                       <button
                         key={v.id}
                         onClick={() => setActiveVideoIdx(i)}
-                        className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-left transition-colors ${
+                        className={`group relative flex items-center gap-2.5 px-5 py-3.5 text-sm transition-all border-b-2 ${
                           i === activeVideoIdx
-                            ? 'bg-[#F5C518]/15 border border-[#F5C518]/30 text-white'
-                            : 'border border-white/8 text-white/60 hover:border-white/20 hover:bg-white/[0.04] hover:text-white/90'
+                            ? 'border-[#F5C518] text-white bg-white/[0.04]'
+                            : 'border-transparent text-white/40 hover:text-white/70 hover:bg-white/[0.02]'
                         }`}
                       >
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          i === activeVideoIdx ? 'bg-[#F5C518] text-[#0A0A0A]' : 'bg-white/10 text-white/60'
+                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 transition-colors ${
+                          i === activeVideoIdx
+                            ? 'bg-[#F5C518] text-[#0A0A0A]'
+                            : 'bg-white/10 text-white/50 group-hover:bg-white/15'
                         }`}>
-                          {i === activeVideoIdx ? (
-                            <Play size={10} fill="currentColor" />
-                          ) : (
-                            <span className="text-[11px] font-semibold">{i + 1}</span>
-                          )}
-                        </div>
-                        <span className="flex-1 truncate text-xs leading-snug">{v.title}</span>
+                          {i === activeVideoIdx ? <Play size={8} fill="currentColor" /> : i + 1}
+                        </span>
+                        <span className="max-w-[180px] truncate font-medium leading-tight">{v.title}</span>
                         {i === activeVideoIdx && (
-                          <span className="text-[9px] font-semibold uppercase tracking-wider text-[#F5C518] flex-shrink-0">
-                            Playing
-                          </span>
+                          <span className="text-[9px] font-semibold uppercase tracking-widest text-[#F5C518]/80 ml-1 flex-shrink-0">Playing</span>
                         )}
                       </button>
                     ))}
                   </div>
-                </aside>
+                </div>
               )}
+
+              {/* Player + sidebar layout (sidebar only for >4 videos) */}
+              <div className={`flex flex-col ${week.videos.length > 4 ? 'lg:flex-row' : ''}`}>
+                {/* Primary player */}
+                <div className="flex-1 min-w-0">
+                  {activeVideo && (
+                    embedSrc ? (
+                      <EmbedFrame
+                        key={activeVideo.id}
+                        src={embedSrc}
+                        title={activeVideo.title}
+                        fallbackUrl={activeVideo.url}
+                        className="rounded-none"
+                      />
+                    ) : (
+                      <HtmlVideoPlayer
+                        key={activeVideo.id}
+                        src={activeVideo.url}
+                        title={activeVideo.title}
+                        onEnded={() => void handleMarkComplete()}
+                      />
+                    )
+                  )}
+                  {/* Video title + description strip — shown under the player for all multi-video lessons */}
+                  {activeVideo && week.videos.length > 1 && (
+                    <div className="px-4 py-3 border-t border-white/[0.06] bg-black/40 flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-mono uppercase tracking-widest text-[#F5C518]/60 mb-0.5">Video {activeVideoIdx + 1} of {week.videos.length}</p>
+                        <p className="text-sm font-semibold text-white truncate">{activeVideo.title}</p>
+                        {activeVideo.description && (
+                          <p className="text-xs text-white/40 mt-0.5 line-clamp-2">{activeVideo.description}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {activeVideoIdx > 0 && (
+                          <button
+                            onClick={() => setActiveVideoIdx(i => i - 1)}
+                            className="w-7 h-7 rounded-full bg-white/8 hover:bg-white/15 text-white/60 hover:text-white flex items-center justify-center transition-colors"
+                            title="Previous video"
+                          >
+                            <ChevronLeft size={13} />
+                          </button>
+                        )}
+                        {activeVideoIdx < week.videos.length - 1 && (
+                          <button
+                            onClick={() => setActiveVideoIdx(i => i + 1)}
+                            className="w-7 h-7 rounded-full bg-white/8 hover:bg-white/15 text-white/60 hover:text-white flex items-center justify-center transition-colors"
+                            title="Next video"
+                          >
+                            <ChevronRight size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sidebar playlist — only for >4 videos */}
+                {week.videos.length > 4 && (
+                  <aside className="lg:w-[300px] lg:flex-shrink-0 lg:border-l border-t lg:border-t-0 border-white/[0.07] bg-black/60 lg:max-h-[56.25vw] lg:overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                    <div className="sticky top-0 z-10 bg-black/95 backdrop-blur-sm px-4 py-3 border-b border-white/[0.07]">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-[#F5C518] text-[#0A0A0A] flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                          {week.videos.length}
+                        </div>
+                        <p className="text-sm font-semibold text-white">Videos in this lesson</p>
+                      </div>
+                    </div>
+                    <div className="p-3 space-y-1.5">
+                      {week.videos.map((v, i) => (
+                        <button
+                          key={v.id}
+                          onClick={() => setActiveVideoIdx(i)}
+                          className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                            i === activeVideoIdx
+                              ? 'bg-[#F5C518]/15 border border-[#F5C518]/30 text-white'
+                              : 'border border-white/8 text-white/60 hover:border-white/20 hover:bg-white/[0.04] hover:text-white/90'
+                          }`}
+                        >
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            i === activeVideoIdx ? 'bg-[#F5C518] text-[#0A0A0A]' : 'bg-white/10 text-white/60'
+                          }`}>
+                            {i === activeVideoIdx ? <Play size={10} fill="currentColor" /> : <span className="text-[11px] font-semibold">{i + 1}</span>}
+                          </div>
+                          <span className="flex-1 truncate text-xs leading-snug">{v.title}</span>
+                          {i === activeVideoIdx && (
+                            <span className="text-[9px] font-semibold uppercase tracking-wider text-[#F5C518] flex-shrink-0">Playing</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </aside>
+                )}
+              </div>
             </div>
           )}
 
@@ -602,6 +716,29 @@ export default function LessonPage() {
                   <p className="text-white/55 leading-relaxed text-base">{week.summary}</p>
                 </div>
 
+                {/* Lesson rich-text content */}
+                {week.lessonDetails.lessonContent && (
+                  <div
+                    className="prose prose-invert prose-sm max-w-none text-white/60 leading-relaxed [&_h2]:text-white [&_h3]:text-white/90 [&_strong]:text-white/80 [&_a]:text-[#F5C518] [&_a:hover]:underline"
+                    dangerouslySetInnerHTML={{ __html: week.lessonDetails.lessonContent }}
+                  />
+                )}
+
+                {/* Lesson images */}
+                {week.lessonDetails.images.length > 0 && (
+                  <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
+                    {week.lessonDetails.images.map(img => (
+                      <img
+                        key={img.id}
+                        src={img.url}
+                        alt={img.alt || img.caption || week.title}
+                        title={img.caption || undefined}
+                        className="h-44 w-auto rounded-xl object-cover flex-shrink-0 border border-white/8"
+                      />
+                    ))}
+                  </div>
+                )}
+
                 {/* Instructor(s) */}
                 {week.lessonDetails.facilitators.length > 0 && (
                   <div>
@@ -616,6 +753,7 @@ export default function LessonPage() {
                             <p className="font-semibold text-white">{f.name}</p>
                             <p className="text-sm text-white/50">{f.title}</p>
                             <p className="text-sm text-white/35">{f.organization}</p>
+                            {f.bio && <p className="text-xs text-white/40 mt-1 leading-relaxed">{f.bio}</p>}
                             <div className="flex flex-wrap gap-3 mt-2 text-sm">
                               <a href={f.emailMailto} className="inline-flex items-center gap-1.5 text-white/50 hover:text-white transition-colors text-xs">
                                 <Mail size={12} /> {f.emailMasked}

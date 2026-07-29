@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
+import prisma from '../../../../infrastructure/prisma/client'
 import { z } from 'zod'
 import { sendSuccess, sendPaginated, sendError } from '../../../../shared/api/response'
 import { AppError } from '../../../../shared/errors/AppError'
@@ -84,12 +85,24 @@ export class CourseCatalogController {
     }
   }
 
+  async getFilterMeta(req: Request, res: Response, next: NextFunction) {
+    try {
+      const meta = await courseCatalogService.getFilterMeta()
+      return sendSuccess(res, meta)
+    } catch (err) {
+      next(err)
+    }
+  }
+
   async getPublicCourses(req: Request, res: Response, next: NextFunction) {
     try {
       const page = Math.max(1, parseInt(req.query.page as string) || 1)
       const limit = Math.min(50, parseInt(req.query.limit as string) || 12)
       
-      const { courses, total } = await courseCatalogService.getPublicCourses(page, limit, req.user?.userId)
+      const q = typeof req.query.q === 'string' && req.query.q.trim() ? req.query.q.trim() : undefined
+      const level = typeof req.query.level === 'string' && req.query.level.trim() ? req.query.level.trim() : undefined
+      const phaseLabel = typeof req.query.phaseLabel === 'string' && req.query.phaseLabel.trim() ? req.query.phaseLabel.trim() : undefined
+      const { courses, total } = await courseCatalogService.getPublicCourses(page, limit, req.user?.userId, q, level, phaseLabel)
       
       return sendPaginated(res, courses, total, page, limit)
     } catch (err) {
@@ -1152,9 +1165,42 @@ export class CourseCatalogController {
 
         await courseCatalogRepository.legacyDeleteCourseFacilitator({ where: { id: cf.id } })
         return sendSuccess(res, { facilitatorId: req.params.facilitatorId }, 'Facilitator removed.')
-        } catch (err) {
+      } catch (err) {
         next(err)
-        }
+      }
+    }
+
+    async getPublicSharedVideo(req: Request, res: Response, next: NextFunction) {
+      try {
+        const { courseSlug, weekSlug, videoId } = req.params
+        const result = await courseCatalogService.getPublicSharedVideo(courseSlug, weekSlug, videoId)
+        return sendSuccess(res, result)
+      } catch (err) {
+        next(err)
+      }
+    }
+
+    async enroll(req: Request, res: Response, next: NextFunction) {
+      try {
+        const { slug } = req.params
+        const userId = req.user!.userId
+
+        const course = await prisma.course.findUnique({ where: { slug } })
+        if (!course) return sendError(res, 'Course not found', 404)
+        
+        const existing = await prisma.courseEnrollment.findUnique({
+          where: { userId_courseId: { userId, courseId: course.id } }
+        })
+        if (existing) return sendSuccess(res, existing, 'Already enrolled.')
+        
+        const enrollment = await prisma.courseEnrollment.create({
+          data: { userId, courseId: course.id }
+        })
+        
+        return sendSuccess(res, enrollment, 'Successfully enrolled.')
+      } catch (err) {
+        next(err)
+      }
     }
 }
 
