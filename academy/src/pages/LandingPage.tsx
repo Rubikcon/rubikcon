@@ -577,7 +577,10 @@ export default function LandingPage() {
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
-                  className="bg-white rounded-2xl p-6 flex flex-col items-center justify-center min-h-[280px] border-2 border-dashed border-[#E8E0D0]"
+                  className="bg-white p-6 flex flex-col items-center justify-center min-h-[280px] border-2 border-dashed border-[#E8E0D0]"
+                  style={{
+                    borderRadius: '255px 15px 225px 15px/15px 225px 15px 255px',
+                  }}
                 >
                   <div className="w-10 h-10 rounded-full bg-[#F2EDE2] flex items-center justify-center mb-3">
                     <BookOpen

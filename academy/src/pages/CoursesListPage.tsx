@@ -30,6 +30,7 @@ type CourseListItem = {
   priceNgn: number | null
   discountPercent: number
   discountedPriceUsd: number | null
+  discountedPriceNgn: number | null
   estimatedDuration: string | null
   phaseLabel: string | null
   heroImage: string | null
@@ -157,10 +158,14 @@ function FeaturedCourseBanner({ course }: { course: CourseListItem }) {
           ) : (
             <>
               <span className="text-2xl font-extrabold text-white tracking-tight">
-                {course.discountedPriceUsd != null ? `$${course.discountedPriceUsd}` : `$${course.priceUsd}`}
+                {course.discountedPriceUsd != null ? `$${course.discountedPriceUsd}` : `$${course.priceUsd ?? 0}`}
+                <span className="mx-2 text-white/30 font-medium text-xl">•</span>
+                {course.discountedPriceNgn != null ? `₦${course.discountedPriceNgn.toLocaleString()}` : `₦${(course.priceNgn ?? 0).toLocaleString()}`}
               </span>
               {course.discountedPriceUsd != null && course.priceUsd != null && (
-                <span className="text-base font-medium text-white/30 line-through">${course.priceUsd}</span>
+                <span className="text-base font-medium text-white/30 line-through">
+                  ${course.priceUsd} • ₦{(course.priceNgn ?? 0).toLocaleString()}
+                </span>
               )}
               {course.discountPercent > 0 && (
                 <span className="text-xs font-bold text-[#F5C518] bg-[#F5C518]/10 border border-[#F5C518]/20 px-2 py-0.5 rounded-full">
@@ -270,10 +275,14 @@ function CourseCard({ course, index }: { course: CourseListItem; index: number }
           ) : (
             <>
               <span className="text-base font-extrabold text-white">
-                {course.discountedPriceUsd != null ? `$${course.discountedPriceUsd}` : `$${course.priceUsd}`}
+                {course.discountedPriceUsd != null ? `$${course.discountedPriceUsd}` : `$${course.priceUsd ?? 0}`}
+                <span className="mx-1.5 text-white/30 font-medium text-sm">•</span>
+                {course.discountedPriceNgn != null ? `₦${course.discountedPriceNgn.toLocaleString()}` : `₦${(course.priceNgn ?? 0).toLocaleString()}`}
               </span>
               {course.discountedPriceUsd != null && course.priceUsd != null && (
-                <span className="text-xs font-medium text-white/30 line-through">${course.priceUsd}</span>
+                <span className="text-xs font-medium text-white/30 line-through">
+                  ${course.priceUsd} • ₦{(course.priceNgn ?? 0).toLocaleString()}
+                </span>
               )}
               {course.discountPercent > 0 && (
                 <span className="text-[10px] font-bold text-[#F5C518] ml-1">{course.discountPercent}% off</span>
