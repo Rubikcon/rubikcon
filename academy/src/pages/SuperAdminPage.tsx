@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   BookOpen,
+  Camera,
   CheckCircle2,
   ChevronDown,
   ClipboardList,
@@ -15,595 +16,976 @@ import {
   ShieldCheck,
   Tag,
   Trash2,
+  UserCog,
   Users,
   XCircle,
-} from 'lucide-react'
-import AcademyNavbar from '../components/AcademyNavbar'
-import { apiRequest } from '../lib/api'
-import SiteContentManager from '../components/SiteContentManager'
-import { getStoredAuth } from '../lib/auth'
-import type { AdminSubmission, CourseStatus } from '../types/academy'
+} from "lucide-react";
+import AcademyNavbar from "../components/AcademyNavbar";
+import { apiRequest } from "../lib/api";
+import SiteContentManager from "../components/SiteContentManager";
+import { getStoredAuth } from "../lib/auth";
+import { compressImageToBase64 } from "../lib/imageCompress";
+import type { AdminSubmission, CourseStatus } from "../types/academy";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Overview = {
-  totalUsers: number
-  adminCount: number
-  learnerCount: number
-  totalEnrollments: number
-  totalCourses: number
-  coursesByStatus: Record<string, number>
-  totalSubmissions: number
-  pendingSubmissions: number
-  totalWeeks: number
-  recentUsers: Array<{ id: string; name: string | null; email: string; role: string; createdAt: string }>
-}
+  totalUsers: number;
+  adminCount: number;
+  learnerCount: number;
+  totalEnrollments: number;
+  totalCourses: number;
+  coursesByStatus: Record<string, number>;
+  totalSubmissions: number;
+  pendingSubmissions: number;
+  totalWeeks: number;
+  recentUsers: Array<{
+    id: string;
+    name: string | null;
+    email: string;
+    role: string;
+    createdAt: string;
+  }>;
+};
 
 type PlatformUser = {
-  id: string
-  name: string | null
-  email: string
-  role: string
-  createdAt: string
-  _count: { courseEnrollments: number }
-  profile: { country: string | null; onboardingCompleted: boolean } | null
-}
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+  createdAt: string;
+  _count: { courseEnrollments: number };
+  profile: { country: string | null; onboardingCompleted: boolean } | null;
+};
 
 type SuperAdminCourse = {
-  id: string
-  title: string
-  slug: string
-  tagline: string | null
-  status: CourseStatus
-  contentUnit: string
-  submittedAt: string | null
-  createdAt: string
+  id: string;
+  title: string;
+  slug: string;
+  tagline: string | null;
+  status: CourseStatus;
+  contentUnit: string;
+  submittedAt: string | null;
+  createdAt: string;
   // Prisma Decimal fields arrive as strings over JSON
-  priceUsd: string | number | null
-  priceNgn: string | number | null
-  discountPercent: number | null
-  _count: { weeks: number }
-  courseFacilitators: Array<{ facilitator: { id: string; name: string; title: string } }>
-  createdBy: { id: string; name: string | null; email: string } | null
+  priceUsd: string | number | null;
+  priceNgn: string | number | null;
+  discountPercent: number | null;
+  _count: { weeks: number };
+  courseFacilitators: Array<{
+    facilitator: { id: string; name: string; title: string };
+  }>;
+  createdBy: { id: string; name: string | null; email: string } | null;
   approvals: Array<{
-    id: string
-    action: 'APPROVED' | 'REJECTED'
-    notes: string | null
-    createdAt: string
-    reviewer: { id: string; name: string | null }
-  }>
-}
+    id: string;
+    action: "APPROVED" | "REJECTED";
+    notes: string | null;
+    createdAt: string;
+    reviewer: { id: string; name: string | null };
+  }>;
+};
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<CourseStatus, { label: string; color: string }> = {
-  DRAFT:          { label: 'Draft',          color: 'border-white/20 text-white/50' },
-  PENDING_REVIEW: { label: 'Pending Review', color: 'border-amber-400/40 text-amber-300 bg-amber-400/10' },
-  APPROVED:       { label: 'Approved',       color: 'border-emerald-400/40 text-emerald-300 bg-emerald-400/10' },
-  REJECTED:       { label: 'Rejected',       color: 'border-red-400/40 text-red-300 bg-red-400/10' },
-}
+  DRAFT: { label: "Draft", color: "border-white/20 text-white/50" },
+  PENDING_REVIEW: {
+    label: "Pending Review",
+    color: "border-amber-400/40 text-amber-300 bg-amber-400/10",
+  },
+  APPROVED: {
+    label: "Approved",
+    color: "border-emerald-400/40 text-emerald-300 bg-emerald-400/10",
+  },
+  REJECTED: {
+    label: "Rejected",
+    color: "border-red-400/40 text-red-300 bg-red-400/10",
+  },
+};
 
 const ROLE_CONFIG: Record<string, { label: string; color: string }> = {
-  USER:        { label: 'Learner',     color: 'text-white/50 border-white/15' },
-  ADMIN:       { label: 'Admin',       color: 'text-[#F5C518] border-[#F5C518]/30' },
-  SUPER_ADMIN: { label: 'Super Admin', color: 'text-purple-300 border-purple-400/30' },
-}
+  USER: { label: "Learner", color: "text-white/50 border-white/15" },
+  ADMIN: { label: "Admin", color: "text-[#F5C518] border-[#F5C518]/30" },
+  SUPER_ADMIN: {
+    label: "Super Admin",
+    color: "text-purple-300 border-purple-400/30",
+  },
+};
 
 const STATUS_FILTERS = [
-  { value: '', label: 'All' },
-  { value: 'PENDING_REVIEW', label: 'Pending' },
-  { value: 'APPROVED', label: 'Approved' },
-  { value: 'REJECTED', label: 'Rejected' },
-  { value: 'DRAFT', label: 'Draft' },
-]
+  { value: "", label: "All" },
+  { value: "PENDING_REVIEW", label: "Pending" },
+  { value: "APPROVED", label: "Approved" },
+  { value: "REJECTED", label: "Rejected" },
+  { value: "DRAFT", label: "Draft" },
+];
 
-type Tab = 'overview' | 'courses' | 'submissions' | 'learners' | 'users' | 'content'
+type Tab =
+  | "overview"
+  | "courses"
+  | "submissions"
+  | "learners"
+  | "users"
+  | "facilitators";
+
+// ─── Facilitator management types (matches GET /superadmin/facilitators) ──
+
+type SuperAdminFacilitator = {
+  id: string;
+  name: string;
+  title: string;
+  organization: string;
+  email: string;
+  linkedinUrl: string;
+  photoUrl: string | null;
+  bio: string | null;
+  createdAt: string;
+  _count: { courses: number; weeks: number; lessons: number };
+};
 
 // ─── Learner activity types (matches GET /superadmin/learners response) ───
 
 type LearnerSummary = {
-  id: string
-  name: string | null
-  email: string
-  createdAt: string
-  country: string | null
-  onboardingCompleted: boolean
-  enrollmentCount: number
-  completedLessons: number
-  inProgressLessons: number
-  totalSubmissions: number
-  quizAttempts: number
-  gigApplications: number
-  lastActivityAt: string | null
-}
+  id: string;
+  name: string | null;
+  email: string;
+  createdAt: string;
+  country: string | null;
+  onboardingCompleted: boolean;
+  enrollmentCount: number;
+  completedLessons: number;
+  inProgressLessons: number;
+  totalSubmissions: number;
+  quizAttempts: number;
+  gigApplications: number;
+  lastActivityAt: string | null;
+};
 
 type LearnerDetail = {
   user: {
-    id: string; name: string | null; email: string; role: string; createdAt: string
+    id: string;
+    name: string | null;
+    email: string;
+    role: string;
+    createdAt: string;
     profile: {
-      country: string | null; experienceLevel: string | null; userRole: string | null
-      motivation: string | null; learningInterests: string[]
-      telegramHandle: string | null; twitterHandle: string | null
-      onboardingCompleted: boolean; completedAt: string | null
-    } | null
-  }
+      country: string | null;
+      experienceLevel: string | null;
+      userRole: string | null;
+      motivation: string | null;
+      learningInterests: string[];
+      telegramHandle: string | null;
+      twitterHandle: string | null;
+      onboardingCompleted: boolean;
+      completedAt: string | null;
+    } | null;
+  };
   enrollments: Array<{
-    course: { id: string; slug: string; title: string; contentUnit: string }
-    enrolledAt: string
-    progressPercent: number
-    completedCount: number
-    totalCount: number
+    course: { id: string; slug: string; title: string; contentUnit: string };
+    enrolledAt: string;
+    progressPercent: number;
+    completedCount: number;
+    totalCount: number;
     weeks: Array<{
-      id: string; slug: string; number: number; title: string
-      status: string; completedAt: string | null
-      quizSubmitted: boolean; assignmentSubmitted: boolean
-      manuallyCompleted: boolean; firstOpenedAt: string | null
-    }>
-  }>
+      id: string;
+      slug: string;
+      number: number;
+      title: string;
+      status: string;
+      completedAt: string | null;
+      quizSubmitted: boolean;
+      assignmentSubmitted: boolean;
+      manuallyCompleted: boolean;
+      firstOpenedAt: string | null;
+    }>;
+  }>;
   submissions: Array<{
-    id: string; status: string; submittedAt: string; reviewedAt: string | null
-    hasFeedback: boolean
+    id: string;
+    status: string;
+    submittedAt: string;
+    reviewedAt: string | null;
+    hasFeedback: boolean;
     assignment: {
-      id: string; title: string
-      week: { id: string; slug: string; number: number; title: string; course: { id: string; slug: string; title: string } }
-    }
-  }>
+      id: string;
+      title: string;
+      week: {
+        id: string;
+        slug: string;
+        number: number;
+        title: string;
+        course: { id: string; slug: string; title: string };
+      };
+    };
+  }>;
   quizAttempts: Array<{
-    id: string; submittedAt: string; score: number; percentage: number; passed: boolean
+    id: string;
+    submittedAt: string;
+    score: number;
+    percentage: number;
+    passed: boolean;
     quiz: {
-      id: string; title: string; passMark: number
-      week: { id: string; slug: string; number: number; title: string; course: { id: string; slug: string; title: string } }
-    }
-  }>
-}
+      id: string;
+      title: string;
+      passMark: number;
+      week: {
+        id: string;
+        slug: string;
+        number: number;
+        title: string;
+        course: { id: string; slug: string; title: string };
+      };
+    };
+  }>;
+};
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, sub }: { label: string; value: number | string; sub?: string }) {
+function StatCard({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: number | string;
+  sub?: string;
+}) {
   return (
     <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-5">
-      <p className="text-xs font-mono uppercase tracking-widest text-white/35 mb-2">{label}</p>
+      <p className="text-xs font-mono uppercase tracking-widest text-white/35 mb-2">
+        {label}
+      </p>
       <p className="font-display text-3xl font-extrabold text-white">{value}</p>
       {sub && <p className="text-xs text-white/35 mt-1">{sub}</p>}
     </div>
-  )
+  );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function SuperAdminPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const [activeTab, setActiveTab] = useState<Tab>("overview");
 
   // Overview
-  const [overview, setOverview] = useState<Overview | null>(null)
-  const [overviewLoading, setOverviewLoading] = useState(true)
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
 
   // Courses
-  const [courses, setCourses] = useState<SuperAdminCourse[]>([])
-  const [coursesLoading, setCoursesLoading] = useState(false)
+  const [courses, setCourses] = useState<SuperAdminCourse[]>([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
   // Default to "All" — a pending-only default hid freshly created DRAFT courses
   // and read as "added courses are not reflecting on the board".
-  const [statusFilter, setStatusFilter] = useState('')
-  const [actionCourseId, setActionCourseId] = useState<string | null>(null)
-  const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null)
-  const [actionNotes, setActionNotes] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const [statusFilter, setStatusFilter] = useState("");
+  const [actionCourseId, setActionCourseId] = useState<string | null>(null);
+  const [actionType, setActionType] = useState<"approve" | "reject" | null>(
+    null,
+  );
+  const [actionNotes, setActionNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   // Pricing editor
-  const [pricingCourse, setPricingCourse] = useState<SuperAdminCourse | null>(null)
-  const [pricingForm, setPricingForm] = useState({ priceUsd: '', priceNgn: '', discountPercent: '' })
-  const [savingPricing, setSavingPricing] = useState(false)
+  const [pricingCourse, setPricingCourse] = useState<SuperAdminCourse | null>(
+    null,
+  );
+  const [pricingForm, setPricingForm] = useState({
+    priceUsd: "",
+    priceNgn: "",
+    discountPercent: "",
+  });
+  const [savingPricing, setSavingPricing] = useState(false);
 
   // Users
-  const [users, setUsers] = useState<PlatformUser[]>([])
-  const [usersTotal, setUsersTotal] = useState(0)
-  const [usersLoading, setUsersLoading] = useState(false)
-  const [userSearch, setUserSearch] = useState('')
-  const [userRoleFilter, setUserRoleFilter] = useState('')
-  const [changingRoleId, setChangingRoleId] = useState<string | null>(null)
+  const [users, setUsers] = useState<PlatformUser[]>([]);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("");
+  const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
 
   // Create admin form
-  const [showCreateAdmin, setShowCreateAdmin] = useState(false)
-  const [createForm, setCreateForm] = useState({ name: '', email: '', password: '' })
-  const [creating, setCreating] = useState(false)
+  const [showCreateAdmin, setShowCreateAdmin] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+  });
+  const [creating, setCreating] = useState(false);
 
   // Delete actions
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'user' | 'course'; id: string; name: string } | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    type: "user" | "course";
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Password change
-  const [showPasswordChange, setShowPasswordChange] = useState(false)
-  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
-  const [changingPassword, setChangingPassword] = useState(false)
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [changingPassword, setChangingPassword] = useState(false);
 
   // Password reset
-  const [resetPasswordData, setResetPasswordData] = useState<{ userId: string; userName: string; resetToken: string; expiresAt: string } | null>(null)
-  const [resettingPassword, setResettingPassword] = useState(false)
+  const [resetPasswordData, setResetPasswordData] = useState<{
+    userId: string;
+    userName: string;
+    resetToken: string;
+    expiresAt: string;
+  } | null>(null);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   // Learners
-  const [learners, setLearners] = useState<LearnerSummary[]>([])
-  const [learnersTotal, setLearnersTotal] = useState(0)
-  const [learnersLoading, setLearnersLoading] = useState(false)
-  const [learnerSearch, setLearnerSearch] = useState('')
-  const [learnerDetail, setLearnerDetail] = useState<LearnerDetail | null>(null)
-  const [learnerDetailLoading, setLearnerDetailLoading] = useState(false)
-  const [openLearnerId, setOpenLearnerId] = useState<string | null>(null)
+  const [learners, setLearners] = useState<LearnerSummary[]>([]);
+  const [learnersTotal, setLearnersTotal] = useState(0);
+  const [learnersLoading, setLearnersLoading] = useState(false);
+  const [learnerSearch, setLearnerSearch] = useState("");
+  const [learnerDetail, setLearnerDetail] = useState<LearnerDetail | null>(
+    null,
+  );
+  const [learnerDetailLoading, setLearnerDetailLoading] = useState(false);
+  const [openLearnerId, setOpenLearnerId] = useState<string | null>(null);
 
   // Create course (super admin can author courses too)
-  const [showCreateCourse, setShowCreateCourse] = useState(false)
-  const [creatingCourse, setCreatingCourse] = useState(false)
-  const [createCourseForm, setCreateCourseForm] = useState({ title: '', slug: '', description: '' })
+  const [showCreateCourse, setShowCreateCourse] = useState(false);
+  const [creatingCourse, setCreatingCourse] = useState(false);
+  const [createCourseForm, setCreateCourseForm] = useState({
+    title: "",
+    slug: "",
+    description: "",
+  });
 
   // Submissions
-  const [submissions, setSubmissions] = useState<AdminSubmission>([])
-  const [submissionsLoading, setSubmissionsLoading] = useState(false)
-  const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({})
-  const [savingFeedbackId, setSavingFeedbackId] = useState<string | null>(null)
-  const [deletingFeedbackId, setDeletingFeedbackId] = useState<string | null>(null)
-  const [submissionStatusFilter, setSubmissionStatusFilter] = useState<'ALL' | 'SUBMITTED' | 'REVIEWED'>('ALL')
+  const [submissions, setSubmissions] = useState<AdminSubmission>([]);
+  const [submissionsLoading, setSubmissionsLoading] = useState(false);
+  const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>(
+    {},
+  );
+  const [savingFeedbackId, setSavingFeedbackId] = useState<string | null>(null);
+  const [deletingFeedbackId, setDeletingFeedbackId] = useState<string | null>(
+    null,
+  );
+  const [submissionStatusFilter, setSubmissionStatusFilter] = useState<
+    "ALL" | "SUBMITTED" | "REVIEWED"
+  >("ALL");
 
-  const [error, setError] = useState<string | null>(null)
+  // Facilitators
+  const [facilitators, setFacilitators] = useState<SuperAdminFacilitator[]>([]);
+  const [facilitatorsLoading, setFacilitatorsLoading] = useState(false);
+  const [editingFacilitator, setEditingFacilitator] =
+    useState<SuperAdminFacilitator | null>(null);
+  const [facilitatorForm, setFacilitatorForm] = useState({
+    name: "",
+    title: "",
+    organization: "",
+    email: "",
+    linkedinUrl: "",
+    bio: "",
+  });
+  const [savingFacilitator, setSavingFacilitator] = useState(false);
+  const [uploadingFacilitatorPhoto, setUploadingFacilitatorPhoto] =
+    useState(false);
+  const [facilitatorModalError, setFacilitatorModalError] = useState<
+    string | null
+  >(null);
+  const [facilitatorModalMessage, setFacilitatorModalMessage] = useState<
+    string | null
+  >(null);
+  const facilitatorFileInputRef = useRef<HTMLInputElement>(null);
 
-  const currentAuth = getStoredAuth()
+  const [error, setError] = useState<string | null>(null);
+
+  const currentAuth = getStoredAuth();
 
   // ─ Synchronous proactive role check ─────────────────────────────────────────
   // localStorage reads are synchronous — gate the render before React
   // paints anything, eliminating any flash of superadmin UI on direct visits.
-  if (!currentAuth) { window.location.replace('/login'); return null }
-  if (currentAuth.user.role !== 'SUPER_ADMIN') { window.location.replace('/dashboard'); return null }
+  if (!currentAuth) {
+    window.location.replace("/login");
+    return null;
+  }
+  if (currentAuth.user.role !== "SUPER_ADMIN") {
+    window.location.replace("/dashboard");
+    return null;
+  }
 
   useEffect(() => {
     // Belt-and-suspenders: covers the case where auth state changes
     // while the user is already on this page.
-    if (!currentAuth) { window.location.replace('/login'); return }
-    if (currentAuth.user.role !== 'SUPER_ADMIN') { window.location.replace('/dashboard'); return }
-    void loadOverview()
-  }, [])
+    if (!currentAuth) {
+      window.location.replace("/login");
+      return;
+    }
+    if (currentAuth.user.role !== "SUPER_ADMIN") {
+      window.location.replace("/dashboard");
+      return;
+    }
+    void loadOverview();
+  }, []);
 
   useEffect(() => {
-    if (activeTab === 'courses') void loadCourses(statusFilter)
-  }, [activeTab, statusFilter])
+    if (activeTab === "courses") void loadCourses(statusFilter);
+  }, [activeTab, statusFilter]);
 
   useEffect(() => {
-    if (activeTab === 'users') void loadUsers()
-  }, [activeTab, userSearch, userRoleFilter])
+    if (activeTab === "users") void loadUsers();
+  }, [activeTab, userSearch, userRoleFilter]);
 
   useEffect(() => {
-    if (activeTab === 'submissions') void loadSubmissions()
-  }, [activeTab])
+    if (activeTab === "submissions") void loadSubmissions();
+  }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab === 'learners') void loadLearners()
-  }, [activeTab, learnerSearch])
+    if (activeTab === "learners") void loadLearners();
+  }, [activeTab, learnerSearch]);
+
+  useEffect(() => {
+    if (activeTab === "facilitators") void loadFacilitators();
+  }, [activeTab]);
 
   async function loadOverview() {
     try {
-      setOverviewLoading(true)
-      const data = await apiRequest<Overview>('/academy/superadmin/overview')
-      setOverview(data)
+      setOverviewLoading(true);
+      const data = await apiRequest<Overview>("/academy/superadmin/overview");
+      setOverview(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load overview.')
+      setError(err instanceof Error ? err.message : "Failed to load overview.");
     } finally {
-      setOverviewLoading(false)
+      setOverviewLoading(false);
     }
   }
 
   async function loadCourses(filter = statusFilter) {
     try {
-      setCoursesLoading(true)
-      setError(null)
-      const qs = filter ? `?status=${filter}` : ''
-      const data = await apiRequest<SuperAdminCourse[]>(`/academy/superadmin/courses${qs}`)
-      setCourses(data)
+      setCoursesLoading(true);
+      setError(null);
+      const qs = filter ? `?status=${filter}` : "";
+      const data = await apiRequest<SuperAdminCourse[]>(
+        `/academy/superadmin/courses${qs}`,
+      );
+      setCourses(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load courses.')
+      setError(err instanceof Error ? err.message : "Unable to load courses.");
     } finally {
-      setCoursesLoading(false)
+      setCoursesLoading(false);
     }
   }
 
   async function loadUsers() {
     try {
-      setUsersLoading(true)
-      setError(null)
-      const params = new URLSearchParams()
-      if (userSearch) params.set('search', userSearch)
-      if (userRoleFilter) params.set('role', userRoleFilter)
-      const data = await apiRequest<{ users: PlatformUser[]; total: number }>(`/academy/superadmin/users?${params}`)
-      setUsers(data.users)
-      setUsersTotal(data.total)
+      setUsersLoading(true);
+      setError(null);
+      const params = new URLSearchParams();
+      if (userSearch) params.set("search", userSearch);
+      if (userRoleFilter) params.set("role", userRoleFilter);
+      const data = await apiRequest<{ users: PlatformUser[]; total: number }>(
+        `/academy/superadmin/users?${params}`,
+      );
+      setUsers(data.users);
+      setUsersTotal(data.total);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load users.')
+      setError(err instanceof Error ? err.message : "Unable to load users.");
     } finally {
-      setUsersLoading(false)
+      setUsersLoading(false);
     }
   }
 
   async function loadSubmissions() {
     try {
-      setSubmissionsLoading(true)
-      setError(null)
-      const data = await apiRequest<AdminSubmission>('/academy/admin/assignments/submissions')
-      setSubmissions(data)
+      setSubmissionsLoading(true);
+      setError(null);
+      const data = await apiRequest<AdminSubmission>(
+        "/academy/admin/assignments/submissions",
+      );
+      setSubmissions(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load submissions.')
+      setError(
+        err instanceof Error ? err.message : "Unable to load submissions.",
+      );
     } finally {
-      setSubmissionsLoading(false)
+      setSubmissionsLoading(false);
     }
   }
 
-  async function submitFeedback(event: FormEvent<HTMLFormElement>, submissionId: string) {
-    event.preventDefault()
-    const feedback = feedbackDrafts[submissionId]?.trim()
-    if (!feedback) return
+  async function submitFeedback(
+    event: FormEvent<HTMLFormElement>,
+    submissionId: string,
+  ) {
+    event.preventDefault();
+    const feedback = feedbackDrafts[submissionId]?.trim();
+    if (!feedback) return;
     try {
-      setSavingFeedbackId(submissionId)
-      await apiRequest(`/academy/admin/assignments/submissions/${submissionId}/feedback`, {
-        method: 'POST',
-        body: JSON.stringify({ feedback }),
-      })
-      setFeedbackDrafts(current => ({ ...current, [submissionId]: '' }))
-      await loadSubmissions()
+      setSavingFeedbackId(submissionId);
+      await apiRequest(
+        `/academy/admin/assignments/submissions/${submissionId}/feedback`,
+        {
+          method: "POST",
+          body: JSON.stringify({ feedback }),
+        },
+      );
+      setFeedbackDrafts((current) => ({ ...current, [submissionId]: "" }));
+      await loadSubmissions();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to save feedback.')
+      setError(err instanceof Error ? err.message : "Unable to save feedback.");
     } finally {
-      setSavingFeedbackId(null)
+      setSavingFeedbackId(null);
     }
   }
 
   async function deleteFeedback(submissionId: string, feedbackId: string) {
-    if (!confirm('Delete this feedback? The learner will no longer see it. If this was the only feedback, the submission will move back to "Pending review".')) return
+    if (
+      !confirm(
+        'Delete this feedback? The learner will no longer see it. If this was the only feedback, the submission will move back to "Pending review".',
+      )
+    )
+      return;
     try {
-      setDeletingFeedbackId(feedbackId)
-      setError(null)
-      await apiRequest(`/academy/admin/assignments/submissions/${submissionId}/feedback/${feedbackId}`, {
-        method: 'DELETE',
-      })
-      await loadSubmissions()
+      setDeletingFeedbackId(feedbackId);
+      setError(null);
+      await apiRequest(
+        `/academy/admin/assignments/submissions/${submissionId}/feedback/${feedbackId}`,
+        {
+          method: "DELETE",
+        },
+      );
+      await loadSubmissions();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to delete feedback.')
+      setError(
+        err instanceof Error ? err.message : "Unable to delete feedback.",
+      );
     } finally {
-      setDeletingFeedbackId(null)
+      setDeletingFeedbackId(null);
     }
   }
 
   async function loadLearners() {
     try {
-      setLearnersLoading(true)
-      setError(null)
-      const params = new URLSearchParams()
-      if (learnerSearch) params.set('search', learnerSearch)
-      const data = await apiRequest<{ learners: LearnerSummary[]; total: number }>(
-        `/academy/superadmin/learners?${params}`,
-      )
-      setLearners(data.learners)
-      setLearnersTotal(data.total)
+      setLearnersLoading(true);
+      setError(null);
+      const params = new URLSearchParams();
+      if (learnerSearch) params.set("search", learnerSearch);
+      const data = await apiRequest<{
+        learners: LearnerSummary[];
+        total: number;
+      }>(`/academy/superadmin/learners?${params}`);
+      setLearners(data.learners);
+      setLearnersTotal(data.total);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load learners.')
+      setError(err instanceof Error ? err.message : "Unable to load learners.");
     } finally {
-      setLearnersLoading(false)
+      setLearnersLoading(false);
     }
   }
 
   async function openLearner(learnerId: string) {
-    setOpenLearnerId(learnerId)
-    setLearnerDetail(null)
-    setLearnerDetailLoading(true)
+    setOpenLearnerId(learnerId);
+    setLearnerDetail(null);
+    setLearnerDetailLoading(true);
     try {
-      const data = await apiRequest<LearnerDetail>(`/academy/superadmin/learners/${learnerId}`)
-      setLearnerDetail(data)
+      const data = await apiRequest<LearnerDetail>(
+        `/academy/superadmin/learners/${learnerId}`,
+      );
+      setLearnerDetail(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load learner activity.')
-      setOpenLearnerId(null)
+      setError(
+        err instanceof Error ? err.message : "Unable to load learner activity.",
+      );
+      setOpenLearnerId(null);
     } finally {
-      setLearnerDetailLoading(false)
+      setLearnerDetailLoading(false);
     }
   }
 
   function closeLearner() {
-    setOpenLearnerId(null)
-    setTimeout(() => setLearnerDetail(null), 200)
+    setOpenLearnerId(null);
+    setTimeout(() => setLearnerDetail(null), 200);
+  }
+
+  // ─── Facilitator management (super admin can edit anyone's profile) ─────
+
+  async function loadFacilitators() {
+    try {
+      setFacilitatorsLoading(true);
+      setError(null);
+      const data = await apiRequest<SuperAdminFacilitator[]>(
+        "/academy/superadmin/facilitators",
+      );
+      setFacilitators(data);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to load facilitators.",
+      );
+    } finally {
+      setFacilitatorsLoading(false);
+    }
+  }
+
+  function openFacilitatorEditor(facilitator: SuperAdminFacilitator) {
+    setEditingFacilitator(facilitator);
+    setFacilitatorForm({
+      name: facilitator.name,
+      title: facilitator.title,
+      organization: facilitator.organization,
+      email: facilitator.email,
+      linkedinUrl: facilitator.linkedinUrl,
+      bio: facilitator.bio ?? "",
+    });
+    setFacilitatorModalError(null);
+    setFacilitatorModalMessage(null);
+  }
+
+  function closeFacilitatorEditor() {
+    setEditingFacilitator(null);
+    setTimeout(() => {
+      setFacilitatorModalError(null);
+      setFacilitatorModalMessage(null);
+    }, 200);
+  }
+
+  async function saveFacilitatorFields() {
+    if (!editingFacilitator) return;
+    const payload: Record<string, string> = {};
+    const name = facilitatorForm.name.trim();
+    const title = facilitatorForm.title.trim();
+    const organization = facilitatorForm.organization.trim();
+    const email = facilitatorForm.email.trim();
+    const linkedinUrl = facilitatorForm.linkedinUrl.trim();
+    const bio = facilitatorForm.bio.trim();
+    if (name && name !== editingFacilitator.name) payload.name = name;
+    if (title && title !== editingFacilitator.title) payload.title = title;
+    if (organization && organization !== editingFacilitator.organization)
+      payload.organization = organization;
+    if (email && email.toLowerCase() !== editingFacilitator.email.toLowerCase())
+      payload.email = email;
+    if (linkedinUrl && linkedinUrl !== editingFacilitator.linkedinUrl)
+      payload.linkedinUrl = linkedinUrl;
+    if (bio !== (editingFacilitator.bio ?? "")) payload.bio = bio;
+    if (Object.keys(payload).length === 0) {
+      setFacilitatorModalMessage("No changes to save.");
+      return;
+    }
+    setSavingFacilitator(true);
+    setFacilitatorModalError(null);
+    setFacilitatorModalMessage(null);
+    try {
+      const updated = await apiRequest<SuperAdminFacilitator>(
+        `/academy/superadmin/facilitators/${editingFacilitator.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        },
+      );
+      setEditingFacilitator(updated);
+      setFacilitators((cur) =>
+        cur.map((f) => (f.id === updated.id ? { ...f, ...updated } : f)),
+      );
+      setFacilitatorModalMessage("Profile updated.");
+    } catch (err) {
+      setFacilitatorModalError(
+        err instanceof Error ? err.message : "Unable to save profile.",
+      );
+    } finally {
+      setSavingFacilitator(false);
+    }
+  }
+
+  async function handleFacilitatorPhotoChange(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !editingFacilitator) return;
+
+    setUploadingFacilitatorPhoto(true);
+    setFacilitatorModalError(null);
+    setFacilitatorModalMessage(null);
+    try {
+      const dataUrl = await compressImageToBase64(file, { maxBase64KB: 100 });
+      const updated = await apiRequest<SuperAdminFacilitator>(
+        `/academy/superadmin/facilitators/${editingFacilitator.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ photoUrl: dataUrl }),
+        },
+      );
+      setEditingFacilitator(updated);
+      setFacilitators((cur) =>
+        cur.map((f) => (f.id === updated.id ? { ...f, ...updated } : f)),
+      );
+      setFacilitatorModalMessage("Profile photo updated.");
+    } catch (err) {
+      setFacilitatorModalError(
+        err instanceof Error ? err.message : "Unable to update photo.",
+      );
+    } finally {
+      setUploadingFacilitatorPhoto(false);
+    }
+  }
+
+  async function removeFacilitatorPhoto() {
+    if (!editingFacilitator) return;
+    if (
+      !confirm(
+        "Remove this facilitator's profile photo? Course pages will fall back to their initials.",
+      )
+    )
+      return;
+    setUploadingFacilitatorPhoto(true);
+    setFacilitatorModalError(null);
+    setFacilitatorModalMessage(null);
+    try {
+      const updated = await apiRequest<SuperAdminFacilitator>(
+        `/academy/superadmin/facilitators/${editingFacilitator.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ photoUrl: null }),
+        },
+      );
+      setEditingFacilitator(updated);
+      setFacilitators((cur) =>
+        cur.map((f) => (f.id === updated.id ? { ...f, ...updated } : f)),
+      );
+      setFacilitatorModalMessage("Profile photo removed.");
+    } catch (err) {
+      setFacilitatorModalError(
+        err instanceof Error ? err.message : "Unable to remove photo.",
+      );
+    } finally {
+      setUploadingFacilitatorPhoto(false);
+    }
   }
 
   async function createCourse(e: FormEvent) {
-    e.preventDefault()
-    setCreatingCourse(true)
-    setError(null)
+    e.preventDefault();
+    setCreatingCourse(true);
+    setError(null);
     try {
-      const course = await apiRequest<{ id: string; slug: string }>('/academy/admin/courses', {
-        method: 'POST',
-        body: JSON.stringify(createCourseForm),
-      })
-      setShowCreateCourse(false)
-      setCreateCourseForm({ title: '', slug: '', description: '' })
+      const course = await apiRequest<{ id: string; slug: string }>(
+        "/academy/admin/courses",
+        {
+          method: "POST",
+          body: JSON.stringify(createCourseForm),
+        },
+      );
+      setShowCreateCourse(false);
+      setCreateCourseForm({ title: "", slug: "", description: "" });
       // Drop straight into the builder, same as the regular admin flow
-      window.location.href = `/admin/courses/${course.id}`
+      window.location.href = `/admin/courses/${course.id}`;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create course.')
+      setError(err instanceof Error ? err.message : "Failed to create course.");
     } finally {
-      setCreatingCourse(false)
+      setCreatingCourse(false);
     }
   }
 
   async function submitAction(e: FormEvent) {
-    e.preventDefault()
-    if (!actionCourseId || !actionType) return
-    setSubmitting(true)
+    e.preventDefault();
+    if (!actionCourseId || !actionType) return;
+    setSubmitting(true);
     try {
-      await apiRequest(`/academy/superadmin/courses/${actionCourseId}/${actionType}`, {
-        method: 'POST',
-        body: JSON.stringify({ notes: actionNotes }),
-      })
-      setActionCourseId(null); setActionType(null); setActionNotes('')
-      await loadCourses(statusFilter)
-      await loadOverview()
+      await apiRequest(
+        `/academy/superadmin/courses/${actionCourseId}/${actionType}`,
+        {
+          method: "POST",
+          body: JSON.stringify({ notes: actionNotes }),
+        },
+      );
+      setActionCourseId(null);
+      setActionType(null);
+      setActionNotes("");
+      await loadCourses(statusFilter);
+      await loadOverview();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Action failed.')
+      setError(err instanceof Error ? err.message : "Action failed.");
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
   }
 
   function openPricing(course: SuperAdminCourse) {
-    setPricingCourse(course)
+    setPricingCourse(course);
     setPricingForm({
-      priceUsd: course.priceUsd != null ? String(Number(course.priceUsd)) : '',
-      priceNgn: course.priceNgn != null ? String(Number(course.priceNgn)) : '',
-      discountPercent: course.discountPercent != null ? String(course.discountPercent) : '',
-    })
+      priceUsd: course.priceUsd != null ? String(Number(course.priceUsd)) : "",
+      priceNgn: course.priceNgn != null ? String(Number(course.priceNgn)) : "",
+      discountPercent:
+        course.discountPercent != null ? String(course.discountPercent) : "",
+    });
   }
 
   async function savePricing(e: FormEvent) {
-    e.preventDefault()
-    if (!pricingCourse) return
+    e.preventDefault();
+    if (!pricingCourse) return;
     const parseNum = (raw: string) => {
-      const trimmed = raw.trim()
-      if (!trimmed) return null
-      const n = Number(trimmed)
-      return Number.isFinite(n) && n >= 0 ? n : null
-    }
-    setSavingPricing(true)
-    setError(null)
+      const trimmed = raw.trim();
+      if (!trimmed) return null;
+      const n = Number(trimmed);
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    };
+    setSavingPricing(true);
+    setError(null);
     try {
       await apiRequest(`/academy/admin/courses/${pricingCourse.id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         body: JSON.stringify({
           priceUsd: parseNum(pricingForm.priceUsd),
           priceNgn: parseNum(pricingForm.priceNgn),
-          discountPercent: pricingForm.discountPercent.trim() ? Math.round(Number(pricingForm.discountPercent)) : null,
+          discountPercent: pricingForm.discountPercent.trim()
+            ? Math.round(Number(pricingForm.discountPercent))
+            : null,
         }),
-      })
-      setPricingCourse(null)
-      await loadCourses(statusFilter)
+      });
+      setPricingCourse(null);
+      await loadCourses(statusFilter);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save pricing.')
+      setError(err instanceof Error ? err.message : "Failed to save pricing.");
     } finally {
-      setSavingPricing(false)
+      setSavingPricing(false);
     }
   }
 
   async function createAdmin(e: FormEvent) {
-    e.preventDefault()
-    setCreating(true)
-    setError(null)
+    e.preventDefault();
+    setCreating(true);
+    setError(null);
     try {
-      await apiRequest('/academy/superadmin/users', {
-        method: 'POST',
+      await apiRequest("/academy/superadmin/users", {
+        method: "POST",
         body: JSON.stringify(createForm),
-      })
-      setShowCreateAdmin(false)
-      setCreateForm({ name: '', email: '', password: '' })
-      await loadUsers()
-      await loadOverview()
+      });
+      setShowCreateAdmin(false);
+      setCreateForm({ name: "", email: "", password: "" });
+      await loadUsers();
+      await loadOverview();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create admin.')
+      setError(err instanceof Error ? err.message : "Failed to create admin.");
     } finally {
-      setCreating(false)
+      setCreating(false);
     }
   }
 
   async function changeRole(userId: string, role: string) {
-    setChangingRoleId(userId)
-    setError(null)
+    setChangingRoleId(userId);
+    setError(null);
     try {
       await apiRequest(`/academy/superadmin/users/${userId}/role`, {
-        method: 'PATCH',
+        method: "PATCH",
         body: JSON.stringify({ role }),
-      })
-      await loadUsers()
-      await loadOverview()
+      });
+      await loadUsers();
+      await loadOverview();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to change role.')
+      setError(err instanceof Error ? err.message : "Failed to change role.");
     } finally {
-      setChangingRoleId(null)
+      setChangingRoleId(null);
     }
   }
 
   async function deleteUser(userId: string) {
-    setDeletingId(userId)
-    setError(null)
+    setDeletingId(userId);
+    setError(null);
     try {
-      await apiRequest(`/academy/superadmin/users/${userId}`, { method: 'DELETE' })
-      setDeleteConfirm(null)
-      await loadUsers()
-      await loadOverview()
+      await apiRequest(`/academy/superadmin/users/${userId}`, {
+        method: "DELETE",
+      });
+      setDeleteConfirm(null);
+      await loadUsers();
+      await loadOverview();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete user.')
+      setError(err instanceof Error ? err.message : "Failed to delete user.");
     } finally {
-      setDeletingId(null)
+      setDeletingId(null);
     }
   }
 
   async function deleteCourse(courseId: string) {
-    setDeletingId(courseId)
-    setError(null)
+    setDeletingId(courseId);
+    setError(null);
     try {
-      await apiRequest(`/academy/superadmin/courses/${courseId}`, { method: 'DELETE' })
-      setDeleteConfirm(null)
-      await loadCourses(statusFilter)
-      await loadOverview()
+      await apiRequest(`/academy/superadmin/courses/${courseId}`, {
+        method: "DELETE",
+      });
+      setDeleteConfirm(null);
+      await loadCourses(statusFilter);
+      await loadOverview();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete course.')
+      setError(err instanceof Error ? err.message : "Failed to delete course.");
     } finally {
-      setDeletingId(null)
+      setDeletingId(null);
     }
   }
 
   async function changePassword(e: FormEvent) {
-    e.preventDefault()
+    e.preventDefault();
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setError('Passwords do not match.')
-      return
+      setError("Passwords do not match.");
+      return;
     }
     if (passwordForm.newPassword.length < 8) {
-      setError('Password must be at least 8 characters.')
-      return
+      setError("Password must be at least 8 characters.");
+      return;
     }
-    setChangingPassword(true)
-    setError(null)
+    setChangingPassword(true);
+    setError(null);
     try {
-      await apiRequest('/auth/change-password', {
-        method: 'POST',
+      await apiRequest("/auth/change-password", {
+        method: "POST",
         body: JSON.stringify({
           currentPassword: passwordForm.currentPassword,
           newPassword: passwordForm.newPassword,
         }),
-      })
-      setShowPasswordChange(false)
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-      setError(null)
+      });
+      setShowPasswordChange(false);
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to change password.')
+      setError(
+        err instanceof Error ? err.message : "Failed to change password.",
+      );
     } finally {
-      setChangingPassword(false)
+      setChangingPassword(false);
     }
   }
 
   async function resetUserPassword(userId: string, userName: string) {
-    setResettingPassword(true)
-    setError(null)
+    setResettingPassword(true);
+    setError(null);
     try {
-      const result = await apiRequest<{ resetToken: string; expiresAt: string }>(`/auth/superadmin/users/${userId}/reset-password`, {
-        method: 'POST',
-      })
-      setResetPasswordData({ userId, userName, resetToken: result.resetToken, expiresAt: result.expiresAt })
+      const result = await apiRequest<{
+        resetToken: string;
+        expiresAt: string;
+      }>(`/auth/superadmin/users/${userId}/reset-password`, {
+        method: "POST",
+      });
+      setResetPasswordData({
+        userId,
+        userName,
+        resetToken: result.resetToken,
+        expiresAt: result.expiresAt,
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reset password.')
+      setError(
+        err instanceof Error ? err.message : "Failed to reset password.",
+      );
     } finally {
-      setResettingPassword(false)
+      setResettingPassword(false);
     }
   }
 
-  const actionCourse = courses.find(c => c.id === actionCourseId)
+  const actionCourse = courses.find((c) => c.id === actionCourseId);
 
   const TABS: Array<{ id: Tab; label: string; icon: typeof ShieldCheck }> = [
-    { id: 'overview',    label: 'Overview',    icon: ShieldCheck },
-    { id: 'courses',     label: 'Courses',     icon: BookOpen },
-    { id: 'submissions', label: 'Submissions', icon: ClipboardList },
-    { id: 'learners',    label: 'Learners',    icon: Users },
-    { id: 'users',       label: 'Users',       icon: Users },
-    { id: 'content',     label: 'Site Content',icon: Database },
-  ]
+    { id: "overview", label: "Overview", icon: ShieldCheck },
+    { id: "courses", label: "Courses", icon: BookOpen },
+    { id: "submissions", label: "Submissions", icon: ClipboardList },
+    { id: "learners", label: "Learners", icon: Users },
+    { id: "users", label: "Users", icon: Users },
+    { id: "content", label: "Site Content", icon: Database },
+  ];
 
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
@@ -611,7 +993,6 @@ export default function SuperAdminPage() {
 
       <main className="pt-24 pb-16 px-4 md:px-6">
         <div className="max-w-7xl mx-auto">
-
           {/* Header */}
           <div className="mb-8 flex items-start justify-between gap-6">
             <div>
@@ -623,7 +1004,8 @@ export default function SuperAdminPage() {
                 Platform Management
               </h1>
               <p className="text-white/45 max-w-2xl">
-                Manage administrators, approve courses, and monitor platform-wide metrics.
+                Manage administrators, approve courses, and monitor
+                platform-wide metrics.
               </p>
             </div>
             <button
@@ -638,34 +1020,39 @@ export default function SuperAdminPage() {
           {error && (
             <div className="mb-6 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100 flex items-center justify-between">
               {error}
-              <button onClick={() => setError(null)} className="text-red-200/60 hover:text-red-100 ml-4">✕</button>
+              <button
+                onClick={() => setError(null)}
+                className="text-red-200/60 hover:text-red-100 ml-4"
+              >
+                ✕
+              </button>
             </div>
           )}
 
           {/* Tab nav */}
           <div className="flex gap-1 mb-8 border-b border-white/10 overflow-x-auto">
-            {TABS.map(tab => {
-              const Icon = tab.icon
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex-shrink-0 inline-flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === tab.id
-                      ? 'border-[#F5C518] text-[#F5C518]'
-                      : 'border-transparent text-white/40 hover:text-white/70'
+                      ? "border-[#F5C518] text-[#F5C518]"
+                      : "border-transparent text-white/40 hover:text-white/70"
                   }`}
                 >
                   <Icon size={14} />
                   {tab.label}
                 </button>
-              )
+              );
             })}
           </div>
 
           {/* ── Overview Tab ─────────────────────────────────────────────────── */}
-          {activeTab === 'overview' && (
-            overviewLoading ? (
+          {activeTab === "overview" &&
+            (overviewLoading ? (
               <div className="flex items-center justify-center py-24">
                 <Loader2 className="animate-spin text-[#F5C518]" size={28} />
               </div>
@@ -673,31 +1060,83 @@ export default function SuperAdminPage() {
               <div className="space-y-8">
                 {/* Stats grid */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <StatCard label="Total users"      value={overview.totalUsers}      sub={`${overview.learnerCount} learners`} />
-                  <StatCard label="Admins"           value={overview.adminCount}      sub="including facilitators" />
-                  <StatCard label="Enrollments"      value={overview.totalEnrollments} sub="across all courses" />
-                  <StatCard label="Total courses"    value={overview.totalCourses}    sub={`${overview.coursesByStatus['APPROVED'] ?? 0} published`} />
-                  <StatCard label="Weeks / Lessons"  value={overview.totalWeeks} />
-                  <StatCard label="Submissions"      value={overview.totalSubmissions} sub={`${overview.pendingSubmissions} pending review`} />
-                  <StatCard label="Pending approval" value={overview.coursesByStatus['PENDING_REVIEW'] ?? 0} sub="courses awaiting review" />
-                  <StatCard label="Rejected"         value={overview.coursesByStatus['REJECTED'] ?? 0} sub="courses need revision" />
+                  <StatCard
+                    label="Total users"
+                    value={overview.totalUsers}
+                    sub={`${overview.learnerCount} learners`}
+                  />
+                  <StatCard
+                    label="Admins"
+                    value={overview.adminCount}
+                    sub="including facilitators"
+                  />
+                  <StatCard
+                    label="Enrollments"
+                    value={overview.totalEnrollments}
+                    sub="across all courses"
+                  />
+                  <StatCard
+                    label="Total courses"
+                    value={overview.totalCourses}
+                    sub={`${overview.coursesByStatus["APPROVED"] ?? 0} published`}
+                  />
+                  <StatCard
+                    label="Weeks / Lessons"
+                    value={overview.totalWeeks}
+                  />
+                  <StatCard
+                    label="Submissions"
+                    value={overview.totalSubmissions}
+                    sub={`${overview.pendingSubmissions} pending review`}
+                  />
+                  <StatCard
+                    label="Pending approval"
+                    value={overview.coursesByStatus["PENDING_REVIEW"] ?? 0}
+                    sub="courses awaiting review"
+                  />
+                  <StatCard
+                    label="Rejected"
+                    value={overview.coursesByStatus["REJECTED"] ?? 0}
+                    sub="courses need revision"
+                  />
                 </div>
 
                 {/* Course status breakdown */}
                 <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-6">
-                  <p className="text-xs font-mono uppercase tracking-widest text-white/30 mb-5">Course pipeline</p>
+                  <p className="text-xs font-mono uppercase tracking-widest text-white/30 mb-5">
+                    Course pipeline
+                  </p>
                   <div className="flex flex-wrap gap-4">
-                    {(['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED'] as CourseStatus[]).map(status => {
-                      const cfg = STATUS_CONFIG[status]
-                      const count = overview.coursesByStatus[status] ?? 0
-                      const pct = overview.totalCourses > 0 ? Math.round((count / overview.totalCourses) * 100) : 0
+                    {(
+                      [
+                        "DRAFT",
+                        "PENDING_REVIEW",
+                        "APPROVED",
+                        "REJECTED",
+                      ] as CourseStatus[]
+                    ).map((status) => {
+                      const cfg = STATUS_CONFIG[status];
+                      const count = overview.coursesByStatus[status] ?? 0;
+                      const pct =
+                        overview.totalCourses > 0
+                          ? Math.round((count / overview.totalCourses) * 100)
+                          : 0;
                       return (
-                        <div key={status} className={`flex-1 min-w-[120px] rounded-2xl border px-4 py-4 ${cfg.color}`}>
-                          <p className="text-xs font-mono uppercase tracking-widest opacity-70 mb-1">{cfg.label}</p>
-                          <p className="font-display text-2xl font-extrabold">{count}</p>
-                          <p className="text-xs opacity-50 mt-0.5">{pct}% of total</p>
+                        <div
+                          key={status}
+                          className={`flex-1 min-w-[120px] rounded-2xl border px-4 py-4 ${cfg.color}`}
+                        >
+                          <p className="text-xs font-mono uppercase tracking-widest opacity-70 mb-1">
+                            {cfg.label}
+                          </p>
+                          <p className="font-display text-2xl font-extrabold">
+                            {count}
+                          </p>
+                          <p className="text-xs opacity-50 mt-0.5">
+                            {pct}% of total
+                          </p>
                         </div>
-                      )
+                      );
                     })}
                   </div>
                 </div>
@@ -705,35 +1144,51 @@ export default function SuperAdminPage() {
                 {/* Recent signups */}
                 <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-6">
                   <div className="flex items-center justify-between mb-5">
-                    <p className="text-xs font-mono uppercase tracking-widest text-white/30">Recent signups</p>
+                    <p className="text-xs font-mono uppercase tracking-widest text-white/30">
+                      Recent signups
+                    </p>
                     <button
-                      onClick={() => setActiveTab('users')}
+                      onClick={() => setActiveTab("users")}
                       className="text-xs text-[#F5C518] hover:text-[#FFE070] transition-colors"
                     >
                       View all →
                     </button>
                   </div>
                   <div className="space-y-2">
-                    {overview.recentUsers.map(u => {
-                      const cfg = ROLE_CONFIG[u.role] ?? ROLE_CONFIG.USER
-                      const initials = (u.name || u.email).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                    {overview.recentUsers.map((u) => {
+                      const cfg = ROLE_CONFIG[u.role] ?? ROLE_CONFIG.USER;
+                      const initials = (u.name || u.email)
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase();
                       return (
-                        <div key={u.id} className="flex items-center gap-4 rounded-xl border border-white/8 bg-black/20 px-4 py-3">
+                        <div
+                          key={u.id}
+                          className="flex items-center gap-4 rounded-xl border border-white/8 bg-black/20 px-4 py-3"
+                        >
                           <div className="w-8 h-8 rounded-full bg-[#F5C518]/15 border border-[#F5C518]/20 flex items-center justify-center text-[#F5C518] text-xs font-extrabold shrink-0">
                             {initials}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-white truncate">{u.name || '—'}</p>
-                            <p className="text-xs text-white/35 truncate">{u.email}</p>
+                            <p className="text-sm font-medium text-white truncate">
+                              {u.name || "—"}
+                            </p>
+                            <p className="text-xs text-white/35 truncate">
+                              {u.email}
+                            </p>
                           </div>
-                          <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-mono uppercase tracking-wide ${cfg.color}`}>
+                          <span
+                            className={`rounded-full border px-2.5 py-0.5 text-[10px] font-mono uppercase tracking-wide ${cfg.color}`}
+                          >
                             {cfg.label}
                           </span>
                           <span className="text-xs text-white/25 shrink-0">
                             {new Date(u.createdAt).toLocaleDateString()}
                           </span>
                         </div>
-                      )
+                      );
                     })}
                   </div>
                 </div>
@@ -741,15 +1196,22 @@ export default function SuperAdminPage() {
                 {/* Quick actions */}
                 <div className="flex flex-wrap gap-3">
                   <button
-                    onClick={() => { setActiveTab('courses'); setStatusFilter('PENDING_REVIEW') }}
+                    onClick={() => {
+                      setActiveTab("courses");
+                      setStatusFilter("PENDING_REVIEW");
+                    }}
                     className="inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-400/10 px-5 py-3 text-sm text-amber-300 hover:bg-amber-400/20 transition-colors"
                   >
                     <Clock size={14} />
-                    Review pending courses ({overview.coursesByStatus['PENDING_REVIEW'] ?? 0})
+                    Review pending courses (
+                    {overview.coursesByStatus["PENDING_REVIEW"] ?? 0})
                   </button>
                   {overview.pendingSubmissions > 0 && (
                     <button
-                      onClick={() => { setActiveTab('submissions'); setSubmissionStatusFilter('SUBMITTED') }}
+                      onClick={() => {
+                        setActiveTab("submissions");
+                        setSubmissionStatusFilter("SUBMITTED");
+                      }}
                       className="inline-flex items-center gap-2 rounded-full border border-teal-400/25 bg-teal-400/10 px-5 py-3 text-sm text-teal-300 hover:bg-teal-400/20 transition-colors"
                     >
                       <ClipboardList size={14} />
@@ -757,14 +1219,20 @@ export default function SuperAdminPage() {
                     </button>
                   )}
                   <button
-                    onClick={() => { setActiveTab('courses'); setShowCreateCourse(true) }}
+                    onClick={() => {
+                      setActiveTab("courses");
+                      setShowCreateCourse(true);
+                    }}
                     className="inline-flex items-center gap-2 rounded-full bg-[#F5C518] px-5 py-3 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors"
                   >
                     <Plus size={14} />
                     Create a new course
                   </button>
                   <button
-                    onClick={() => { setActiveTab('users'); setShowCreateAdmin(true) }}
+                    onClick={() => {
+                      setActiveTab("users");
+                      setShowCreateAdmin(true);
+                    }}
                     className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white/70 hover:text-white hover:border-white/30 transition-colors"
                   >
                     <Plus size={14} />
@@ -772,32 +1240,36 @@ export default function SuperAdminPage() {
                   </button>
                 </div>
               </div>
-            ) : null
-          )}
+            ) : null)}
 
           {/* ── Courses Tab ──────────────────────────────────────────────────── */}
-          {activeTab === 'courses' && (
+          {activeTab === "courses" && (
             <div>
               <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
                 <div className="flex gap-2 flex-wrap">
-                  {STATUS_FILTERS.map(f => {
-                    const count = f.value === ''
-                      ? overview?.totalCourses
-                      : overview?.coursesByStatus[f.value] ?? 0
+                  {STATUS_FILTERS.map((f) => {
+                    const count =
+                      f.value === ""
+                        ? overview?.totalCourses
+                        : (overview?.coursesByStatus[f.value] ?? 0);
                     return (
                       <button
                         key={f.value}
                         onClick={() => setStatusFilter(f.value)}
                         className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
                           statusFilter === f.value
-                            ? 'border-[#F5C518]/50 bg-[#F5C518]/10 text-[#F5C518]'
-                            : 'border-white/10 text-white/50 hover:border-white/20'
+                            ? "border-[#F5C518]/50 bg-[#F5C518]/10 text-[#F5C518]"
+                            : "border-white/10 text-white/50 hover:border-white/20"
                         }`}
                       >
                         {f.label}
-                        {count !== undefined && <span className="ml-1.5 text-xs opacity-60">{count}</span>}
+                        {count !== undefined && (
+                          <span className="ml-1.5 text-xs opacity-60">
+                            {count}
+                          </span>
+                        )}
                       </button>
-                    )
+                    );
                   })}
                 </div>
                 <button
@@ -810,25 +1282,46 @@ export default function SuperAdminPage() {
 
               {/* Inline create form */}
               {showCreateCourse && (
-                <form onSubmit={createCourse} className="mb-6 rounded-[24px] border border-[#F5C518]/20 bg-[#F5C518]/5 p-6 space-y-4">
+                <form
+                  onSubmit={createCourse}
+                  className="mb-6 rounded-[24px] border border-[#F5C518]/20 bg-[#F5C518]/5 p-6 space-y-4"
+                >
                   <div>
-                    <h3 className="text-sm font-semibold text-[#F5C518]">Create new course</h3>
-                    <p className="text-xs text-white/40 mt-1">Just the essentials — you'll fill in modules, lessons, intro video, etc. in the course builder.</p>
+                    <h3 className="text-sm font-semibold text-[#F5C518]">
+                      Create new course
+                    </h3>
+                    <p className="text-xs text-white/40 mt-1">
+                      Just the essentials — you'll fill in modules, lessons,
+                      intro video, etc. in the course builder.
+                    </p>
                   </div>
                   <div className="grid md:grid-cols-2 gap-4">
                     {[
-                      { key: 'title' as const, label: 'Title *', placeholder: 'Blockchain for Social Impact' },
-                      { key: 'slug' as const, label: 'Slug * (lowercase, hyphens only)', placeholder: 'blockchain-social-impact' },
+                      {
+                        key: "title" as const,
+                        label: "Title *",
+                        placeholder: "Blockchain for Social Impact",
+                      },
+                      {
+                        key: "slug" as const,
+                        label: "Slug * (lowercase, hyphens only)",
+                        placeholder: "blockchain-social-impact",
+                      },
                     ].map(({ key, label, placeholder }) => (
                       <div key={key}>
-                        <label className="block text-xs text-white/40 mb-1">{label}</label>
+                        <label className="block text-xs text-white/40 mb-1">
+                          {label}
+                        </label>
                         <input
                           value={createCourseForm[key]}
-                          onChange={e => {
-                            const val = key === 'slug'
-                              ? e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-')
-                              : e.target.value
-                            setCreateCourseForm(p => ({ ...p, [key]: val }))
+                          onChange={(e) => {
+                            const val =
+                              key === "slug"
+                                ? e.target.value
+                                    .toLowerCase()
+                                    .replace(/[^a-z0-9-]/g, "-")
+                                : e.target.value;
+                            setCreateCourseForm((p) => ({ ...p, [key]: val }));
                           }}
                           required
                           placeholder={placeholder}
@@ -838,10 +1331,17 @@ export default function SuperAdminPage() {
                     ))}
                   </div>
                   <div>
-                    <label className="block text-xs text-white/40 mb-1">Description * (min 10 characters)</label>
+                    <label className="block text-xs text-white/40 mb-1">
+                      Description * (min 10 characters)
+                    </label>
                     <textarea
                       value={createCourseForm.description}
-                      onChange={e => setCreateCourseForm(p => ({ ...p, description: e.target.value }))}
+                      onChange={(e) =>
+                        setCreateCourseForm((p) => ({
+                          ...p,
+                          description: e.target.value,
+                        }))
+                      }
                       required
                       minLength={10}
                       rows={3}
@@ -850,10 +1350,18 @@ export default function SuperAdminPage() {
                     />
                   </div>
                   <div className="flex gap-3">
-                    <button type="submit" disabled={creatingCourse} className="rounded-full bg-[#F5C518] px-5 py-2.5 text-sm font-semibold text-[#0A0A0A] disabled:opacity-50">
-                      {creatingCourse ? 'Creating…' : 'Create & open builder'}
+                    <button
+                      type="submit"
+                      disabled={creatingCourse}
+                      className="rounded-full bg-[#F5C518] px-5 py-2.5 text-sm font-semibold text-[#0A0A0A] disabled:opacity-50"
+                    >
+                      {creatingCourse ? "Creating…" : "Create & open builder"}
                     </button>
-                    <button type="button" onClick={() => setShowCreateCourse(false)} className="rounded-full border border-white/10 px-5 py-2.5 text-sm text-white/50 hover:border-white/20">
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateCourse(false)}
+                      className="rounded-full border border-white/10 px-5 py-2.5 text-sm text-white/50 hover:border-white/20"
+                    >
                       Cancel
                     </button>
                   </div>
@@ -870,45 +1378,85 @@ export default function SuperAdminPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {courses.map(course => {
-                    const cfg = STATUS_CONFIG[course.status]
+                  {courses.map((course) => {
+                    const cfg = STATUS_CONFIG[course.status];
                     return (
-                      <div key={course.id} className="rounded-[24px] border border-white/10 bg-white/[0.04] p-6">
+                      <div
+                        key={course.id}
+                        className="rounded-[24px] border border-white/10 bg-white/[0.04] p-6"
+                      >
                         <div className="flex flex-wrap items-start justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 mb-2 flex-wrap">
-                              <span className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-mono ${cfg.color}`}>
+                              <span
+                                className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-mono ${cfg.color}`}
+                              >
                                 {cfg.label}
                               </span>
                               {course.submittedAt && (
                                 <span className="flex items-center gap-1 text-xs text-white/35">
                                   <Clock size={11} />
-                                  Submitted {new Date(course.submittedAt).toLocaleDateString()}
+                                  Submitted{" "}
+                                  {new Date(
+                                    course.submittedAt,
+                                  ).toLocaleDateString()}
                                 </span>
                               )}
                             </div>
-                            <h3 className="text-xl font-bold text-white mb-1">{course.title}</h3>
-                            <p className="text-sm text-white/40 mb-3">/{course.slug}</p>
+                            <h3 className="text-xl font-bold text-white mb-1">
+                              {course.title}
+                            </h3>
+                            <p className="text-sm text-white/40 mb-3">
+                              /{course.slug}
+                            </p>
                             <div className="flex flex-wrap gap-4 text-sm text-white/50">
-                              <span>{course._count.weeks} {course.contentUnit.toLowerCase()}{course._count.weeks !== 1 ? 's' : ''}</span>
-                              <span>{course.courseFacilitators.length} facilitator{course.courseFacilitators.length !== 1 ? 's' : ''}</span>
-                              {course.createdBy && <span>by {course.createdBy.name || course.createdBy.email}</span>}
-                              {(Number(course.priceUsd) > 0 || Number(course.priceNgn) > 0) ? (
+                              <span>
+                                {course._count.weeks}{" "}
+                                {course.contentUnit.toLowerCase()}
+                                {course._count.weeks !== 1 ? "s" : ""}
+                              </span>
+                              <span>
+                                {course.courseFacilitators.length} facilitator
+                                {course.courseFacilitators.length !== 1
+                                  ? "s"
+                                  : ""}
+                              </span>
+                              {course.createdBy && (
+                                <span>
+                                  by{" "}
+                                  {course.createdBy.name ||
+                                    course.createdBy.email}
+                                </span>
+                              )}
+                              {Number(course.priceUsd) > 0 ||
+                              Number(course.priceNgn) > 0 ? (
                                 <span className="text-teal-300">
                                   {[
-                                    Number(course.priceUsd) > 0 ? `$${Number(course.priceUsd).toLocaleString()}` : null,
-                                    Number(course.priceNgn) > 0 ? `₦${Number(course.priceNgn).toLocaleString()}` : null,
-                                  ].filter(Boolean).join(' / ')}
-                                  {(course.discountPercent ?? 0) > 0 && ` · −${course.discountPercent}%`}
+                                    Number(course.priceUsd) > 0
+                                      ? `$${Number(course.priceUsd).toLocaleString()}`
+                                      : null,
+                                    Number(course.priceNgn) > 0
+                                      ? `₦${Number(course.priceNgn).toLocaleString()}`
+                                      : null,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" / ")}
+                                  {(course.discountPercent ?? 0) > 0 &&
+                                    ` · −${course.discountPercent}%`}
                                 </span>
                               ) : (
-                                <span className="text-emerald-300/70">Free</span>
+                                <span className="text-emerald-300/70">
+                                  Free
+                                </span>
                               )}
                             </div>
                             {course.courseFacilitators.length > 0 && (
                               <div className="flex flex-wrap gap-2 mt-3">
-                                {course.courseFacilitators.map(cf => (
-                                  <span key={cf.facilitator.id} className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50">
+                                {course.courseFacilitators.map((cf) => (
+                                  <span
+                                    key={cf.facilitator.id}
+                                    className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50"
+                                  >
                                     {cf.facilitator.name}
                                   </span>
                                 ))}
@@ -916,8 +1464,10 @@ export default function SuperAdminPage() {
                             )}
                             {course.approvals.length > 0 && (
                               <p className="mt-2 text-xs text-white/30">
-                                Last: {course.approvals[0].action} by {course.approvals[0].reviewer.name}
-                                {course.approvals[0].notes && ` — "${course.approvals[0].notes}"`}
+                                Last: {course.approvals[0].action} by{" "}
+                                {course.approvals[0].reviewer.name}
+                                {course.approvals[0].notes &&
+                                  ` — "${course.approvals[0].notes}"`}
                               </p>
                             )}
                           </div>
@@ -951,24 +1501,38 @@ export default function SuperAdminPage() {
                             >
                               <Tag size={14} /> Pricing
                             </button>
-                            {course.status !== 'APPROVED' && (
+                            {course.status !== "APPROVED" && (
                               <button
-                                onClick={() => { setActionCourseId(course.id); setActionType('approve'); setActionNotes('') }}
+                                onClick={() => {
+                                  setActionCourseId(course.id);
+                                  setActionType("approve");
+                                  setActionNotes("");
+                                }}
                                 className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-400/20 transition-colors"
                               >
                                 <CheckCircle2 size={14} /> Approve &amp; publish
                               </button>
                             )}
-                            {course.status === 'PENDING_REVIEW' && (
+                            {course.status === "PENDING_REVIEW" && (
                               <button
-                                onClick={() => { setActionCourseId(course.id); setActionType('reject'); setActionNotes('') }}
+                                onClick={() => {
+                                  setActionCourseId(course.id);
+                                  setActionType("reject");
+                                  setActionNotes("");
+                                }}
                                 className="inline-flex items-center gap-1.5 rounded-full border border-red-400/30 bg-red-400/10 px-4 py-2 text-sm text-red-300 hover:bg-red-400/20 transition-colors"
                               >
                                 <XCircle size={14} /> Reject
                               </button>
                             )}
                             <button
-                              onClick={() => setDeleteConfirm({ type: 'course', id: course.id, name: course.title })}
+                              onClick={() =>
+                                setDeleteConfirm({
+                                  type: "course",
+                                  id: course.id,
+                                  name: course.title,
+                                })
+                              }
                               className="inline-flex items-center gap-1.5 rounded-full border border-red-400/30 bg-red-400/5 px-4 py-2 text-sm text-red-300/60 hover:bg-red-400/10 hover:text-red-300 transition-colors"
                             >
                               <Trash2 size={14} />
@@ -976,7 +1540,7 @@ export default function SuperAdminPage() {
                           </div>
                         </div>
                       </div>
-                    )
+                    );
                   })}
                 </div>
               )}
@@ -984,92 +1548,130 @@ export default function SuperAdminPage() {
           )}
 
           {/* ── Submissions Tab ──────────────────────────────────────────────── */}
-          {activeTab === 'submissions' && (
+          {activeTab === "submissions" && (
             <div>
               {/* Status filter */}
               <div className="flex flex-wrap items-center gap-3 mb-5">
                 <div className="flex gap-1.5">
-                  {(['ALL', 'SUBMITTED', 'REVIEWED'] as const).map(s => {
-                    const count = s === 'ALL'
-                      ? submissions.length
-                      : submissions.filter(x => x.status === s).length
+                  {(["ALL", "SUBMITTED", "REVIEWED"] as const).map((s) => {
+                    const count =
+                      s === "ALL"
+                        ? submissions.length
+                        : submissions.filter((x) => x.status === s).length;
                     return (
                       <button
                         key={s}
                         onClick={() => setSubmissionStatusFilter(s)}
                         className={`rounded-full px-4 py-1.5 text-sm transition-colors border ${
                           submissionStatusFilter === s
-                            ? 'border-[#F5C518] bg-[#F5C518]/10 text-[#F5C518]'
-                            : 'border-white/15 text-white/60 hover:border-white/30'
+                            ? "border-[#F5C518] bg-[#F5C518]/10 text-[#F5C518]"
+                            : "border-white/15 text-white/60 hover:border-white/30"
                         }`}
                       >
-                        {s === 'ALL' ? 'All' : s === 'SUBMITTED' ? 'Pending review' : 'Reviewed'}
-                        <span className="ml-1.5 text-xs opacity-60">{count}</span>
+                        {s === "ALL"
+                          ? "All"
+                          : s === "SUBMITTED"
+                            ? "Pending review"
+                            : "Reviewed"}
+                        <span className="ml-1.5 text-xs opacity-60">
+                          {count}
+                        </span>
                       </button>
-                    )
+                    );
                   })}
                 </div>
               </div>
 
               {submissionsLoading ? (
                 <div className="rounded-[24px] border border-white/8 bg-white/[0.02] p-12 text-center">
-                  <Loader2 className="animate-spin text-[#F5C518] mx-auto mb-3" size={24} />
+                  <Loader2
+                    className="animate-spin text-[#F5C518] mx-auto mb-3"
+                    size={24}
+                  />
                   <p className="text-white/40">Loading submissions…</p>
                 </div>
               ) : submissions.length === 0 ? (
                 <div className="rounded-[24px] border border-white/8 bg-white/[0.02] p-12 text-center">
-                  <ClipboardList size={28} className="text-white/20 mx-auto mb-3" />
-                  <p className="text-white/40">No submissions yet across the platform.</p>
+                  <ClipboardList
+                    size={28}
+                    className="text-white/20 mx-auto mb-3"
+                  />
+                  <p className="text-white/40">
+                    No submissions yet across the platform.
+                  </p>
                 </div>
               ) : (
                 (() => {
-                  const filtered = submissionStatusFilter === 'ALL'
-                    ? submissions
-                    : submissions.filter(s => s.status === submissionStatusFilter)
+                  const filtered =
+                    submissionStatusFilter === "ALL"
+                      ? submissions
+                      : submissions.filter(
+                          (s) => s.status === submissionStatusFilter,
+                        );
                   if (filtered.length === 0) {
                     return (
                       <div className="rounded-[24px] border border-white/8 bg-white/[0.02] p-12 text-center">
-                        <ClipboardList size={28} className="text-white/20 mx-auto mb-3" />
-                        <p className="text-white/40">No {submissionStatusFilter.toLowerCase()} submissions.</p>
+                        <ClipboardList
+                          size={28}
+                          className="text-white/20 mx-auto mb-3"
+                        />
+                        <p className="text-white/40">
+                          No {submissionStatusFilter.toLowerCase()} submissions.
+                        </p>
                       </div>
-                    )
+                    );
                   }
                   return (
                     <div className="space-y-5">
-                      {filtered.map(submission => (
-                        <div key={submission.id} className="rounded-[24px] border border-white/10 bg-white/[0.04] p-6">
+                      {filtered.map((submission) => (
+                        <div
+                          key={submission.id}
+                          className="rounded-[24px] border border-white/10 bg-white/[0.04] p-6"
+                        >
                           <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
                             <div>
                               <div className="flex items-center gap-2 mb-2">
-                                <span className="text-xs font-mono text-white/30">Week {submission.assignment.week.number}</span>
-                                <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-mono ${
-                                  submission.status === 'SUBMITTED'
-                                    ? 'border-amber-400/30 text-amber-300 bg-amber-400/8'
-                                    : submission.status === 'REVIEWED'
-                                      ? 'border-emerald-400/30 text-emerald-300'
-                                      : 'border-white/15 text-white/40'
-                                }`}>
+                                <span className="text-xs font-mono text-white/30">
+                                  Week {submission.assignment.week.number}
+                                </span>
+                                <span
+                                  className={`rounded-full border px-2.5 py-0.5 text-[11px] font-mono ${
+                                    submission.status === "SUBMITTED"
+                                      ? "border-amber-400/30 text-amber-300 bg-amber-400/8"
+                                      : submission.status === "REVIEWED"
+                                        ? "border-emerald-400/30 text-emerald-300"
+                                        : "border-white/15 text-white/40"
+                                  }`}
+                                >
                                   {submission.status}
                                 </span>
                               </div>
                               <h3 className="text-lg font-semibold text-white mb-0.5">
-                                <span className="text-[10px] font-mono uppercase tracking-wider text-[#F5C518] mr-2">L{submission.assignment.week.number}</span>
+                                <span className="text-[10px] font-mono uppercase tracking-wider text-[#F5C518] mr-2">
+                                  L{submission.assignment.week.number}
+                                </span>
                                 {submission.assignment.title}
                               </h3>
                               <p className="text-sm text-white/40">
                                 <button
                                   type="button"
-                                  onClick={() => void openLearner(submission.user.id)}
+                                  onClick={() =>
+                                    void openLearner(submission.user.id)
+                                  }
                                   className="text-white/60 hover:text-[#F5C518] underline-offset-2 hover:underline transition-colors"
                                   title="View this learner's full profile"
                                 >
-                                  {submission.user.name || submission.user.email}
+                                  {submission.user.name ||
+                                    submission.user.email}
                                 </button>
-                                {' · '}{submission.assignment.week.title}
+                                {" · "}
+                                {submission.assignment.week.title}
                               </p>
                             </div>
                             <p className="text-xs text-white/30">
-                              {new Date(submission.submittedAt).toLocaleDateString()}
+                              {new Date(
+                                submission.submittedAt,
+                              ).toLocaleDateString()}
                             </p>
                           </div>
 
@@ -1081,35 +1683,55 @@ export default function SuperAdminPage() {
                                 View assignment prompt
                                 {submission.assignment.deadline && (
                                   <span className="ml-auto text-[10px] text-white/30">
-                                    Due {new Date(submission.assignment.deadline).toLocaleDateString()}
+                                    Due{" "}
+                                    {new Date(
+                                      submission.assignment.deadline,
+                                    ).toLocaleDateString()}
                                   </span>
                                 )}
                               </summary>
                               <div className="px-4 pb-3 pt-1 text-sm text-white/70 leading-relaxed whitespace-pre-line border-t border-white/10">
                                 {submission.assignment.instructions}
-                                {submission.assignment.choices && submission.assignment.choices.length > 0 && (
-                                  <div className="mt-3 pt-3 border-t border-white/10">
-                                    <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-white/40 mb-2">
-                                      Choices the learner could pick from
-                                    </p>
-                                    <ul className="space-y-1.5">
-                                      {submission.assignment.choices.map(c => (
-                                        <li key={c.id} className="text-xs text-white/55">
-                                          <strong className="text-white/75">{c.title}</strong>
-                                          {c.description && <span className="text-white/40"> — {c.description}</span>}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
+                                {submission.assignment.choices &&
+                                  submission.assignment.choices.length > 0 && (
+                                    <div className="mt-3 pt-3 border-t border-white/10">
+                                      <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-white/40 mb-2">
+                                        Choices the learner could pick from
+                                      </p>
+                                      <ul className="space-y-1.5">
+                                        {submission.assignment.choices.map(
+                                          (c) => (
+                                            <li
+                                              key={c.id}
+                                              className="text-xs text-white/55"
+                                            >
+                                              <strong className="text-white/75">
+                                                {c.title}
+                                              </strong>
+                                              {c.description && (
+                                                <span className="text-white/40">
+                                                  {" "}
+                                                  — {c.description}
+                                                </span>
+                                              )}
+                                            </li>
+                                          ),
+                                        )}
+                                      </ul>
+                                    </div>
+                                  )}
                               </div>
                             </details>
                           )}
 
                           {submission.choice && (
                             <div className="mb-3 rounded-xl border border-[#F5C518]/15 bg-[#F5C518]/8 px-4 py-2.5">
-                              <p className="text-xs text-[#F5C518]/60 mb-0.5">Selected option</p>
-                              <p className="text-sm font-medium text-[#F5C518]">{submission.choice.title}</p>
+                              <p className="text-xs text-[#F5C518]/60 mb-0.5">
+                                Selected option
+                              </p>
+                              <p className="text-sm font-medium text-[#F5C518]">
+                                {submission.choice.title}
+                              </p>
                             </div>
                           )}
 
@@ -1122,84 +1744,135 @@ export default function SuperAdminPage() {
                                 {submission.textResponse}
                               </p>
                             </div>
-                          ) : !submission.attachmentUrl && !submission.choice && (
-                            <div className="rounded-2xl border border-amber-400/20 bg-amber-400/5 px-4 py-3 mb-4 text-xs text-amber-200">
-                              ⚠️ This submission has no text response, no attachment, and no selected choice — the learner may have submitted an empty form.
-                            </div>
+                          ) : (
+                            !submission.attachmentUrl &&
+                            !submission.choice && (
+                              <div className="rounded-2xl border border-amber-400/20 bg-amber-400/5 px-4 py-3 mb-4 text-xs text-amber-200">
+                                ⚠️ This submission has no text response, no
+                                attachment, and no selected choice — the learner
+                                may have submitted an empty form.
+                              </div>
+                            )
                           )}
 
                           {submission.feedback.length > 0 && (
                             <div className="space-y-2 mb-4">
-                              {submission.feedback.map(fb => {
-                                const isMine = fb.reviewer.id === currentAuth?.user.id
+                              {submission.feedback.map((fb) => {
+                                const isMine =
+                                  fb.reviewer.id === currentAuth?.user.id;
                                 // Super admin can always delete; regular admin only deletes their own.
                                 // (We're on the SuperAdmin page so the user IS super admin — they can delete any.)
                                 return (
-                                  <div key={fb.id} className="rounded-2xl border border-teal-400/15 bg-teal-400/10 p-4">
+                                  <div
+                                    key={fb.id}
+                                    className="rounded-2xl border border-teal-400/15 bg-teal-400/10 p-4"
+                                  >
                                     <div className="flex items-start justify-between gap-3 mb-2">
                                       <div className="min-w-0">
                                         <p className="text-xs font-mono uppercase tracking-[0.16em] text-teal-100/60">
-                                          {isMine ? 'Your feedback' : `Feedback by ${fb.reviewer.name || fb.reviewer.email}`}
+                                          {isMine
+                                            ? "Your feedback"
+                                            : `Feedback by ${fb.reviewer.name || fb.reviewer.email}`}
                                         </p>
                                         <p className="text-[10px] text-teal-100/40 mt-0.5">
-                                          {new Date(fb.createdAt).toLocaleString()}
+                                          {new Date(
+                                            fb.createdAt,
+                                          ).toLocaleString()}
                                         </p>
                                       </div>
                                       <button
-                                        onClick={() => void deleteFeedback(submission.id, fb.id)}
+                                        onClick={() =>
+                                          void deleteFeedback(
+                                            submission.id,
+                                            fb.id,
+                                          )
+                                        }
                                         disabled={deletingFeedbackId === fb.id}
                                         title="Delete this feedback"
                                         className="p-1.5 text-teal-100/40 hover:text-red-400 transition-colors disabled:opacity-40 flex-shrink-0"
                                       >
-                                        {deletingFeedbackId === fb.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                        {deletingFeedbackId === fb.id ? (
+                                          <Loader2
+                                            size={14}
+                                            className="animate-spin"
+                                          />
+                                        ) : (
+                                          <Trash2 size={14} />
+                                        )}
                                       </button>
                                     </div>
-                                    <p className="text-sm text-white/75 whitespace-pre-line">{fb.feedback}</p>
+                                    <p className="text-sm text-white/75 whitespace-pre-line">
+                                      {fb.feedback}
+                                    </p>
                                   </div>
-                                )
+                                );
                               })}
                             </div>
                           )}
 
-                          <form onSubmit={e => void submitFeedback(e, submission.id)} className="space-y-3">
+                          <form
+                            onSubmit={(e) =>
+                              void submitFeedback(e, submission.id)
+                            }
+                            className="space-y-3"
+                          >
                             <textarea
-                              value={feedbackDrafts[submission.id] ?? ''}
-                              onChange={e => setFeedbackDrafts(cur => ({ ...cur, [submission.id]: e.target.value }))}
+                              value={feedbackDrafts[submission.id] ?? ""}
+                              onChange={(e) =>
+                                setFeedbackDrafts((cur) => ({
+                                  ...cur,
+                                  [submission.id]: e.target.value,
+                                }))
+                              }
                               rows={3}
-                              placeholder={submission.feedback.length > 0 ? 'Add additional feedback…' : 'Leave feedback for this learner…'}
+                              placeholder={
+                                submission.feedback.length > 0
+                                  ? "Add additional feedback…"
+                                  : "Leave feedback for this learner…"
+                              }
                               className="w-full rounded-2xl border border-white/12 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#F5C518]/40"
                             />
                             <button
                               type="submit"
-                              disabled={savingFeedbackId === submission.id || !feedbackDrafts[submission.id]?.trim()}
+                              disabled={
+                                savingFeedbackId === submission.id ||
+                                !feedbackDrafts[submission.id]?.trim()
+                              }
                               className="rounded-full bg-[#F5C518] px-5 py-2.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors disabled:opacity-40"
                             >
-                              {savingFeedbackId === submission.id ? 'Saving…' : 'Save feedback'}
+                              {savingFeedbackId === submission.id
+                                ? "Saving…"
+                                : "Save feedback"}
                             </button>
                           </form>
                         </div>
                       ))}
                     </div>
-                  )
+                  );
                 })()
               )}
             </div>
           )}
 
           {/* ── Learners Tab ─────────────────────────────────────────────────── */}
-          {activeTab === 'learners' && (
+          {activeTab === "learners" && (
             <div>
               <div className="flex items-center gap-3 mb-6">
                 <div className="relative flex-1 max-w-md">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                  <Search
+                    size={14}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+                  />
                   <input
                     value={learnerSearch}
-                    onChange={e => setLearnerSearch(e.target.value)}
+                    onChange={(e) => setLearnerSearch(e.target.value)}
                     placeholder="Search learners by name or email…"
                     className="w-full rounded-full border border-white/12 bg-black/30 pl-9 pr-4 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/30"
                   />
                 </div>
-                <div className="text-xs text-white/40">{learnersTotal} total</div>
+                <div className="text-xs text-white/40">
+                  {learnersTotal} total
+                </div>
               </div>
 
               {learnersLoading ? (
@@ -1212,9 +1885,17 @@ export default function SuperAdminPage() {
                 </div>
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {learners.map(l => {
-                    const initials = (l.name || l.email).split(/\s+|@/).map(s => s[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
-                    const lastActive = l.lastActivityAt ? new Date(l.lastActivityAt) : null
+                  {learners.map((l) => {
+                    const initials = (l.name || l.email)
+                      .split(/\s+|@/)
+                      .map((s) => s[0])
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase();
+                    const lastActive = l.lastActivityAt
+                      ? new Date(l.lastActivityAt)
+                      : null;
                     return (
                       <button
                         key={l.id}
@@ -1226,25 +1907,49 @@ export default function SuperAdminPage() {
                             {initials}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-semibold text-white truncate">{l.name || 'Unnamed learner'}</p>
-                            <p className="text-xs text-white/35 truncate">{l.email}</p>
-                            {l.country && <p className="text-[11px] text-white/30 mt-0.5">📍 {l.country}</p>}
+                            <p className="font-semibold text-white truncate">
+                              {l.name || "Unnamed learner"}
+                            </p>
+                            <p className="text-xs text-white/35 truncate">
+                              {l.email}
+                            </p>
+                            {l.country && (
+                              <p className="text-[11px] text-white/30 mt-0.5">
+                                📍 {l.country}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-xs">
-                          <Mini label="Courses"        value={l.enrollmentCount} accent="text-white/70" />
-                          <Mini label="Lessons done"   value={l.completedLessons} accent="text-emerald-300" />
-                          <Mini label="In progress"    value={l.inProgressLessons} accent="text-teal-300" />
-                          <Mini label="Submissions"    value={l.totalSubmissions} accent="text-[#F5C518]" />
+                          <Mini
+                            label="Courses"
+                            value={l.enrollmentCount}
+                            accent="text-white/70"
+                          />
+                          <Mini
+                            label="Lessons done"
+                            value={l.completedLessons}
+                            accent="text-emerald-300"
+                          />
+                          <Mini
+                            label="In progress"
+                            value={l.inProgressLessons}
+                            accent="text-teal-300"
+                          />
+                          <Mini
+                            label="Submissions"
+                            value={l.totalSubmissions}
+                            accent="text-[#F5C518]"
+                          />
                         </div>
                         <p className="text-[10px] text-white/30 mt-2.5">
                           {lastActive
-                            ? `Last active ${lastActive.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
-                            : 'No activity yet'}
-                          {!l.onboardingCompleted && ' · Onboarding incomplete'}
+                            ? `Last active ${lastActive.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
+                            : "No activity yet"}
+                          {!l.onboardingCompleted && " · Onboarding incomplete"}
                         </p>
                       </button>
-                    )
+                    );
                   })}
                 </div>
               )}
@@ -1252,22 +1957,25 @@ export default function SuperAdminPage() {
           )}
 
           {/* ── Users Tab ────────────────────────────────────────────────────── */}
-          {activeTab === 'users' && (
+          {activeTab === "users" && (
             <div>
               {/* Controls */}
               <div className="flex flex-wrap items-center gap-3 mb-6">
                 <div className="relative flex-1 min-w-[200px]">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                  <Search
+                    size={14}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+                  />
                   <input
                     value={userSearch}
-                    onChange={e => setUserSearch(e.target.value)}
+                    onChange={(e) => setUserSearch(e.target.value)}
                     placeholder="Search by name or email…"
                     className="w-full rounded-full border border-white/12 bg-white/[0.03] py-2.5 pl-9 pr-4 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#F5C518]/40"
                   />
                 </div>
                 <select
                   value={userRoleFilter}
-                  onChange={e => setUserRoleFilter(e.target.value)}
+                  onChange={(e) => setUserRoleFilter(e.target.value)}
                   className="rounded-full border border-white/12 bg-[#0A0A0A] px-4 py-2.5 text-sm text-white/65 focus:outline-none focus:border-[#F5C518]/40"
                 >
                   <option value="">All roles</option>
@@ -1289,37 +1997,60 @@ export default function SuperAdminPage() {
                   onSubmit={createAdmin}
                   className="mb-6 rounded-[24px] border border-[#F5C518]/20 bg-[#F5C518]/5 p-6 space-y-4"
                 >
-                  <h3 className="text-sm font-semibold text-[#F5C518] mb-1">Create admin / facilitator account</h3>
-                  <p className="text-xs text-white/40">This user will have full admin access — they can build courses, review submissions, and manage learners.</p>
+                  <h3 className="text-sm font-semibold text-[#F5C518] mb-1">
+                    Create admin / facilitator account
+                  </h3>
+                  <p className="text-xs text-white/40">
+                    This user will have full admin access — they can build
+                    courses, review submissions, and manage learners.
+                  </p>
                   <div className="grid md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs text-white/40 mb-1">Full name *</label>
+                      <label className="block text-xs text-white/40 mb-1">
+                        Full name *
+                      </label>
                       <input
                         required
                         value={createForm.name}
-                        onChange={e => setCreateForm(p => ({ ...p, name: e.target.value }))}
+                        onChange={(e) =>
+                          setCreateForm((p) => ({ ...p, name: e.target.value }))
+                        }
                         placeholder="Dr. Jane Doe"
                         className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-white/40 mb-1">Email address *</label>
+                      <label className="block text-xs text-white/40 mb-1">
+                        Email address *
+                      </label>
                       <input
                         required
                         type="email"
                         value={createForm.email}
-                        onChange={e => setCreateForm(p => ({ ...p, email: e.target.value }))}
+                        onChange={(e) =>
+                          setCreateForm((p) => ({
+                            ...p,
+                            email: e.target.value,
+                          }))
+                        }
                         placeholder="facilitator@org.com"
                         className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-white/40 mb-1">Temporary password *</label>
+                      <label className="block text-xs text-white/40 mb-1">
+                        Temporary password *
+                      </label>
                       <input
                         required
                         type="password"
                         value={createForm.password}
-                        onChange={e => setCreateForm(p => ({ ...p, password: e.target.value }))}
+                        onChange={(e) =>
+                          setCreateForm((p) => ({
+                            ...p,
+                            password: e.target.value,
+                          }))
+                        }
                         placeholder="Min. 8 characters"
                         className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
                       />
@@ -1331,7 +2062,7 @@ export default function SuperAdminPage() {
                       disabled={creating}
                       className="rounded-full bg-[#F5C518] px-5 py-2.5 text-sm font-semibold text-[#0A0A0A] disabled:opacity-50"
                     >
-                      {creating ? 'Creating…' : 'Create admin account'}
+                      {creating ? "Creating…" : "Create admin account"}
                     </button>
                     <button
                       type="button"
@@ -1346,7 +2077,7 @@ export default function SuperAdminPage() {
 
               {/* User count */}
               <p className="text-xs text-white/35 mb-4">
-                {usersTotal} user{usersTotal !== 1 ? 's' : ''} found
+                {usersTotal} user{usersTotal !== 1 ? "s" : ""} found
               </p>
 
               {/* User list */}
@@ -1364,55 +2095,83 @@ export default function SuperAdminPage() {
                     <span></span>
                   </div>
                   {users.length === 0 ? (
-                    <div className="px-5 py-10 text-center text-sm text-white/30">No users found.</div>
+                    <div className="px-5 py-10 text-center text-sm text-white/30">
+                      No users found.
+                    </div>
                   ) : (
-                    users.map(u => {
-                      const cfg = ROLE_CONFIG[u.role] ?? ROLE_CONFIG.USER
-                      const initials = (u.name || u.email).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-                      const isSelf = u.id === currentAuth?.user.id
+                    users.map((u) => {
+                      const cfg = ROLE_CONFIG[u.role] ?? ROLE_CONFIG.USER;
+                      const initials = (u.name || u.email)
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase();
+                      const isSelf = u.id === currentAuth?.user.id;
                       return (
-                        <div key={u.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 items-center px-5 py-3.5 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.02] transition-colors">
+                        <div
+                          key={u.id}
+                          className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 items-center px-5 py-3.5 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.02] transition-colors"
+                        >
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-8 h-8 rounded-full bg-[#F5C518]/12 border border-[#F5C518]/20 flex items-center justify-center text-[#F5C518] text-xs font-extrabold shrink-0">
                               {initials}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-white truncate">{u.name || '—'}</p>
-                              <p className="text-xs text-white/35 truncate">{u.email}</p>
+                              <p className="text-sm font-medium text-white truncate">
+                                {u.name || "—"}
+                              </p>
+                              <p className="text-xs text-white/35 truncate">
+                                {u.email}
+                              </p>
                             </div>
                           </div>
-                          <span className="text-sm text-white/40 tabular-nums">{u._count.courseEnrollments}</span>
+                          <span className="text-sm text-white/40 tabular-nums">
+                            {u._count.courseEnrollments}
+                          </span>
                           <span className="text-xs text-white/30 tabular-nums shrink-0">
                             {new Date(u.createdAt).toLocaleDateString()}
                           </span>
                           <div className="relative shrink-0">
                             {isSelf ? (
-                              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-wide ${cfg.color}`}>
+                              <span
+                                className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-wide ${cfg.color}`}
+                              >
                                 {cfg.label}
                               </span>
                             ) : (
                               <div className="relative group/role">
-                                <button className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-wide cursor-pointer hover:opacity-80 transition-opacity ${cfg.color}`}>
+                                <button
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-wide cursor-pointer hover:opacity-80 transition-opacity ${cfg.color}`}
+                                >
                                   {cfg.label}
-                                  <ChevronDown size={10} className="opacity-60" />
+                                  <ChevronDown
+                                    size={10}
+                                    className="opacity-60"
+                                  />
                                 </button>
                                 <div className="absolute right-0 top-full mt-1 w-36 rounded-xl border border-white/12 bg-[#111] shadow-xl z-10 py-1 hidden group-hover/role:block">
-                                  {['USER', 'ADMIN', 'SUPER_ADMIN'].map(r => {
-                                    const rc = ROLE_CONFIG[r]
+                                  {["USER", "ADMIN", "SUPER_ADMIN"].map((r) => {
+                                    const rc = ROLE_CONFIG[r];
                                     return (
                                       <button
                                         key={r}
                                         onClick={() => void changeRole(u.id, r)}
-                                        disabled={changingRoleId === u.id || u.role === r}
+                                        disabled={
+                                          changingRoleId === u.id ||
+                                          u.role === r
+                                        }
                                         className={`w-full text-left px-4 py-2 text-xs transition-colors ${
                                           u.role === r
-                                            ? 'text-white/25 cursor-default'
-                                            : 'text-white/65 hover:text-white hover:bg-white/[0.06]'
+                                            ? "text-white/25 cursor-default"
+                                            : "text-white/65 hover:text-white hover:bg-white/[0.06]"
                                         }`}
                                       >
-                                        {changingRoleId === u.id ? '…' : rc.label}
+                                        {changingRoleId === u.id
+                                          ? "…"
+                                          : rc.label}
                                       </button>
-                                    )
+                                    );
                                   })}
                                 </div>
                               </div>
@@ -1421,7 +2180,9 @@ export default function SuperAdminPage() {
                           {!isSelf && (
                             <div className="flex gap-1">
                               <button
-                                onClick={() => resetUserPassword(u.id, u.name || u.email)}
+                                onClick={() =>
+                                  resetUserPassword(u.id, u.name || u.email)
+                                }
                                 disabled={resettingPassword}
                                 className="shrink-0 text-blue-400/50 hover:text-blue-400 transition-colors p-1 disabled:opacity-50"
                                 title="Reset password"
@@ -1429,7 +2190,13 @@ export default function SuperAdminPage() {
                                 <RotateCcw size={14} />
                               </button>
                               <button
-                                onClick={() => setDeleteConfirm({ type: 'user', id: u.id, name: u.name || u.email })}
+                                onClick={() =>
+                                  setDeleteConfirm({
+                                    type: "user",
+                                    id: u.id,
+                                    name: u.name || u.email,
+                                  })
+                                }
                                 className="shrink-0 text-red-400/50 hover:text-red-400 transition-colors p-1"
                                 title="Delete user"
                               >
@@ -1438,7 +2205,7 @@ export default function SuperAdminPage() {
                             </div>
                           )}
                         </div>
-                      )
+                      );
                     })
                   )}
                 </div>
@@ -1446,13 +2213,12 @@ export default function SuperAdminPage() {
             </div>
           )}
 
-        {/* ─── SITE CONTENT TAB ────────────────────────────────────────────── */}
-        {activeTab === 'content' && (
-          <div className="rounded-3xl border border-white/5 bg-[#0A0A0A]/50 p-6 backdrop-blur-md">
-            <SiteContentManager />
-          </div>
-        )}
-
+          {/* ─── SITE CONTENT TAB ────────────────────────────────────────────── */}
+          {activeTab === "content" && (
+            <div className="rounded-3xl border border-white/5 bg-[#0A0A0A]/50 p-6 backdrop-blur-md">
+              <SiteContentManager />
+            </div>
+          )}
         </div>
       </main>
 
@@ -1461,20 +2227,26 @@ export default function SuperAdminPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#111] p-6">
             <h2 className="font-display text-xl font-extrabold text-white mb-1">
-              {actionType === 'approve' ? 'Approve course' : 'Reject course'}
+              {actionType === "approve" ? "Approve course" : "Reject course"}
             </h2>
             <p className="text-sm text-white/50 mb-5">"{actionCourse.title}"</p>
             <form onSubmit={submitAction} className="space-y-4">
               <div>
                 <label className="block text-xs text-white/40 mb-1">
-                  {actionType === 'approve' ? 'Notes (optional)' : 'Rejection reason (required)'}
+                  {actionType === "approve"
+                    ? "Notes (optional)"
+                    : "Rejection reason (required)"}
                 </label>
                 <textarea
                   value={actionNotes}
-                  onChange={e => setActionNotes(e.target.value)}
-                  required={actionType === 'reject'}
+                  onChange={(e) => setActionNotes(e.target.value)}
+                  required={actionType === "reject"}
                   rows={4}
-                  placeholder={actionType === 'approve' ? 'Optional notes for the admin…' : 'Explain what needs to be fixed…'}
+                  placeholder={
+                    actionType === "approve"
+                      ? "Optional notes for the admin…"
+                      : "Explain what needs to be fixed…"
+                  }
                   className="w-full rounded-2xl border border-white/12 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#F5C518]/40"
                 />
               </div>
@@ -1483,16 +2255,24 @@ export default function SuperAdminPage() {
                   type="submit"
                   disabled={submitting}
                   className={`flex-1 rounded-full py-3 text-sm font-semibold transition-colors disabled:opacity-50 ${
-                    actionType === 'approve'
-                      ? 'bg-emerald-500 text-white hover:bg-emerald-400'
-                      : 'bg-red-500 text-white hover:bg-red-400'
+                    actionType === "approve"
+                      ? "bg-emerald-500 text-white hover:bg-emerald-400"
+                      : "bg-red-500 text-white hover:bg-red-400"
                   }`}
                 >
-                  {submitting ? 'Submitting…' : actionType === 'approve' ? 'Approve & publish' : 'Reject course'}
+                  {submitting
+                    ? "Submitting…"
+                    : actionType === "approve"
+                      ? "Approve & publish"
+                      : "Reject course"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setActionCourseId(null); setActionType(null); setActionNotes('') }}
+                  onClick={() => {
+                    setActionCourseId(null);
+                    setActionType(null);
+                    setActionNotes("");
+                  }}
                   className="rounded-full border border-white/10 px-5 py-3 text-sm text-white/60 hover:border-white/20"
                 >
                   Cancel
@@ -1507,45 +2287,78 @@ export default function SuperAdminPage() {
       {pricingCourse && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#111] p-6">
-            <h2 className="font-display text-xl font-extrabold text-white mb-1">Course pricing</h2>
-            <p className="text-sm text-white/50 mb-5">"{pricingCourse.title}"</p>
+            <h2 className="font-display text-xl font-extrabold text-white mb-1">
+              Course pricing
+            </h2>
+            <p className="text-sm text-white/50 mb-5">
+              "{pricingCourse.title}"
+            </p>
             <form onSubmit={savePricing} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-white/40 mb-1">Price (USD)</label>
+                  <label className="block text-xs text-white/40 mb-1">
+                    Price (USD)
+                  </label>
                   <input
-                    type="number" min="0" step="0.01"
+                    type="number"
+                    min="0"
+                    step="0.01"
                     value={pricingForm.priceUsd}
-                    onChange={e => setPricingForm(p => ({ ...p, priceUsd: e.target.value }))}
+                    onChange={(e) =>
+                      setPricingForm((p) => ({
+                        ...p,
+                        priceUsd: e.target.value,
+                      }))
+                    }
                     placeholder="e.g. 150"
                     className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#F5C518]/40"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-white/40 mb-1">Price (NGN)</label>
+                  <label className="block text-xs text-white/40 mb-1">
+                    Price (NGN)
+                  </label>
                   <input
-                    type="number" min="0" step="0.01"
+                    type="number"
+                    min="0"
+                    step="0.01"
                     value={pricingForm.priceNgn}
-                    onChange={e => setPricingForm(p => ({ ...p, priceNgn: e.target.value }))}
+                    onChange={(e) =>
+                      setPricingForm((p) => ({
+                        ...p,
+                        priceNgn: e.target.value,
+                      }))
+                    }
                     placeholder="e.g. 220000"
                     className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#F5C518]/40"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-white/40 mb-1">Discount (%) — slashes the original price on the storefront</label>
+                <label className="block text-xs text-white/40 mb-1">
+                  Discount (%) — slashes the original price on the storefront
+                </label>
                 <input
-                  type="number" min="0" max="100" step="1"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
                   value={pricingForm.discountPercent}
-                  onChange={e => setPricingForm(p => ({ ...p, discountPercent: e.target.value }))}
+                  onChange={(e) =>
+                    setPricingForm((p) => ({
+                      ...p,
+                      discountPercent: e.target.value,
+                    }))
+                  }
                   placeholder="e.g. 20"
                   className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#F5C518]/40"
                 />
               </div>
               <p className="text-[11px] text-white/35 leading-relaxed">
-                Leave both prices empty to make the course free. Learners see the original price struck
-                through next to the discounted price. Online payment (Paystack &amp; crypto) integration is
-                coming — pricing is display-only until then.
+                Leave both prices empty to make the course free. Learners see
+                the original price struck through next to the discounted price.
+                Online payment (Paystack &amp; crypto) integration is coming —
+                pricing is display-only until then.
               </p>
               <div className="flex gap-3">
                 <button
@@ -1553,7 +2366,7 @@ export default function SuperAdminPage() {
                   disabled={savingPricing}
                   className="flex-1 rounded-full bg-[#F5C518] py-3 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors disabled:opacity-50"
                 >
-                  {savingPricing ? 'Saving…' : 'Save pricing'}
+                  {savingPricing ? "Saving…" : "Save pricing"}
                 </button>
                 <button
                   type="button"
@@ -1573,18 +2386,24 @@ export default function SuperAdminPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[24px] border border-red-500/20 bg-[#111] p-6">
             <h2 className="font-display text-xl font-extrabold text-white mb-1">
-              Delete {deleteConfirm.type === 'user' ? 'user' : 'course'}?
+              Delete {deleteConfirm.type === "user" ? "user" : "course"}?
             </h2>
             <p className="text-sm text-white/50 mb-6">
-              Are you sure you want to delete <span className="font-semibold">{deleteConfirm.name}</span>? This action cannot be undone.
+              Are you sure you want to delete{" "}
+              <span className="font-semibold">{deleteConfirm.name}</span>? This
+              action cannot be undone.
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => deleteConfirm.type === 'user' ? deleteUser(deleteConfirm.id) : deleteCourse(deleteConfirm.id)}
+                onClick={() =>
+                  deleteConfirm.type === "user"
+                    ? deleteUser(deleteConfirm.id)
+                    : deleteCourse(deleteConfirm.id)
+                }
                 disabled={deletingId === deleteConfirm.id}
                 className="flex-1 rounded-full bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50"
               >
-                {deletingId === deleteConfirm.id ? 'Deleting…' : 'Delete'}
+                {deletingId === deleteConfirm.id ? "Deleting…" : "Delete"}
               </button>
               <button
                 onClick={() => setDeleteConfirm(null)}
@@ -1602,37 +2421,62 @@ export default function SuperAdminPage() {
       {showPasswordChange && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#111] p-6">
-            <h2 className="font-display text-xl font-extrabold text-white mb-1">Change password</h2>
-            <p className="text-sm text-white/50 mb-5">Update your account password</p>
+            <h2 className="font-display text-xl font-extrabold text-white mb-1">
+              Change password
+            </h2>
+            <p className="text-sm text-white/50 mb-5">
+              Update your account password
+            </p>
             <form onSubmit={changePassword} className="space-y-4">
               <div>
-                <label className="block text-xs text-white/40 mb-1">Current password *</label>
+                <label className="block text-xs text-white/40 mb-1">
+                  Current password *
+                </label>
                 <input
                   type="password"
                   required
                   value={passwordForm.currentPassword}
-                  onChange={e => setPasswordForm(p => ({ ...p, currentPassword: e.target.value }))}
+                  onChange={(e) =>
+                    setPasswordForm((p) => ({
+                      ...p,
+                      currentPassword: e.target.value,
+                    }))
+                  }
                   className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
                 />
               </div>
               <div>
-                <label className="block text-xs text-white/40 mb-1">New password *</label>
+                <label className="block text-xs text-white/40 mb-1">
+                  New password *
+                </label>
                 <input
                   type="password"
                   required
                   value={passwordForm.newPassword}
-                  onChange={e => setPasswordForm(p => ({ ...p, newPassword: e.target.value }))}
+                  onChange={(e) =>
+                    setPasswordForm((p) => ({
+                      ...p,
+                      newPassword: e.target.value,
+                    }))
+                  }
                   placeholder="Min. 8 characters"
                   className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
                 />
               </div>
               <div>
-                <label className="block text-xs text-white/40 mb-1">Confirm new password *</label>
+                <label className="block text-xs text-white/40 mb-1">
+                  Confirm new password *
+                </label>
                 <input
                   type="password"
                   required
                   value={passwordForm.confirmPassword}
-                  onChange={e => setPasswordForm(p => ({ ...p, confirmPassword: e.target.value }))}
+                  onChange={(e) =>
+                    setPasswordForm((p) => ({
+                      ...p,
+                      confirmPassword: e.target.value,
+                    }))
+                  }
                   className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
                 />
               </div>
@@ -1642,13 +2486,17 @@ export default function SuperAdminPage() {
                   disabled={changingPassword}
                   className="flex-1 rounded-full bg-[#F5C518] px-5 py-3 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors disabled:opacity-50"
                 >
-                  {changingPassword ? 'Changing…' : 'Change password'}
+                  {changingPassword ? "Changing…" : "Change password"}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    setShowPasswordChange(false)
-                    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+                    setShowPasswordChange(false);
+                    setPasswordForm({
+                      currentPassword: "",
+                      newPassword: "",
+                      confirmPassword: "",
+                    });
                   }}
                   disabled={changingPassword}
                   className="rounded-full border border-white/10 px-5 py-3 text-sm text-white/60 hover:border-white/20 disabled:opacity-50"
@@ -1670,21 +2518,32 @@ export default function SuperAdminPage() {
                 <RotateCcw size={16} className="text-blue-400" />
               </div>
               <div className="flex-1">
-                <h2 className="font-display text-xl font-extrabold text-white">Password reset initiated</h2>
-                <p className="text-sm text-white/50 mt-1">for <span className="font-semibold">{resetPasswordData.userName}</span></p>
+                <h2 className="font-display text-xl font-extrabold text-white">
+                  Password reset initiated
+                </h2>
+                <p className="text-sm text-white/50 mt-1">
+                  for{" "}
+                  <span className="font-semibold">
+                    {resetPasswordData.userName}
+                  </span>
+                </p>
               </div>
             </div>
 
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-5 space-y-3">
               <div>
-                <p className="text-xs text-blue-300/70 uppercase tracking-widest font-mono mb-1">Reset Token</p>
+                <p className="text-xs text-blue-300/70 uppercase tracking-widest font-mono mb-1">
+                  Reset Token
+                </p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 text-sm font-mono text-blue-300 bg-black/50 rounded-lg px-3 py-2 break-all">
                     {resetPasswordData.resetToken}
                   </code>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(resetPasswordData.resetToken)
+                      navigator.clipboard.writeText(
+                        resetPasswordData.resetToken,
+                      );
                       // Could add a toast notification here
                     }}
                     className="shrink-0 p-2 text-blue-300/60 hover:text-blue-300 transition-colors"
@@ -1695,17 +2554,27 @@ export default function SuperAdminPage() {
                 </div>
               </div>
               <div>
-                <p className="text-xs text-blue-300/70 uppercase tracking-widest font-mono mb-1">Valid Until</p>
-                <p className="text-sm text-blue-200">{new Date(resetPasswordData.expiresAt).toLocaleString()}</p>
+                <p className="text-xs text-blue-300/70 uppercase tracking-widest font-mono mb-1">
+                  Valid Until
+                </p>
+                <p className="text-sm text-blue-200">
+                  {new Date(resetPasswordData.expiresAt).toLocaleString()}
+                </p>
               </div>
             </div>
 
             <div className="bg-white/5 rounded-xl p-4 mb-5 space-y-2 text-sm">
-              <p className="text-white/80 font-semibold">Instructions to share with user:</p>
+              <p className="text-white/80 font-semibold">
+                Instructions to share with user:
+              </p>
               <ol className="text-white/60 space-y-1.5 text-xs leading-relaxed ml-4 list-decimal">
                 <li>Go to the login page</li>
                 <li>Enter your email address</li>
-                <li>Leave the password field <strong className="text-white">empty</strong> and click <strong className="text-white">Log in</strong></li>
+                <li>
+                  Leave the password field{" "}
+                  <strong className="text-white">empty</strong> and click{" "}
+                  <strong className="text-white">Log in</strong>
+                </li>
                 <li>You'll be prompted to set a new password</li>
                 <li>This reset window is valid for 10 minutes</li>
               </ol>
@@ -1714,7 +2583,9 @@ export default function SuperAdminPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(`Your Rubikcon Academy password has been reset.\n\nValid until: ${new Date(resetPasswordData.expiresAt).toLocaleString()}\n\nHow to sign in:\n1. Go to https://www.rubikconacademy.xyz/login\n2. Enter your email address\n3. Leave the password field empty\n4. Click "Log in"\n5. You'll be prompted to set a new password\n\n(The reset window expires in 10 minutes — please sign in before then.)`)
+                  navigator.clipboard.writeText(
+                    `Your Rubikcon Academy password has been reset.\n\nValid until: ${new Date(resetPasswordData.expiresAt).toLocaleString()}\n\nHow to sign in:\n1. Go to https://www.rubikconacademy.xyz/login\n2. Enter your email address\n3. Leave the password field empty\n4. Click "Log in"\n5. You'll be prompted to set a new password\n\n(The reset window expires in 10 minutes — please sign in before then.)`,
+                  );
                 }}
                 className="flex-1 rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
               >
@@ -1738,13 +2609,18 @@ export default function SuperAdminPage() {
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
         >
           <div
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
             className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-[24px] border border-white/10 bg-[#0F0F11] p-6"
           >
             {learnerDetailLoading || !learnerDetail ? (
               <div className="flex flex-col items-center justify-center py-16">
-                <Loader2 size={28} className="animate-spin text-[#F5C518] mb-3" />
-                <p className="text-sm text-white/40">Loading learner activity…</p>
+                <Loader2
+                  size={28}
+                  className="animate-spin text-[#F5C518] mb-3"
+                />
+                <p className="text-sm text-white/40">
+                  Loading learner activity…
+                </p>
               </div>
             ) : (
               <>
@@ -1752,58 +2628,117 @@ export default function SuperAdminPage() {
                 <div className="flex items-start justify-between gap-3 mb-5">
                   <div className="flex items-start gap-3 min-w-0">
                     <div className="w-12 h-12 rounded-full bg-[#F5C518]/15 border border-[#F5C518]/30 flex items-center justify-center text-[#F5C518] font-display font-extrabold shrink-0">
-                      {(learnerDetail.user.name || learnerDetail.user.email).split(/\s+|@/).map(s => s[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()}
+                      {(learnerDetail.user.name || learnerDetail.user.email)
+                        .split(/\s+|@/)
+                        .map((s) => s[0])
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .join("")
+                        .toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <h2 className="font-display text-xl font-extrabold text-white truncate">{learnerDetail.user.name || 'Unnamed learner'}</h2>
-                      <p className="text-sm text-white/45 truncate">{learnerDetail.user.email}</p>
+                      <h2 className="font-display text-xl font-extrabold text-white truncate">
+                        {learnerDetail.user.name || "Unnamed learner"}
+                      </h2>
+                      <p className="text-sm text-white/45 truncate">
+                        {learnerDetail.user.email}
+                      </p>
                       <p className="text-[11px] text-white/30 mt-0.5">
-                        Joined {new Date(learnerDetail.user.createdAt).toLocaleDateString()}
-                        {learnerDetail.user.profile?.country && ` · ${learnerDetail.user.profile.country}`}
-                        {learnerDetail.user.profile?.experienceLevel && ` · ${learnerDetail.user.profile.experienceLevel}`}
+                        Joined{" "}
+                        {new Date(
+                          learnerDetail.user.createdAt,
+                        ).toLocaleDateString()}
+                        {learnerDetail.user.profile?.country &&
+                          ` · ${learnerDetail.user.profile.country}`}
+                        {learnerDetail.user.profile?.experienceLevel &&
+                          ` · ${learnerDetail.user.profile.experienceLevel}`}
                       </p>
                     </div>
                   </div>
-                  <button onClick={closeLearner} className="text-white/40 hover:text-white text-2xl leading-none">×</button>
+                  <button
+                    onClick={closeLearner}
+                    className="text-white/40 hover:text-white text-2xl leading-none"
+                  >
+                    ×
+                  </button>
                 </div>
 
                 {/* Enrollments + per-lesson progress */}
-                <Section title={`Course progress (${learnerDetail.enrollments.length} enrolled)`}>
+                <Section
+                  title={`Course progress (${learnerDetail.enrollments.length} enrolled)`}
+                >
                   {learnerDetail.enrollments.length === 0 ? (
-                    <p className="text-sm text-white/40">Not enrolled in any course yet.</p>
+                    <p className="text-sm text-white/40">
+                      Not enrolled in any course yet.
+                    </p>
                   ) : (
                     <div className="space-y-4">
-                      {learnerDetail.enrollments.map(e => (
-                        <div key={e.course.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                      {learnerDetail.enrollments.map((e) => (
+                        <div
+                          key={e.course.id}
+                          className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                        >
                           <div className="flex items-start justify-between gap-3 mb-2">
                             <div className="min-w-0">
-                              <p className="font-semibold text-white truncate">{e.course.title}</p>
-                              <p className="text-xs text-white/40">{e.completedCount} / {e.totalCount} {e.course.contentUnit.toLowerCase()}{e.totalCount !== 1 ? 's' : ''} complete · {e.progressPercent}%</p>
+                              <p className="font-semibold text-white truncate">
+                                {e.course.title}
+                              </p>
+                              <p className="text-xs text-white/40">
+                                {e.completedCount} / {e.totalCount}{" "}
+                                {e.course.contentUnit.toLowerCase()}
+                                {e.totalCount !== 1 ? "s" : ""} complete ·{" "}
+                                {e.progressPercent}%
+                              </p>
                             </div>
-                            <div className="text-xs text-white/30 whitespace-nowrap">Enrolled {new Date(e.enrolledAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>
+                            <div className="text-xs text-white/30 whitespace-nowrap">
+                              Enrolled{" "}
+                              {new Date(e.enrolledAt).toLocaleDateString(
+                                "en-GB",
+                                { day: "numeric", month: "short" },
+                              )}
+                            </div>
                           </div>
                           <div className="h-1.5 rounded-full bg-white/8 overflow-hidden mb-3">
-                            <div className="h-full bg-[#F5C518] transition-all" style={{ width: `${e.progressPercent}%` }} />
+                            <div
+                              className="h-full bg-[#F5C518] transition-all"
+                              style={{ width: `${e.progressPercent}%` }}
+                            />
                           </div>
                           <details className="text-xs">
-                            <summary className="cursor-pointer text-white/50 hover:text-white/70">Show lesson-by-lesson</summary>
+                            <summary className="cursor-pointer text-white/50 hover:text-white/70">
+                              Show lesson-by-lesson
+                            </summary>
                             <ul className="mt-2 space-y-1">
-                              {e.weeks.map(w => {
-                                const dotColor = w.status === 'COMPLETE'
-                                  ? 'bg-emerald-400'
-                                  : w.status === 'IN_PROGRESS' ? 'bg-teal-400' : 'bg-white/15'
+                              {e.weeks.map((w) => {
+                                const dotColor =
+                                  w.status === "COMPLETE"
+                                    ? "bg-emerald-400"
+                                    : w.status === "IN_PROGRESS"
+                                      ? "bg-teal-400"
+                                      : "bg-white/15";
                                 return (
-                                  <li key={w.id} className="flex items-center gap-2 py-1">
-                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor}`} />
-                                    <span className="font-mono text-white/35 w-6 text-right shrink-0">{w.number}</span>
-                                    <span className="text-white/70 truncate flex-1">{w.title}</span>
+                                  <li
+                                    key={w.id}
+                                    className="flex items-center gap-2 py-1"
+                                  >
+                                    <span
+                                      className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor}`}
+                                    />
+                                    <span className="font-mono text-white/35 w-6 text-right shrink-0">
+                                      {w.number}
+                                    </span>
+                                    <span className="text-white/70 truncate flex-1">
+                                      {w.title}
+                                    </span>
                                     <span className="text-[10px] text-white/40 shrink-0">
-                                      {w.status === 'COMPLETE' && w.completedAt
-                                        ? `✓ ${new Date(w.completedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
-                                        : w.status === 'IN_PROGRESS' ? 'In progress' : '—'}
+                                      {w.status === "COMPLETE" && w.completedAt
+                                        ? `✓ ${new Date(w.completedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
+                                        : w.status === "IN_PROGRESS"
+                                          ? "In progress"
+                                          : "—"}
                                     </span>
                                   </li>
-                                )
+                                );
                               })}
                             </ul>
                           </details>
@@ -1814,23 +2749,41 @@ export default function SuperAdminPage() {
                 </Section>
 
                 {/* Submissions */}
-                <Section title={`Recent assignment submissions (${learnerDetail.submissions.length})`}>
+                <Section
+                  title={`Recent assignment submissions (${learnerDetail.submissions.length})`}
+                >
                   {learnerDetail.submissions.length === 0 ? (
                     <p className="text-sm text-white/40">No submissions yet.</p>
                   ) : (
                     <div className="space-y-2">
-                      {learnerDetail.submissions.slice(0, 10).map(s => (
-                        <div key={s.id} className="rounded-xl border border-white/8 bg-black/30 p-3 text-sm">
+                      {learnerDetail.submissions.slice(0, 10).map((s) => (
+                        <div
+                          key={s.id}
+                          className="rounded-xl border border-white/8 bg-black/30 p-3 text-sm"
+                        >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="text-white truncate">{s.assignment.title}</p>
-                              <p className="text-xs text-white/40 truncate">{s.assignment.week.course.title} · Lesson {s.assignment.week.number}</p>
+                              <p className="text-white truncate">
+                                {s.assignment.title}
+                              </p>
+                              <p className="text-xs text-white/40 truncate">
+                                {s.assignment.week.course.title} · Lesson{" "}
+                                {s.assignment.week.number}
+                              </p>
                             </div>
                             <div className="flex flex-col items-end gap-1 shrink-0">
-                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-mono ${
-                                s.status === 'REVIEWED' ? 'border-emerald-400/30 text-emerald-300' : 'border-amber-400/30 text-amber-300'
-                              }`}>{s.status}</span>
-                              <span className="text-[10px] text-white/30">{new Date(s.submittedAt).toLocaleDateString()}</span>
+                              <span
+                                className={`rounded-full border px-2 py-0.5 text-[10px] font-mono ${
+                                  s.status === "REVIEWED"
+                                    ? "border-emerald-400/30 text-emerald-300"
+                                    : "border-amber-400/30 text-amber-300"
+                                }`}
+                              >
+                                {s.status}
+                              </span>
+                              <span className="text-[10px] text-white/30">
+                                {new Date(s.submittedAt).toLocaleDateString()}
+                              </span>
                             </div>
                           </div>
                           {s.hasFeedback && (
@@ -1842,7 +2795,11 @@ export default function SuperAdminPage() {
                       ))}
                       {learnerDetail.submissions.length > 10 && (
                         <p className="text-xs text-white/30 text-center pt-1">
-                          + {learnerDetail.submissions.length - 10} older submission{learnerDetail.submissions.length - 10 !== 1 ? 's' : ''}
+                          + {learnerDetail.submissions.length - 10} older
+                          submission
+                          {learnerDetail.submissions.length - 10 !== 1
+                            ? "s"
+                            : ""}
                         </p>
                       )}
                     </div>
@@ -1850,24 +2807,43 @@ export default function SuperAdminPage() {
                 </Section>
 
                 {/* Quiz attempts */}
-                <Section title={`Quiz attempts (${learnerDetail.quizAttempts.length})`}>
+                <Section
+                  title={`Quiz attempts (${learnerDetail.quizAttempts.length})`}
+                >
                   {learnerDetail.quizAttempts.length === 0 ? (
-                    <p className="text-sm text-white/40">No quiz attempts yet.</p>
+                    <p className="text-sm text-white/40">
+                      No quiz attempts yet.
+                    </p>
                   ) : (
                     <div className="space-y-2">
-                      {learnerDetail.quizAttempts.slice(0, 10).map(a => (
-                        <div key={a.id} className="rounded-xl border border-white/8 bg-black/30 p-3 text-sm flex items-center justify-between gap-3">
+                      {learnerDetail.quizAttempts.slice(0, 10).map((a) => (
+                        <div
+                          key={a.id}
+                          className="rounded-xl border border-white/8 bg-black/30 p-3 text-sm flex items-center justify-between gap-3"
+                        >
                           <div className="min-w-0">
-                            <p className="text-white truncate">{a.quiz.title}</p>
-                            <p className="text-xs text-white/40 truncate">{a.quiz.week.course.title} · Lesson {a.quiz.week.number}</p>
+                            <p className="text-white truncate">
+                              {a.quiz.title}
+                            </p>
+                            <p className="text-xs text-white/40 truncate">
+                              {a.quiz.week.course.title} · Lesson{" "}
+                              {a.quiz.week.number}
+                            </p>
                           </div>
                           <div className="flex flex-col items-end gap-0.5 shrink-0">
-                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-                              a.passed ? 'border-emerald-400/30 text-emerald-300 bg-emerald-400/8' : 'border-red-400/30 text-red-300 bg-red-400/8'
-                            }`}>
-                              {Math.round(a.percentage)}% · {a.passed ? 'Pass' : 'Fail'}
+                            <span
+                              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                                a.passed
+                                  ? "border-emerald-400/30 text-emerald-300 bg-emerald-400/8"
+                                  : "border-red-400/30 text-red-300 bg-red-400/8"
+                              }`}
+                            >
+                              {Math.round(a.percentage)}% ·{" "}
+                              {a.passed ? "Pass" : "Fail"}
                             </span>
-                            <span className="text-[10px] text-white/30">{new Date(a.submittedAt).toLocaleDateString()}</span>
+                            <span className="text-[10px] text-white/30">
+                              {new Date(a.submittedAt).toLocaleDateString()}
+                            </span>
                           </div>
                         </div>
                       ))}
@@ -1880,23 +2856,45 @@ export default function SuperAdminPage() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-function Mini({ label, value, accent }: { label: string; value: number; accent: string }) {
+function Mini({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent: string;
+}) {
   return (
     <div>
-      <p className={`font-display text-xl font-extrabold ${accent} leading-none`}>{value}</p>
-      <p className="text-[10px] text-white/35 uppercase tracking-widest mt-0.5">{label}</p>
+      <p
+        className={`font-display text-xl font-extrabold ${accent} leading-none`}
+      >
+        {value}
+      </p>
+      <p className="text-[10px] text-white/35 uppercase tracking-widest mt-0.5">
+        {label}
+      </p>
     </div>
-  )
+  );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="mb-6">
-      <h3 className="text-xs font-mono uppercase tracking-[0.18em] text-white/35 mb-3">{title}</h3>
+      <h3 className="text-xs font-mono uppercase tracking-[0.18em] text-white/35 mb-3">
+        {title}
+      </h3>
       {children}
     </section>
-  )
+  );
 }
