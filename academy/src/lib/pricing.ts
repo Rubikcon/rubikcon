@@ -25,16 +25,23 @@ export function coursePriceInfo(course: CoursePricing) {
   const hasNgn = (course.priceNgn ?? 0) > 0
   if (!hasUsd && !hasNgn) return null
   const discounted = (course.discountPercent ?? 0) > 0
+  
+  const rawOriginalUsd = course.priceUsd ?? 0
+  const rawOriginalNgn = course.priceNgn ?? 0
+  
+  const rawCurrentUsd = discounted ? (course.discountedPriceUsd ?? 0) : rawOriginalUsd
+  const rawCurrentNgn = discounted ? (course.discountedPriceNgn ?? 0) : rawOriginalNgn
+
   return {
     discounted,
     discountPercent: course.discountPercent ?? 0,
     original: [
-      hasUsd ? formatMoney(course.priceUsd!, 'USD') : null,
-      hasNgn ? formatMoney(course.priceNgn!, 'NGN') : null,
-    ].filter(Boolean).join(' / '),
+      formatMoney(rawOriginalUsd, 'USD'),
+      formatMoney(rawOriginalNgn, 'NGN'),
+    ].join(' • '),
     current: [
-      hasUsd ? formatMoney((discounted ? course.discountedPriceUsd : course.priceUsd)!, 'USD') : null,
-      hasNgn ? formatMoney((discounted ? course.discountedPriceNgn : course.priceNgn)!, 'NGN') : null,
-    ].filter(Boolean).join(' / '),
+      formatMoney(rawCurrentUsd, 'USD'),
+      formatMoney(rawCurrentNgn, 'NGN'),
+    ].join(' • '),
   }
 }
