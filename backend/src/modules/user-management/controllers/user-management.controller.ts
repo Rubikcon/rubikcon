@@ -1,13 +1,16 @@
 import { Request, Response, NextFunction } from 'express'
 import { sendSuccess, sendError } from '../../../shared/api/response'
 import { userManagementService } from '../services/user-management.service'
-import { UpdateRoleSchema, CreateFacilitatorSchema, UpdateFacilitatorSchema } from '../schemas/user-management.schemas'
+import { UpdateRoleSchema, CreateFacilitatorSchema, UpdateFacilitatorSchema, SubmitFacilitatorApplicationSchema, UpdateFacilitatorApplicationStatusSchema } from '../schemas/user-management.schemas'
 
 export class UserManagementController {
   async getLearners(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await userManagementService.getLearners()
-      return sendSuccess(res, result.learners)
+      const q = req.query.q as string | undefined
+      const page = parseInt(req.query.page as string, 10) || 1
+      const limit = parseInt(req.query.limit as string, 10) || 20
+      const result = await userManagementService.getLearners(q, page, limit)
+      return sendSuccess(res, result)
     } catch (err) { next(err) }
   }
 
@@ -75,8 +78,12 @@ export class UserManagementController {
 
   async getUsers(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await userManagementService.getUsers()
-      return sendSuccess(res, result.users)
+      const q = req.query.q as string | undefined
+      const role = req.query.role as string | undefined
+      const page = parseInt(req.query.page as string, 10) || 1
+      const limit = parseInt(req.query.limit as string, 10) || 20
+      const result = await userManagementService.getUsers(q, role, page, limit)
+      return sendSuccess(res, result)
     } catch (err) { next(err) }
   }
 
@@ -93,6 +100,31 @@ export class UserManagementController {
     try {
       await userManagementService.deleteUser(req.params.userId)
       return sendSuccess(res, null, 'User deleted.')
+    } catch (err) { next(err) }
+  }
+
+  async submitFacilitatorApplication(req: Request, res: Response, next: NextFunction) {
+    try {
+      const parsed = SubmitFacilitatorApplicationSchema.safeParse(req.body)
+      if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+      const result = await userManagementService.submitFacilitatorApplication(parsed.data)
+      return sendSuccess(res, result.application, 'Application submitted.', 201)
+    } catch (err) { next(err) }
+  }
+
+  async getFacilitatorApplications(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await userManagementService.getFacilitatorApplications()
+      return sendSuccess(res, result.applications)
+    } catch (err) { next(err) }
+  }
+
+  async updateFacilitatorApplicationStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const parsed = UpdateFacilitatorApplicationStatusSchema.safeParse(req.body)
+      if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
+      const result = await userManagementService.updateFacilitatorApplicationStatus(req.params.id, parsed.data.status)
+      return sendSuccess(res, result.application, 'Application status updated.')
     } catch (err) { next(err) }
   }
 }

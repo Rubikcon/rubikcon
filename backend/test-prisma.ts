@@ -1,0 +1,1 @@
+import { PrismaClient } from '@prisma/client'; const prisma = new PrismaClient(); async function run() { try { await prisma.course.findMany({ select: { id: true, enrollments: false } }) } catch (e: any) { console.log(e.name, e.message); } } run();

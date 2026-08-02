@@ -24,6 +24,7 @@ const WeekEditorPage = lazy(() => import('./pages/WeekEditorPage'))
 const SuperAdminPage = lazy(() => import('./pages/SuperAdminPage'))
 const SuperAdminCourseDetailPage = lazy(() => import('./pages/SuperAdminCourseDetailPage'))
 const FacilitatorsPage = lazy(() => import('./pages/FacilitatorsPage'))
+const FacilitatorApplyPage = lazy(() => import('./pages/FacilitatorApplyPage'))
 const AboutPage = lazy(() => import('./pages/AboutPage'))
 const ContactPage = lazy(() => import('./pages/ContactPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="/course/:slug/week/:weekSlug" component={LessonPage} />
           <Route path="/share/course/:courseSlug/week/:weekSlug/video/:videoId" component={SharedVideoPage} />
           <Route path="/facilitators" component={FacilitatorsPage} />
+          <Route path="/facilitator/apply" component={FacilitatorApplyPage} />
           <Route path="/about" component={AboutPage} />
           <Route path="/contact" component={ContactPage} />
 

@@ -120,6 +120,7 @@ router.get('/superadmin/courses', requireAuth, requireSuperAdmin, courseCatalogC
 router.get('/superadmin/courses/:courseId', requireAuth, requireSuperAdmin, courseCatalogController.getCourseDetailsAdmin.bind(courseCatalogController))
 router.post('/superadmin/courses/:courseId/approve', requireAuth, requireSuperAdmin, courseCatalogController.approveCourse.bind(courseCatalogController))
 router.post('/superadmin/courses/:courseId/reject', requireAuth, requireSuperAdmin, courseCatalogController.rejectCourse.bind(courseCatalogController))
+router.patch('/superadmin/courses/:courseId/featured', requireAuth, requireSuperAdmin, courseCatalogController.setFeaturedCourse.bind(courseCatalogController))
 router.delete('/superadmin/courses/:courseId', requireAuth, requireSuperAdmin, courseCatalogController.deleteCourse.bind(courseCatalogController))
 
 export const courseCatalogRoutes = router
@@ -139,3 +140,4 @@ router.put('/admin/testimonials/:id', requireAuth, requireAdmin, courseCatalogCo
 router.delete('/admin/testimonials/:id', requireAuth, requireAdmin, courseCatalogController.legacy_delete_admin_testimonials_id.bind(courseCatalogController));
 router.post('/admin/courses/:courseId/facilitators', requireAuth, requireAdmin, courseCatalogController.legacy_post_admin_courses_courseId_facilitators.bind(courseCatalogController));
 router.delete('/admin/courses/:courseId/facilitators/:facilitatorId', requireAuth, requireAdmin, courseCatalogController.legacy_delete_admin_courses_courseId_facilitators_facilitatorId.bind(courseCatalogController));
+

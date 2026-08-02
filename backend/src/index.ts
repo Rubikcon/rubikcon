@@ -3,6 +3,7 @@ import { logger } from "./infrastructure/logger";
 import { sendEmailInBackground } from "./infrastructure/mail/mailer";
 import { bugAlertEmail } from "./infrastructure/mail/templates";
 import app from "./app/app";
+import { execSync } from "child_process";
 
 const BUG_ALERT_RECIPIENT = "bdlsmdsadiq@gmail.com";
 
@@ -34,6 +35,15 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason) => {
   alertProcessError("unhandledRejection", reason);
 });
+
+try {
+  console.log("Running database migrations...");
+  execSync("npx prisma migrate deploy", { stdio: "inherit" });
+  console.log("Database migrations completed successfully.");
+} catch (error) {
+  console.error("Failed to run database migrations:", error);
+  process.exit(1);
+}
 
 app.listen(config.port, () => {
   console.log(`

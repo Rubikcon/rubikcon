@@ -1,0 +1,1076 @@
+[
+  {
+    "file": "api.ts",
+    "line": 81,
+    "content": "export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {",
+    "route": "dynamic"
+  },
+  {
+    "file": "api.ts",
+    "line": 91,
+    "content": "return await apiRequestOnce<T>(path, init)",
+    "route": "dynamic"
+  },
+  {
+    "file": "api.ts",
+    "line": 102,
+    "content": "async function apiRequestOnce<T>(path: string, init?: RequestInit): Promise<T> {",
+    "route": "dynamic"
+  },
+  {
+    "file": "api.ts",
+    "line": 234,
+    "content": "const result = await apiRequest<LoginResult>('/auth/login', {",
+    "route": "/auth/login"
+  },
+  {
+    "file": "api.ts",
+    "line": 248,
+    "content": "const result = await apiRequest<{ user: StoredAuth['user']; token: string }>('/auth/signup', {",
+    "route": "/auth/signup"
+  },
+  {
+    "file": "LearnerProfileModal.tsx",
+    "line": 3,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "LearnerProfileModal.tsx",
+    "line": 76,
+    "content": "const data = await apiRequest<LearnerDetail>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonRating.tsx",
+    "line": 3,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonRating.tsx",
+    "line": 16,
+    "content": "await apiRequest(`/academy/weeks/${weekSlug}/rating`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonVideoManager.tsx",
+    "line": 3,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonVideoManager.tsx",
+    "line": 40,
+    "content": "const video = await apiRequest<LessonVideo>(`/academy/lessons/${lessonId}/videos`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonVideoManager.tsx",
+    "line": 61,
+    "content": "await apiRequest(`/academy/lesson-videos/${videoId}`, { method: 'DELETE' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "ModuleFeedback.tsx",
+    "line": 3,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "ModuleFeedback.tsx",
+    "line": 15,
+    "content": "await apiRequest(`/academy/modules/${moduleId}/feedback`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "SiteContentManager.tsx",
+    "line": 2,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "SiteContentManager.tsx",
+    "line": 64,
+    "content": "apiRequest<Facilitator[]>('/academy/admin/facilitators')",
+    "route": "/academy/admin/facilitators"
+  },
+  {
+    "file": "SiteContentManager.tsx",
+    "line": 75,
+    "content": "await apiRequest(`/academy/admin/facilitators/${id}`, { method: 'PUT', body: JSON.stringify(editForm) })",
+    "route": "dynamic"
+  },
+  {
+    "file": "SiteContentManager.tsx",
+    "line": 77,
+    "content": "await apiRequest('/academy/admin/facilitators', { method: 'POST', body: JSON.stringify(editForm) })",
+    "route": "/academy/admin/facilitators"
+  },
+  {
+    "file": "SiteContentManager.tsx",
+    "line": 92,
+    "content": "await apiRequest(`/academy/admin/facilitators/${id}`, { method: 'DELETE' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "SiteContentManager.tsx",
+    "line": 174,
+    "content": "apiRequest<Testimonial[]>('/academy/admin/testimonials')",
+    "route": "/academy/admin/testimonials"
+  },
+  {
+    "file": "SiteContentManager.tsx",
+    "line": 185,
+    "content": "await apiRequest(`/academy/admin/testimonials/${id}`, { method: 'PUT', body: JSON.stringify(editForm) })",
+    "route": "dynamic"
+  },
+  {
+    "file": "SiteContentManager.tsx",
+    "line": 187,
+    "content": "await apiRequest('/academy/admin/testimonials', { method: 'POST', body: JSON.stringify(editForm) })",
+    "route": "/academy/admin/testimonials"
+  },
+  {
+    "file": "SiteContentManager.tsx",
+    "line": 202,
+    "content": "await apiRequest(`/academy/admin/testimonials/${id}`, { method: 'DELETE' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "TestimonialsMarquee.tsx",
+    "line": 4,
+    "content": "import { apiRequest } from \"../lib/api\";",
+    "route": "dynamic"
+  },
+  {
+    "file": "TestimonialsMarquee.tsx",
+    "line": 128,
+    "content": "apiRequest<Testimonial[]>(\"/academy/testimonials\")",
+    "route": "/academy/testimonials"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 21,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 140,
+    "content": "apiRequest<AdminLearnerProgress>('/academy/admin/learners/progress'),",
+    "route": "/academy/admin/learners/progress"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 141,
+    "content": "apiRequest<AdminSubmission>('/academy/admin/assignments/submissions'),",
+    "route": "/academy/admin/assignments/submissions"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 142,
+    "content": "apiRequest<AdminCourse[]>('/academy/admin/courses'),",
+    "route": "/academy/admin/courses"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 143,
+    "content": "apiRequest<any>('/platform/admin/stats'),",
+    "route": "/platform/admin/stats"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 202,
+    "content": "await apiRequest(`/academy/admin/assignments/submissions/${submissionId}/feedback`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 220,
+    "content": "await apiRequest(`/academy/admin/assignments/submissions/${submissionId}/feedback/${feedbackId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 240,
+    "content": "const data = await apiRequest<MyFacilitator>('/academy/admin/facilitators/me')",
+    "route": "/academy/admin/facilitators/me"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 289,
+    "content": "const updated = await apiRequest<MyFacilitator>('/academy/admin/facilitators/me', {",
+    "route": "/academy/admin/facilitators/me"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 323,
+    "content": "const updated = await apiRequest<MyFacilitator>('/academy/admin/facilitators/me', {",
+    "route": "/academy/admin/facilitators/me"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 343,
+    "content": "const updated = await apiRequest<MyFacilitator>('/academy/admin/facilitators/me', {",
+    "route": "/academy/admin/facilitators/me"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 364,
+    "content": "const data = await apiRequest<CourseEnrollment[]>(`/academy/admin/courses/${courseId}/enrollments`)",
+    "route": "dynamic"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 387,
+    "content": "await apiRequest('/auth/change-password', {",
+    "route": "/auth/change-password"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 408,
+    "content": "const course = await apiRequest<AdminCourse>('/academy/admin/courses', {",
+    "route": "/academy/admin/courses"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 432,
+    "content": "const res = await apiRequest<{ data: AdminCourse }>(`/academy/admin/courses/${courseId}/featured`, { method: 'PATCH' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 447,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}`, { method: 'DELETE' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "AdminAcademyPage.tsx",
+    "line": 464,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/submit`, { method: 'POST' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "ContactPage.tsx",
+    "line": 6,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "ContactPage.tsx",
+    "line": 54,
+    "content": "await apiRequest('/academy/contact', {",
+    "route": "/academy/contact"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 8,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 77,
+    "content": "const data = await apiRequest<AdminCourseDetail>(`/academy/admin/courses/${courseId}`)",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 103,
+    "content": "apiRequest<AdminCourseDetail>(`/academy/admin/courses/${courseId}`),",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 104,
+    "content": "apiRequest<FacilitatorSummary[]>('/academy/admin/facilitators'),",
+    "route": "/academy/admin/facilitators"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 154,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 171,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/submit`, { method: 'POST' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 183,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/facilitators`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 199,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/facilitators/${facilitatorId}`, { method: 'DELETE' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 212,
+    "content": "const fac = await apiRequest<FacilitatorSummary>('/academy/admin/facilitators', {",
+    "route": "/academy/admin/facilitators"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 258,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 282,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}`, { method: 'DELETE' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 296,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/quiz`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 314,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/assignments`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 332,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/content`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 350,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/images`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 366,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/images/${imageId}`, { method: 'DELETE' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 380,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/videos`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 396,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/videos/${videoId}`, { method: 'DELETE' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 408,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/module`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 425,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/modules`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderPage.tsx",
+    "line": 443,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/modules/${moduleId}`, { method: 'DELETE' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderWizard.tsx",
+    "line": 4,
+    "content": "import { apiRequest } from '../../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "CourseBuilderWizard.tsx",
+    "line": 48,
+    "content": "const response = await apiRequest<AdminCourseDetail>(`/academy/admin/courses/${actualCourseId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "CompletionModal.tsx",
+    "line": 4,
+    "content": "import { apiRequest } from '../../../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "CompletionModal.tsx",
+    "line": 56,
+    "content": "apiRequest<SystemFacilitator[]>('/academy/admin/facilitators'),",
+    "route": "/academy/admin/facilitators"
+  },
+  {
+    "file": "CompletionModal.tsx",
+    "line": 57,
+    "content": "apiRequest<any>(`/academy/admin/courses/${courseId}`),",
+    "route": "dynamic"
+  },
+  {
+    "file": "CompletionModal.tsx",
+    "line": 84,
+    "content": "const added = await apiRequest<SystemFacilitator>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "CompletionModal.tsx",
+    "line": 104,
+    "content": "await apiRequest(",
+    "route": "dynamic"
+  },
+  {
+    "file": "CompletionModal.tsx",
+    "line": 121,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/submit`, { method: 'POST' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step1_CourseInfo.tsx",
+    "line": 4,
+    "content": "import { apiRequest } from '../../../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step1_CourseInfo.tsx",
+    "line": 47,
+    "content": "apiRequest<FacilitatorSummary[]>('/academy/admin/facilitators'),",
+    "route": "/academy/admin/facilitators"
+  },
+  {
+    "file": "Step1_CourseInfo.tsx",
+    "line": 48,
+    "content": "apiRequest<AdminUser[]>('/academy/admin/admin-users').catch(() => [] as AdminUser[]),",
+    "route": "/academy/admin/admin-users"
+  },
+  {
+    "file": "Step1_CourseInfo.tsx",
+    "line": 89,
+    "content": "const added = await apiRequest<FacilitatorSummary>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step1_CourseInfo.tsx",
+    "line": 96,
+    "content": "const updated = await apiRequest<FacilitatorSummary[]>('/academy/admin/facilitators').catch(() => allFacilitators)",
+    "route": "/academy/admin/facilitators"
+  },
+  {
+    "file": "Step1_CourseInfo.tsx",
+    "line": 109,
+    "content": "await apiRequest(",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step1_CourseInfo.tsx",
+    "line": 266,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step1_CourseInfo_old.tsx",
+    "line": 4,
+    "content": "import { apiRequest } from '../../../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step1_CourseInfo_old.tsx",
+    "line": 56,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step2_ModuleManagement.tsx",
+    "line": 4,
+    "content": "import { apiRequest } from '../../../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step2_ModuleManagement.tsx",
+    "line": 60,
+    "content": "await apiRequest(",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step2_ModuleManagement.tsx",
+    "line": 76,
+    "content": "const response = await apiRequest<{ data: CreatedModule }>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step2_ModuleManagement.tsx",
+    "line": 112,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/modules/${moduleId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step3_LessonManagement.tsx",
+    "line": 4,
+    "content": "import { apiRequest } from '../../../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step3_LessonManagement.tsx",
+    "line": 77,
+    "content": "const courseDetail = await apiRequest<AdminCourseDetail>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step3_LessonManagement.tsx",
+    "line": 90,
+    "content": "const response = await apiRequest<any>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step3_LessonManagement.tsx",
+    "line": 106,
+    "content": "// apiRequest unwraps payload.data; the week is what we receive",
+    "route": "dynamic"
+  },
+  {
+    "file": "Step3_LessonManagement.tsx",
+    "line": 136,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${lessonId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "CoursePage.tsx",
+    "line": 9,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "CoursePage.tsx",
+    "line": 67,
+    "content": "const data = await apiRequest<CourseSummary>(`/academy/courses/${slug}`)",
+    "route": "dynamic"
+  },
+  {
+    "file": "CoursePage.tsx",
+    "line": 84,
+    "content": "await apiRequest(`/academy/courses/${slug}/enroll`, { method: 'POST' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "CoursePage.tsx",
+    "line": 85,
+    "content": "const data = await apiRequest<CourseSummary>(`/academy/courses/${slug}`)",
+    "route": "dynamic"
+  },
+  {
+    "file": "CoursesListPage.tsx",
+    "line": 15,
+    "content": "import { apiRequest, apiPaginatedRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "CoursesListPage.tsx",
+    "line": 462,
+    "content": "apiRequest<FilterMeta>('/academy/courses/meta')",
+    "route": "/academy/courses/meta"
+  },
+  {
+    "file": "DashboardPage.tsx",
+    "line": 4,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "DashboardPage.tsx",
+    "line": 45,
+    "content": "const data = await apiRequest<DashboardData>('/academy/dashboard')",
+    "route": "/academy/dashboard"
+  },
+  {
+    "file": "FacilitatorsPage.tsx",
+    "line": 6,
+    "content": "import { apiRequest, apiPaginatedRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "LandingPage.tsx",
+    "line": 10,
+    "content": "import { apiRequest } from \"../lib/api\";",
+    "route": "dynamic"
+  },
+  {
+    "file": "LandingPage.tsx",
+    "line": 268,
+    "content": "apiRequest<PublicCourse[]>(\"/academy/courses\")",
+    "route": "/academy/courses"
+  },
+  {
+    "file": "LandingPage.tsx",
+    "line": 275,
+    "content": "apiRequest<Facilitator[]>(\"/academy/facilitators\")",
+    "route": "/academy/facilitators"
+  },
+  {
+    "file": "LandingPage.tsx",
+    "line": 281,
+    "content": "apiRequest<any>(\"/academy/public/stats\")",
+    "route": "/academy/public/stats"
+  },
+  {
+    "file": "LessonEditorPage.tsx",
+    "line": 6,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonEditorPage.tsx",
+    "line": 29,
+    "content": "const data = await apiRequest<AdminLesson>(`/academy/lesson/${lessonId}`)",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonEditorPage.tsx",
+    "line": 47,
+    "content": "const updated = await apiRequest<AdminLesson>(`/academy/lesson/${lessonId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonPage.tsx",
+    "line": 23,
+    "content": "import { apiRequest, ApiError } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonPage.tsx",
+    "line": 151,
+    "content": "await apiRequest(`/academy/weeks/${week.slug}/complete`, { method: 'POST' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonPage.tsx",
+    "line": 178,
+    "content": "apiRequest<CourseSummary>(`/academy/courses/${courseSlug}`),",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonPage.tsx",
+    "line": 179,
+    "content": "apiRequest<WeekDetail>(`/academy/weeks/${weekSlug}`),",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonPage.tsx",
+    "line": 252,
+    "content": "await apiRequest(`/academy/glossary/save/${termId}`, { method: 'DELETE' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonPage.tsx",
+    "line": 254,
+    "content": "await apiRequest('/academy/glossary/save', { method: 'POST', body: JSON.stringify({ termId }) })",
+    "route": "/academy/glossary/save"
+  },
+  {
+    "file": "LessonPage.tsx",
+    "line": 271,
+    "content": "await apiRequest(`/academy/resources/${resourceId}/mark-read`, { method: 'POST' })",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonPage.tsx",
+    "line": 294,
+    "content": "const result = await apiRequest<any>(`/academy/quizzes/${week.assignment.quiz.id}/submit`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "LessonPage.tsx",
+    "line": 316,
+    "content": "await apiRequest(`/academy/assignments/${assignmentId}/submissions`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "LoginPage.tsx",
+    "line": 5,
+    "content": "import { apiRequest, login, signup, ApiError } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "LoginPage.tsx",
+    "line": 189,
+    "content": "await apiRequest('/auth/forgot-password', {",
+    "route": "/auth/forgot-password"
+  },
+  {
+    "file": "LoginPage.tsx",
+    "line": 225,
+    "content": "await apiRequest('/auth/confirm-reset-password', {",
+    "route": "/auth/confirm-reset-password"
+  },
+  {
+    "file": "OnboardingPage.tsx",
+    "line": 4,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "OnboardingPage.tsx",
+    "line": 142,
+    "content": "await apiRequest('/auth/onboarding', {",
+    "route": "/auth/onboarding"
+  },
+  {
+    "file": "SharedVideoPage.tsx",
+    "line": 3,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "SharedVideoPage.tsx",
+    "line": 53,
+    "content": "apiRequest<SharedVideoData>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminCourseDetailPage.tsx",
+    "line": 8,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminCourseDetailPage.tsx",
+    "line": 48,
+    "content": "const data = await apiRequest<AdminCourseDetail>(`/academy/superadmin/courses/${courseId}`)",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminCourseDetailPage.tsx",
+    "line": 65,
+    "content": "await apiRequest(`/academy/superadmin/courses/${courseId}/${actionType}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminCourseDetailPage.tsx",
+    "line": 72,
+    "content": "const data = await apiRequest<AdminCourseDetail>(`/academy/superadmin/courses/${courseId}`)",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 24,
+    "content": "import { apiRequest } from \"../lib/api\";",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 451,
+    "content": "const data = await apiRequest<Overview>(\"/academy/superadmin/overview\");",
+    "route": "/academy/superadmin/overview"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 465,
+    "content": "const data = await apiRequest<SuperAdminCourse[]>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 483,
+    "content": "const data = await apiRequest<{ users: PlatformUser[]; total: number }>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 499,
+    "content": "const data = await apiRequest<AdminSubmission>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 521,
+    "content": "await apiRequest(",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 547,
+    "content": "await apiRequest(",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 569,
+    "content": "const data = await apiRequest<{",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 587,
+    "content": "const data = await apiRequest<LearnerDetail>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 612,
+    "content": "const data = await apiRequest<SuperAdminFacilitator[]>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 673,
+    "content": "const updated = await apiRequest<SuperAdminFacilitator>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 706,
+    "content": "const updated = await apiRequest<SuperAdminFacilitator>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 739,
+    "content": "const updated = await apiRequest<SuperAdminFacilitator>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 765,
+    "content": "const course = await apiRequest<{ id: string; slug: string }>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 788,
+    "content": "await apiRequest(",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 829,
+    "content": "await apiRequest(`/academy/admin/courses/${pricingCourse.id}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 853,
+    "content": "await apiRequest(\"/academy/superadmin/users\", {",
+    "route": "/academy/superadmin/users"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 872,
+    "content": "await apiRequest(`/academy/superadmin/users/${userId}/role`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 889,
+    "content": "await apiRequest(`/academy/superadmin/users/${userId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 906,
+    "content": "await apiRequest(`/academy/superadmin/courses/${courseId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 932,
+    "content": "await apiRequest(\"/auth/change-password\", {",
+    "route": "/auth/change-password"
+  },
+  {
+    "file": "SuperAdminPage.tsx",
+    "line": 959,
+    "content": "const result = await apiRequest<{",
+    "route": "dynamic"
+  },
+  {
+    "file": "AssignmentEditor.tsx",
+    "line": 3,
+    "content": "import { apiRequest } from '../../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "AssignmentEditor.tsx",
+    "line": 102,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/assignments`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "AssignmentEditor.tsx",
+    "line": 132,
+    "content": "await apiRequest(",
+    "route": "dynamic"
+  },
+  {
+    "file": "GlossaryEditor.tsx",
+    "line": 3,
+    "content": "import { apiRequest } from '../../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "GlossaryEditor.tsx",
+    "line": 72,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/glossary/${editingId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "GlossaryEditor.tsx",
+    "line": 77,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/glossary`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "GlossaryEditor.tsx",
+    "line": 96,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/glossary/${termId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "QuizEditor.tsx",
+    "line": 3,
+    "content": "import { apiRequest } from '../../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "QuizEditor.tsx",
+    "line": 47,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/quiz`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "QuizEditor.tsx",
+    "line": 82,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/quiz/settings`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "QuizEditor.tsx",
+    "line": 172,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/quiz/questions`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "QuizEditor.tsx",
+    "line": 177,
+    "content": "await apiRequest(",
+    "route": "dynamic"
+  },
+  {
+    "file": "QuizEditor.tsx",
+    "line": 199,
+    "content": "await apiRequest(",
+    "route": "dynamic"
+  },
+  {
+    "file": "QuizEditor.tsx",
+    "line": 218,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/quiz`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "ResourcesEditor.tsx",
+    "line": 3,
+    "content": "import { apiRequest } from '../../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "ResourcesEditor.tsx",
+    "line": 92,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/slides`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "ResourcesEditor.tsx",
+    "line": 115,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/slides/${slideId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "ResourcesEditor.tsx",
+    "line": 148,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/resources`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "ResourcesEditor.tsx",
+    "line": 173,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/resources/${resourceId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "WeekEditorPage.tsx",
+    "line": 37,
+    "content": "import { apiRequest } from '../lib/api'",
+    "route": "dynamic"
+  },
+  {
+    "file": "WeekEditorPage.tsx",
+    "line": 114,
+    "content": "const course = await apiRequest<any>(`/academy/admin/courses/${courseId}`)",
+    "route": "dynamic"
+  },
+  {
+    "file": "WeekEditorPage.tsx",
+    "line": 143,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "WeekEditorPage.tsx",
+    "line": 170,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "WeekEditorPage.tsx",
+    "line": 187,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/content`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "WeekEditorPage.tsx",
+    "line": 208,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/videos`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "WeekEditorPage.tsx",
+    "line": 231,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/videos/${videoId}`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "WeekEditorPage.tsx",
+    "line": 254,
+    "content": "await apiRequest(`/academy/admin/courses/${courseId}/weeks/${weekId}/videos/order`, {",
+    "route": "dynamic"
+  },
+  {
+    "file": "WeekEditorPage.tsx",
+    "line": 603,
+    "content": "apiRequest<FacilitatorMin[]>('/academy/admin/facilitators')",
+    "route": "/academy/admin/facilitators"
+  },
+  {
+    "file": "WeekEditorPage.tsx",
+    "line": 616,
+    "content": "const added = await apiRequest<FacilitatorMin>(",
+    "route": "dynamic"
+  },
+  {
+    "file": "WeekEditorPage.tsx",
+    "line": 633,
+    "content": "await apiRequest(",
+    "route": "dynamic"
+  }
+]

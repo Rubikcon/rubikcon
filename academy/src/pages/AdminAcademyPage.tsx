@@ -13,6 +13,7 @@ import {
   Trash2,
   UserCircle,
   Users,
+  Star,
 } from 'lucide-react'
 import { compressImageToBase64 } from '../lib/imageCompress'
 import LearnerProfileModal from '../components/LearnerProfileModal'
@@ -139,7 +140,7 @@ export default function AdminAcademyPage() {
       apiRequest<AdminLearnerProgress>('/academy/admin/learners/progress'),
       apiRequest<AdminSubmission>('/academy/admin/assignments/submissions'),
       apiRequest<AdminCourse[]>('/academy/admin/courses'),
-      apiRequest<any>('/academy/admin/stats'),
+      apiRequest<any>('/platform/admin/stats'),
     ])
     setProgress(progressData)
     setSubmissions(submissionData)
@@ -423,6 +424,18 @@ export default function AdminAcademyPage() {
       setError(err instanceof Error ? err.message : 'Failed to create course.')
     } finally {
       setCreating(false)
+    }
+  }
+
+  async function toggleFeaturedCourse(courseId: string) {
+    try {
+      const res = await apiRequest<{ data: AdminCourse }>(`/academy/admin/courses/${courseId}/featured`, { method: 'PATCH' })
+      setCourses(courses.map(c => {
+        if (c.id === courseId) return { ...c, isFeatured: true }
+        return { ...c, isFeatured: false }
+      }))
+    } catch (err: any) {
+      setError(err.message || 'Failed to set featured course')
     }
   }
 
@@ -756,6 +769,24 @@ export default function AdminAcademyPage() {
                           >
                             <Eye size={14} />
                           </a>
+                          {isSuperAdmin && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                toggleFeaturedCourse(course.id)
+                              }}
+                              title={course.isFeatured ? "Unset featured" : "Set as featured"}
+                              className={`inline-flex items-center justify-center w-8 h-8 rounded-full bg-black/40 border transition-colors ${
+                                course.isFeatured
+                                  ? 'border-[#F5C518] text-[#F5C518] bg-[#F5C518]/10'
+                                  : 'border-white/10 text-white/50 hover:text-[#F5C518] hover:border-[#F5C518]/40 hover:bg-[#F5C518]/10'
+                              }`}
+                            >
+                              <Star size={14} className={course.isFeatured ? 'fill-current' : ''} />
+                            </button>
+                          )}
                           {canDelete && (
                             <button
                               type="button"

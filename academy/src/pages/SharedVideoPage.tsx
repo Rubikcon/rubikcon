@@ -6,6 +6,7 @@ import AcademyNavbar from '../components/AcademyNavbar'
 import { getEmbedUrl } from '../components/VideoEmbed'
 import EmbedFrame from '../components/EmbedFrame'
 import HtmlVideoPlayer from '../components/HtmlVideoPlayer'
+import SlideViewer, { getGoogleSlidesEmbedUrl } from '../components/SlideViewer'
 
 type SharedVideoData = {
   video: {
@@ -89,7 +90,8 @@ export default function SharedVideoPage() {
     )
   }
 
-  const embedSrc = getEmbedUrl(data.video.url)
+  const slideEmbedSrc = getGoogleSlidesEmbedUrl(data.video.url)
+  const videoEmbedSrc = getEmbedUrl(data.video.url)
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] flex flex-col">
@@ -99,9 +101,16 @@ export default function SharedVideoPage() {
         {/* Video Player Area */}
         <div className="w-full bg-black border-b border-white/[0.07]">
           <div className="max-w-6xl mx-auto w-full aspect-video">
-            {embedSrc ? (
+            {slideEmbedSrc ? (
+              <SlideViewer
+                url={data.video.url}
+                title={data.video.title}
+                slideCount={0}
+                viewerType="INLINE"
+              />
+            ) : videoEmbedSrc ? (
               <EmbedFrame
-                src={embedSrc}
+                src={videoEmbedSrc}
                 title={data.video.title}
                 fallbackUrl={data.video.url}
                 className="rounded-none h-full w-full border-0"

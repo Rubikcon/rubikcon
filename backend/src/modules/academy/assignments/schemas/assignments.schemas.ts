@@ -2,12 +2,12 @@
 import { z } from 'zod'
 
 export const AssignmentSubmissionSchema = z.object({
-  choiceId: z.string().uuid('Invalid choice ID').optional(),
-  textResponse: z.string().trim().min(1).max(10000).optional(),
-  attachmentName: z.string().trim().min(1).max(255).optional(),
-  attachmentUrl: z.string().url('Invalid attachment URL').optional(),
-  attachmentMimeType: z.string().trim().min(1).max(120).optional(),
-  attachmentSizeBytes: z.number().int().positive().max(10_000_000).optional(),
+  choiceId: z.string().uuid('Invalid choice ID').nullish().transform(val => val || undefined),
+  textResponse: z.string().trim().nullish().transform(val => val || undefined),
+  attachmentName: z.string().trim().nullish().transform(val => val || undefined),
+  attachmentUrl: z.string().url('Invalid attachment URL').nullish().transform(val => val || undefined),
+  attachmentMimeType: z.string().trim().nullish().transform(val => val || undefined),
+  attachmentSizeBytes: z.number().int().positive().max(10_000_000).nullish().transform(val => val || undefined),
 }).superRefine((value, ctx) => {
   if (!value.textResponse && !value.attachmentUrl) {
     ctx.addIssue({

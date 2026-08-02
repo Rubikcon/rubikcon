@@ -1,6 +1,5 @@
 // --- Games ---
 
-
 model Score {
   id        String   @id @default(uuid())
   sessionId String

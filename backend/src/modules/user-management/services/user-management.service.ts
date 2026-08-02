@@ -2,15 +2,69 @@ import { NotFoundError, ValidationError } from '../../../shared/errors/AppError'
 import { userManagementRepository } from '../repositories/user-management.repository'
 
 export class UserManagementService {
-  async getLearners() {
-    const learners = await userManagementRepository.findLearners()
-    return { learners }
+  async getLearners(q?: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit
+    const { learners, total } = await userManagementRepository.findLearners(q, skip, limit)
+    return { 
+      learners, 
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      } 
+    }
   }
 
   async getLearnerById(userId: string) {
     const learner = await userManagementRepository.findLearnerById(userId)
     if (!learner) throw new NotFoundError('Learner not found.')
-    return { learner }
+    
+    // Format into the structure expected by SuperAdminPage
+    const enrollments = learner.courseEnrollments.map((enr: any) => {
+      const course = enr.course
+      const weeks = (course.weeks || []).map((w: any) => {
+        const wp = learner.weekProgress.find((p: any) => p.week.id === w.id)
+        return {
+          id: w.id,
+          slug: w.slug,
+          number: w.number,
+          title: w.title,
+          status: wp ? wp.status : 'NOT_STARTED',
+          completedAt: wp ? wp.completedAt : null,
+          quizSubmitted: wp ? wp.quizSubmitted : false,
+          assignmentSubmitted: wp ? wp.assignmentSubmitted : false,
+          manuallyCompleted: wp ? wp.manuallyCompleted : false,
+          firstOpenedAt: wp ? wp.firstOpenedAt : null,
+        }
+      })
+      const completedCount = weeks.filter((w: any) => w.status === 'COMPLETE').length
+      const totalCount = weeks.length
+      return {
+        course: { id: course.id, slug: course.slug, title: course.title, contentUnit: course.contentUnit },
+        enrolledAt: enr.enrolledAt,
+        progressPercent: totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0,
+        completedCount,
+        totalCount,
+        weeks
+      }
+    })
+
+    const formattedLearner = {
+      user: {
+        id: learner.id,
+        name: learner.name,
+        email: learner.email,
+        role: learner.role,
+        createdAt: learner.createdAt,
+        profile: learner.profile
+      },
+      enrollments,
+      submissions: learner.assignmentSubmissions,
+      quizAttempts: learner.quizAttempts
+    }
+    
+    return { learner: formattedLearner }
   }
 
   async getFacilitators() {
@@ -55,9 +109,18 @@ export class UserManagementService {
     return { admins }
   }
 
-  async getUsers() {
-    const users = await userManagementRepository.findUsers()
-    return { users }
+  async getUsers(q?: string, role?: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit
+    const { users, total } = await userManagementRepository.findUsers(q, role, skip, limit)
+    return {
+      users,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      }
+    }
   }
 
   private async checkLastSuperAdminGuard(errorMessage: string) {
@@ -89,6 +152,21 @@ export class UserManagementService {
 
     await userManagementRepository.delete(userId)
     return { success: true }
+  }
+
+  async submitFacilitatorApplication(data: any) {
+    const application = await userManagementRepository.createFacilitatorApplication(data)
+    return { application }
+  }
+
+  async getFacilitatorApplications() {
+    const applications = await userManagementRepository.findFacilitatorApplications()
+    return { applications }
+  }
+
+  async updateFacilitatorApplicationStatus(id: string, status: string) {
+    const application = await userManagementRepository.updateFacilitatorApplicationStatus(id, status)
+    return { application }
   }
 }
 

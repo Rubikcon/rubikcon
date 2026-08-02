@@ -26,6 +26,7 @@ type CourseListItem = {
   tagline: string | null
   level: string | null
   isPaid: boolean
+  isFeatured: boolean
   priceUsd: number | null
   priceNgn: number | null
   discountPercent: number
@@ -532,9 +533,9 @@ export default function CoursesListPage() {
   }
 
   const hasActiveFilters = q || activeLevel || activePhase
-  const featuredCourse = courses[0] // always first result (no flag needed)
+  const featuredCourse = courses.find((c) => c.isFeatured) || courses[0]
   const gridCourses = courses // show all in grid, including featured
-  const showBanner = !loading && !error && courses.length > 0 && page === 1 && !hasActiveFilters
+  const showBanner = !loading && !error && featuredCourse && page === 1 && !hasActiveFilters
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] flex flex-col">

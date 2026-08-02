@@ -71,6 +71,7 @@ type SuperAdminCourse = {
   priceUsd: string | number | null;
   priceNgn: string | number | null;
   discountPercent: number | null;
+  isFeatured: boolean;
   _count: { weeks: number };
   courseFacilitators: Array<{
     facilitator: { id: string; name: string; title: string };
@@ -273,6 +274,8 @@ export default function SuperAdminPage() {
   // Courses
   const [courses, setCourses] = useState<SuperAdminCourse[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
+  const [coursesPage, setCoursesPage] = useState(1);
+  const [coursesTotalPages, setCoursesTotalPages] = useState(1);
   // Default to "All" — a pending-only default hid freshly created DRAFT courses
   // and read as "added courses are not reflecting on the board".
   const [statusFilter, setStatusFilter] = useState("");
@@ -298,9 +301,14 @@ export default function SuperAdminPage() {
   const [users, setUsers] = useState<PlatformUser[]>([]);
   const [usersTotal, setUsersTotal] = useState(0);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotalPages, setUsersTotalPages] = useState(1);
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("");
   const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
+
+  // Featured Course
+  const [settingFeatured, setSettingFeatured] = useState<string | null>(null);
 
   // Create admin form
   const [showCreateAdmin, setShowCreateAdmin] = useState(false);
@@ -341,6 +349,8 @@ export default function SuperAdminPage() {
   const [learners, setLearners] = useState<LearnerSummary[]>([]);
   const [learnersTotal, setLearnersTotal] = useState(0);
   const [learnersLoading, setLearnersLoading] = useState(false);
+  const [learnersPage, setLearnersPage] = useState(1);
+  const [learnersTotalPages, setLearnersTotalPages] = useState(1);
   const [learnerSearch, setLearnerSearch] = useState("");
   const [learnerDetail, setLearnerDetail] = useState<LearnerDetail | null>(
     null,
@@ -359,6 +369,9 @@ export default function SuperAdminPage() {
 
   // Submissions
   const [submissions, setSubmissions] = useState<AdminSubmission>([]);
+  const [submissionsTotal, setSubmissionsTotal] = useState(0);
+  const [submissionsPage, setSubmissionsPage] = useState(1);
+  const [submissionsTotalPages, setSubmissionsTotalPages] = useState(1);
   const [submissionsLoading, setSubmissionsLoading] = useState(false);
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>(
     {},
@@ -426,20 +439,20 @@ export default function SuperAdminPage() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "courses") void loadCourses(statusFilter);
-  }, [activeTab, statusFilter]);
+    if (activeTab === "courses") void loadCourses();
+  }, [activeTab, statusFilter, coursesPage]);
 
   useEffect(() => {
     if (activeTab === "users") void loadUsers();
-  }, [activeTab, userSearch, userRoleFilter]);
+  }, [activeTab, userSearch, userRoleFilter, usersPage]);
 
   useEffect(() => {
     if (activeTab === "submissions") void loadSubmissions();
-  }, [activeTab]);
+  }, [activeTab, submissionsPage]);
 
   useEffect(() => {
     if (activeTab === "learners") void loadLearners();
-  }, [activeTab, learnerSearch]);
+  }, [activeTab, learnerSearch, learnersPage]);
 
   useEffect(() => {
     if (activeTab === "facilitators") void loadFacilitators();
@@ -461,11 +474,15 @@ export default function SuperAdminPage() {
     try {
       setCoursesLoading(true);
       setError(null);
-      const qs = filter ? `?status=${filter}` : "";
-      const data = await apiRequest<SuperAdminCourse[]>(
-        `/academy/superadmin/courses${qs}`,
+      const qs = new URLSearchParams();
+      if (filter) qs.set("status", filter);
+      qs.set("page", coursesPage.toString());
+      qs.set("limit", "10");
+      const data = await apiRequest<{ courses: SuperAdminCourse[]; pagination: any }>(
+        `/academy/superadmin/courses?${qs}`,
       );
-      setCourses(data);
+      setCourses(data.courses);
+      setCoursesTotalPages(data.pagination.totalPages || 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load courses.");
     } finally {
@@ -478,13 +495,16 @@ export default function SuperAdminPage() {
       setUsersLoading(true);
       setError(null);
       const params = new URLSearchParams();
-      if (userSearch) params.set("search", userSearch);
+      if (userSearch) params.set("q", userSearch);
       if (userRoleFilter) params.set("role", userRoleFilter);
-      const data = await apiRequest<{ users: PlatformUser[]; total: number }>(
+      params.set("page", usersPage.toString());
+      params.set("limit", "20");
+      const data = await apiRequest<{ users: PlatformUser[]; pagination: any }>(
         `/academy/superadmin/users?${params}`,
       );
       setUsers(data.users);
-      setUsersTotal(data.total);
+      setUsersTotal(data.pagination.total);
+      setUsersTotalPages(data.pagination.totalPages || 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load users.");
     } finally {
@@ -496,10 +516,18 @@ export default function SuperAdminPage() {
     try {
       setSubmissionsLoading(true);
       setError(null);
-      const data = await apiRequest<AdminSubmission>(
-        "/academy/admin/assignments/submissions",
+      const params = new URLSearchParams();
+      params.set("page", submissionsPage.toString());
+      params.set("limit", "20");
+      const data = await apiRequest<{
+        submissions: AdminSubmission;
+        pagination: any;
+      }>(
+        `/academy/admin/assignments/submissions?${params}`,
       );
-      setSubmissions(data);
+      setSubmissions(data.submissions);
+      setSubmissionsTotal(data.pagination.total);
+      setSubmissionsTotalPages(data.pagination.totalPages || 1);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to load submissions.",
@@ -565,13 +593,16 @@ export default function SuperAdminPage() {
       setLearnersLoading(true);
       setError(null);
       const params = new URLSearchParams();
-      if (learnerSearch) params.set("search", learnerSearch);
+      if (learnerSearch) params.set("q", learnerSearch);
+      params.set("page", learnersPage.toString());
+      params.set("limit", "20");
       const data = await apiRequest<{
         learners: LearnerSummary[];
-        total: number;
+        pagination: any;
       }>(`/academy/superadmin/learners?${params}`);
       setLearners(data.learners);
-      setLearnersTotal(data.total);
+      setLearnersTotal(data.pagination.total);
+      setLearnersTotalPages(data.pagination.totalPages || 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load learners.");
     } finally {
@@ -915,6 +946,20 @@ export default function SuperAdminPage() {
       setDeletingId(null);
     }
   }
+
+  const handleSetFeatured = async (courseId: string) => {
+    setSettingFeatured(courseId);
+    try {
+      await apiRequest(`/academy/superadmin/courses/${courseId}/featured`, {
+        method: "PATCH",
+      });
+      await loadCourses(statusFilter);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to set featured course.");
+    } finally {
+      setSettingFeatured(null);
+    }
+  };
 
   async function changePassword(e: FormEvent) {
     e.preventDefault();
@@ -1495,6 +1540,25 @@ export default function SuperAdminPage() {
                             >
                               <Eye size={14} /> Preview
                             </a>
+                            {course.status === "APPROVED" && (
+                              <button
+                                onClick={() => handleSetFeatured(course.id)}
+                                disabled={settingFeatured === course.id}
+                                title="Set as featured course"
+                                className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+                                  course.isFeatured
+                                    ? "border-[#F5C518] bg-[#F5C518] text-[#0A0A0A]"
+                                    : "border-white/15 text-white/60 hover:border-[#F5C518]/40 hover:text-[#F5C518]"
+                                }`}
+                              >
+                                {settingFeatured === course.id ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  <ShieldCheck size={14} />
+                                )}
+                                {course.isFeatured ? "Featured" : "Set Featured"}
+                              </button>
+                            )}
                             <button
                               onClick={() => openPricing(course)}
                               title="Set USD/NGN pricing and discount"
@@ -1543,6 +1607,28 @@ export default function SuperAdminPage() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {!coursesLoading && coursesTotalPages > 1 && (
+                <div className="mt-8 flex items-center justify-center gap-6 border-t border-white/10 pt-6 pb-20">
+                  <button
+                    disabled={coursesPage === 1}
+                    onClick={() => setCoursesPage(coursesPage - 1)}
+                    className="rounded-full border border-white/20 bg-white/5 px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-white/50">
+                    Page {coursesPage} of {coursesTotalPages}
+                  </span>
+                  <button
+                    disabled={coursesPage === coursesTotalPages}
+                    onClick={() => setCoursesPage(coursesPage + 1)}
+                    className="rounded-full border border-white/20 bg-white/5 px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
                 </div>
               )}
             </div>
@@ -1852,6 +1938,28 @@ export default function SuperAdminPage() {
                   );
                 })()
               )}
+
+              {!submissionsLoading && submissionsTotalPages > 1 && (
+                <div className="mt-8 flex items-center justify-center gap-6 border-t border-white/10 pt-6 pb-20">
+                  <button
+                    disabled={submissionsPage === 1}
+                    onClick={() => setSubmissionsPage(submissionsPage - 1)}
+                    className="rounded-full border border-white/20 bg-white/5 px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-white/50">
+                    Page {submissionsPage} of {submissionsTotalPages}
+                  </span>
+                  <button
+                    disabled={submissionsPage === submissionsTotalPages}
+                    onClick={() => setSubmissionsPage(submissionsPage + 1)}
+                    className="rounded-full border border-white/20 bg-white/5 px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1952,6 +2060,28 @@ export default function SuperAdminPage() {
                       </button>
                     );
                   })}
+                </div>
+              )}
+
+              {!learnersLoading && learnersTotalPages > 1 && (
+                <div className="mt-8 flex items-center justify-center gap-6 border-t border-white/10 pt-6 pb-20">
+                  <button
+                    disabled={learnersPage === 1}
+                    onClick={() => setLearnersPage(learnersPage - 1)}
+                    className="rounded-full border border-white/20 bg-white/5 px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-white/50">
+                    Page {learnersPage} of {learnersTotalPages}
+                  </span>
+                  <button
+                    disabled={learnersPage === learnersTotalPages}
+                    onClick={() => setLearnersPage(learnersPage + 1)}
+                    className="rounded-full border border-white/20 bg-white/5 px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
                 </div>
               )}
             </div>
@@ -2209,6 +2339,28 @@ export default function SuperAdminPage() {
                       );
                     })
                   )}
+                </div>
+              )}
+
+              {!usersLoading && usersTotalPages > 1 && (
+                <div className="mt-8 flex items-center justify-center gap-6 border-t border-white/10 pt-6 pb-20">
+                  <button
+                    disabled={usersPage === 1}
+                    onClick={() => setUsersPage(usersPage - 1)}
+                    className="rounded-full border border-white/20 bg-white/5 px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-white/50">
+                    Page {usersPage} of {usersTotalPages}
+                  </span>
+                  <button
+                    disabled={usersPage === usersTotalPages}
+                    onClick={() => setUsersPage(usersPage + 1)}
+                    className="rounded-full border border-white/20 bg-white/5 px-4 py-1.5 text-sm font-medium text-white hover:bg-white/10 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
                 </div>
               )}
             </div>

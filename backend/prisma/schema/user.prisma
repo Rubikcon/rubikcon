@@ -1,36 +1,35 @@
 // --- Auth & Users ---
 
-
 model User {
-  id                        String   @id @default(uuid())
-  email                     String   @unique
-  password                  String
-  name                      String?
-  role                      Role     @default(USER)
-  passwordResetToken        String?
-  passwordResetExpiresAt    DateTime?
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  id                     String    @id @default(uuid())
+  email                  String    @unique
+  password               String
+  name                   String?
+  role                   Role      @default(USER)
+  passwordResetToken     String?
+  passwordResetExpiresAt DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   // Relations
-  sessions     Session[]
-  progress     Progress[]
-  scores       Score[]
-  applications Application[]
-  gigs         Gig[]
-  savedTerms   SavedGlossaryTerm[]
-  readingItems ReadingProgress[]
-  quizAttempts QuizAttempt[]
-  quizRetakeAccess QuizRetakeUnlock[] @relation("QuizRetakeLearner")
-  quizRetakeUnlocksGranted QuizRetakeUnlock[] @relation("QuizRetakeAdmin")
-  assignmentSubmissions AssignmentSubmission[]
-  assignmentFeedbackGiven AssignmentFeedback[] @relation("AssignmentFeedbackReviewer")
-  weekProgress WeekProgress[]
-  coursesCreated  Course[]         @relation("CourseCreator")
-  courseApprovals CourseApproval[] @relation("CourseApprovalReviewer")
-  courseEnrollments CourseEnrollment[]
-  moduleFeedbacks ModuleFeedback[]
-  profile      UserProfile?
+  sessions                 Session[]
+  progress                 Progress[]
+  scores                   Score[]
+  applications             Application[]
+  gigs                     Gig[]
+  savedTerms               SavedGlossaryTerm[]
+  readingItems             ReadingProgress[]
+  quizAttempts             QuizAttempt[]
+  quizRetakeAccess         QuizRetakeUnlock[]     @relation("QuizRetakeLearner")
+  quizRetakeUnlocksGranted QuizRetakeUnlock[]     @relation("QuizRetakeAdmin")
+  assignmentSubmissions    AssignmentSubmission[]
+  assignmentFeedbackGiven  AssignmentFeedback[]   @relation("AssignmentFeedbackReviewer")
+  weekProgress             WeekProgress[]
+  coursesCreated           Course[]               @relation("CourseCreator")
+  courseApprovals          CourseApproval[]       @relation("CourseApprovalReviewer")
+  courseEnrollments        CourseEnrollment[]
+  moduleFeedbacks          ModuleFeedback[]
+  profile                  UserProfile?
 
   @@index([email])
   @@map("users")
@@ -42,9 +41,7 @@ enum Role {
   SUPER_ADMIN
 }
 
-
 // --- User Profile (onboarding data) ---
-
 
 model UserProfile {
   id                  String    @id @default(uuid())
@@ -65,4 +62,24 @@ model UserProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_profiles")
+}
+
+enum FacilitatorApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model FacilitatorApplication {
+  id          String                       @id @default(uuid())
+  name        String
+  email       String
+  linkedinUrl String
+  bio         String?
+  whyJoin     String?
+  status      FacilitatorApplicationStatus @default(PENDING)
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
+
+  @@map("facilitator_applications")
 }

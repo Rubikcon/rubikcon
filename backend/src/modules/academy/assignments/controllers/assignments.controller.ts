@@ -17,8 +17,10 @@ export class AssignmentsController {
 
   async getSubmissions(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await assignmentsService.getSubmissions(req.query.courseId as string, req.user!.userId, req.user!.email, req.user!.role)
-      return sendSuccess(res, result.submissions)
+      const page = parseInt(req.query.page as string, 10) || 1
+      const limit = parseInt(req.query.limit as string, 10) || 20
+      const result = await assignmentsService.getSubmissions(req.query.courseId as string, req.user!.userId, req.user!.email, req.user!.role, page, limit)
+      return sendSuccess(res, result)
     } catch (err) { next(err) }
   }
 

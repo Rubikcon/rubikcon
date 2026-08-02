@@ -24,6 +24,7 @@ export type AdminCourse = {
   status: CourseStatus
   published: boolean
   isPaid: boolean
+  isFeatured?: boolean
   contentUnit: string
   weekCount: number
   facilitators: FacilitatorSummary[]
@@ -60,6 +61,7 @@ export type AdminCourseDetail = {
   status: CourseStatus
   published: boolean
   isPaid: boolean
+  isFeatured?: boolean
   approvalNotes: string | null
   submittedAt: string | null
   approvedAt: string | null
@@ -183,6 +185,7 @@ export type CourseSummary = {
   enrolled: boolean
   // Pricing — null/0 means the course is free (or fees announced per intake).
   isPaid: boolean
+  isFeatured?: boolean
   priceUsd: number | null
   priceNgn: number | null
   discountPercent: number
