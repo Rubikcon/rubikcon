@@ -100,7 +100,7 @@ export class UserManagementRepository {
     })
   }
 
-  async findUsers(q?: string) {
+  async findUsers(q?: string, role?: string) {
     const where: any = {}
     if (q) {
       where.OR = [
@@ -108,9 +108,19 @@ export class UserManagementRepository {
         { email: { contains: q, mode: 'insensitive' } },
       ]
     }
+    if (role) {
+      where.role = role
+    }
     return prisma.user.findMany({
       where,
-      select: { id: true, name: true, email: true, role: true, createdAt: true },
+      select: { 
+        id: true, 
+        name: true, 
+        email: true, 
+        role: true, 
+        createdAt: true,
+        _count: { select: { courseEnrollments: true } } 
+      },
       orderBy: { createdAt: 'desc' },
     })
   }
@@ -129,6 +139,23 @@ export class UserManagementRepository {
 
   async delete(id: string) {
     return prisma.user.delete({ where: { id } })
+  }
+
+  async createFacilitatorApplication(data: any) {
+    return prisma.facilitatorApplication.create({ data })
+  }
+
+  async findFacilitatorApplications() {
+    return prisma.facilitatorApplication.findMany({
+      orderBy: { createdAt: 'desc' },
+    })
+  }
+
+  async updateFacilitatorApplicationStatus(id: string, status: any) {
+    return prisma.facilitatorApplication.update({
+      where: { id },
+      data: { status },
+    })
   }
 }
 

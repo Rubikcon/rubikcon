@@ -33,4 +33,8 @@ router.delete('/superadmin/users/:userId', requireAuth, requireSuperAdmin, userM
 router.get('/superadmin/learners', requireAuth, requireSuperAdmin, userManagementController.getLearners.bind(userManagementController))
 router.get('/superadmin/learners/:userId', requireAuth, requireSuperAdmin, userManagementController.getLearnerById.bind(userManagementController))
 
+router.post('/facilitator-applications', userManagementController.submitFacilitatorApplication.bind(userManagementController))
+router.get('/superadmin/facilitator-applications', requireAuth, requireSuperAdmin, userManagementController.getFacilitatorApplications.bind(userManagementController))
+router.patch('/superadmin/facilitator-applications/:id/status', requireAuth, requireSuperAdmin, userManagementController.updateFacilitatorApplicationStatus.bind(userManagementController))
+
 export const userManagementRoutes = router

@@ -1,0 +1,734 @@
+[
+  {
+    "method": "GET",
+    "route": "/weeks/:weekSlug/assignment",
+    "file": "assignments.routes.ts",
+    "line": 9
+  },
+  {
+    "method": "POST",
+    "route": "/assignments/:assignmentId/submissions",
+    "file": "assignments.routes.ts",
+    "line": 10
+  },
+  {
+    "method": "GET",
+    "route": "/admin/assignments/submissions",
+    "file": "assignments.routes.ts",
+    "line": 12
+  },
+  {
+    "method": "POST",
+    "route": "/admin/assignments/submissions/:submissionId/feedback",
+    "file": "assignments.routes.ts",
+    "line": 13
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/assignments/submissions/:submissionId/feedback/:feedbackId",
+    "file": "assignments.routes.ts",
+    "line": 14
+  },
+  {
+    "method": "POST",
+    "route": "/admin/courses/:courseId/weeks/:weekId/assignments",
+    "file": "assignments.routes.ts",
+    "line": 16
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/courses/:courseId/weeks/:weekId/assignments/:assignmentId",
+    "file": "assignments.routes.ts",
+    "line": 17
+  },
+  {
+    "method": "GET",
+    "route": "/testimonials",
+    "file": "course-catalog.routes.ts",
+    "line": 10
+  },
+  {
+    "method": "GET",
+    "route": "/facilitators",
+    "file": "course-catalog.routes.ts",
+    "line": 11
+  },
+  {
+    "method": "POST",
+    "route": "/contact",
+    "file": "course-catalog.routes.ts",
+    "line": 12
+  },
+  {
+    "method": "GET",
+    "route": "/public/stats",
+    "file": "course-catalog.routes.ts",
+    "line": 13
+  },
+  {
+    "method": "GET",
+    "route": "/public/courses/:courseSlug/weeks/:weekSlug/videos/:videoId",
+    "file": "course-catalog.routes.ts",
+    "line": 14
+  },
+  {
+    "method": "GET",
+    "route": "/courses/meta",
+    "file": "course-catalog.routes.ts",
+    "line": 17
+  },
+  {
+    "method": "GET",
+    "route": "/courses",
+    "file": "course-catalog.routes.ts",
+    "line": 18
+  },
+  {
+    "method": "GET",
+    "route": "/courses/:slug",
+    "file": "course-catalog.routes.ts",
+    "line": 19
+  },
+  {
+    "method": "GET",
+    "route": "/courses/:slug/weeks",
+    "file": "course-catalog.routes.ts",
+    "line": 20
+  },
+  {
+    "method": "POST",
+    "route": "/courses/:slug/enroll",
+    "file": "course-catalog.routes.ts",
+    "line": 21
+  },
+  {
+    "method": "POST",
+    "route": "/admin/courses/:courseId/modules",
+    "file": "course-catalog.routes.ts",
+    "line": 68
+  },
+  {
+    "method": "PATCH",
+    "route": "/admin/courses/:courseId/modules/:moduleId",
+    "file": "course-catalog.routes.ts",
+    "line": 69
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/courses/:courseId/modules/:moduleId",
+    "file": "course-catalog.routes.ts",
+    "line": 70
+  },
+  {
+    "method": "POST",
+    "route": "/admin/courses/:courseId/weeks",
+    "file": "course-catalog.routes.ts",
+    "line": 73
+  },
+  {
+    "method": "PATCH",
+    "route": "/admin/courses/:courseId/weeks/:weekId",
+    "file": "course-catalog.routes.ts",
+    "line": 74
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/courses/:courseId/weeks/:weekId",
+    "file": "course-catalog.routes.ts",
+    "line": 75
+  },
+  {
+    "method": "PATCH",
+    "route": "/admin/courses/:courseId/weeks/:weekId/module",
+    "file": "course-catalog.routes.ts",
+    "line": 76
+  },
+  {
+    "method": "POST",
+    "route": "/admin/courses/:courseId/modules/:moduleId/lessons",
+    "file": "course-catalog.routes.ts",
+    "line": 79
+  },
+  {
+    "method": "DELETE",
+    "route": "/lesson/:lessonId",
+    "file": "course-catalog.routes.ts",
+    "line": 80
+  },
+  {
+    "method": "POST",
+    "route": "/lessons/:lessonId/facilitators",
+    "file": "course-catalog.routes.ts",
+    "line": 83
+  },
+  {
+    "method": "DELETE",
+    "route": "/lessons/:lessonId/facilitators/:facilitatorId",
+    "file": "course-catalog.routes.ts",
+    "line": 84
+  },
+  {
+    "method": "PATCH",
+    "route": "/admin/courses/:courseId/weeks/:weekId/content",
+    "file": "course-catalog.routes.ts",
+    "line": 87
+  },
+  {
+    "method": "POST",
+    "route": "/admin/courses/:courseId/weeks/:weekId/images",
+    "file": "course-catalog.routes.ts",
+    "line": 90
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/courses/:courseId/weeks/:weekId/images/:imageId",
+    "file": "course-catalog.routes.ts",
+    "line": 91
+  },
+  {
+    "method": "POST",
+    "route": "/admin/courses/:courseId/weeks/:weekId/videos",
+    "file": "course-catalog.routes.ts",
+    "line": 94
+  },
+  {
+    "method": "PATCH",
+    "route": "/admin/courses/:courseId/weeks/:weekId/videos/order",
+    "file": "course-catalog.routes.ts",
+    "line": 95
+  },
+  {
+    "method": "PATCH",
+    "route": "/admin/courses/:courseId/weeks/:weekId/videos/:videoId",
+    "file": "course-catalog.routes.ts",
+    "line": 96
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/courses/:courseId/weeks/:weekId/videos/:videoId",
+    "file": "course-catalog.routes.ts",
+    "line": 97
+  },
+  {
+    "method": "POST",
+    "route": "/admin/courses/:courseId/weeks/:weekId/facilitators",
+    "file": "course-catalog.routes.ts",
+    "line": 100
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/courses/:courseId/weeks/:weekId/facilitators/:facilitatorId",
+    "file": "course-catalog.routes.ts",
+    "line": 101
+  },
+  {
+    "method": "POST",
+    "route": "/admin/courses/:courseId/weeks/:weekId/glossary",
+    "file": "course-catalog.routes.ts",
+    "line": 104
+  },
+  {
+    "method": "PATCH",
+    "route": "/admin/courses/:courseId/weeks/:weekId/glossary/:termId",
+    "file": "course-catalog.routes.ts",
+    "line": 105
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/courses/:courseId/weeks/:weekId/glossary/:termId",
+    "file": "course-catalog.routes.ts",
+    "line": 106
+  },
+  {
+    "method": "POST",
+    "route": "/admin/courses/:courseId/weeks/:weekId/resources",
+    "file": "course-catalog.routes.ts",
+    "line": 109
+  },
+  {
+    "method": "PATCH",
+    "route": "/admin/courses/:courseId/weeks/:weekId/resources/:resourceId",
+    "file": "course-catalog.routes.ts",
+    "line": 110
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/courses/:courseId/weeks/:weekId/resources/:resourceId",
+    "file": "course-catalog.routes.ts",
+    "line": 111
+  },
+  {
+    "method": "POST",
+    "route": "/admin/courses/:courseId/weeks/:weekId/slides",
+    "file": "course-catalog.routes.ts",
+    "line": 114
+  },
+  {
+    "method": "PATCH",
+    "route": "/admin/courses/:courseId/weeks/:weekId/slides/:slideId",
+    "file": "course-catalog.routes.ts",
+    "line": 115
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/courses/:courseId/weeks/:weekId/slides/:slideId",
+    "file": "course-catalog.routes.ts",
+    "line": 116
+  },
+  {
+    "method": "GET",
+    "route": "/superadmin/courses",
+    "file": "course-catalog.routes.ts",
+    "line": 119
+  },
+  {
+    "method": "GET",
+    "route": "/superadmin/courses/:courseId",
+    "file": "course-catalog.routes.ts",
+    "line": 120
+  },
+  {
+    "method": "POST",
+    "route": "/superadmin/courses/:courseId/approve",
+    "file": "course-catalog.routes.ts",
+    "line": 121
+  },
+  {
+    "method": "POST",
+    "route": "/superadmin/courses/:courseId/reject",
+    "file": "course-catalog.routes.ts",
+    "line": 122
+  },
+  {
+    "method": "DELETE",
+    "route": "/superadmin/courses/:courseId",
+    "file": "course-catalog.routes.ts",
+    "line": 123
+  },
+  {
+    "method": "GET",
+    "route": "/weeks/:weekSlug",
+    "file": "course-catalog.routes.ts",
+    "line": 126
+  },
+  {
+    "method": "POST",
+    "route": "/modules/:moduleId/feedback",
+    "file": "course-catalog.routes.ts",
+    "line": 127
+  },
+  {
+    "method": "GET",
+    "route": "/weeks/:weekSlug/resources",
+    "file": "course-catalog.routes.ts",
+    "line": 128
+  },
+  {
+    "method": "GET",
+    "route": "/course",
+    "file": "course-catalog.routes.ts",
+    "line": 129
+  },
+  {
+    "method": "GET",
+    "route": "/course/:slug",
+    "file": "course-catalog.routes.ts",
+    "line": 130
+  },
+  {
+    "method": "GET",
+    "route": "/lesson/:id",
+    "file": "course-catalog.routes.ts",
+    "line": 131
+  },
+  {
+    "method": "PATCH",
+    "route": "/lesson/:id",
+    "file": "course-catalog.routes.ts",
+    "line": 132
+  },
+  {
+    "method": "POST",
+    "route": "/lessons/:lessonId/videos",
+    "file": "course-catalog.routes.ts",
+    "line": 133
+  },
+  {
+    "method": "PUT",
+    "route": "/lesson-videos/:videoId",
+    "file": "course-catalog.routes.ts",
+    "line": 134
+  },
+  {
+    "method": "DELETE",
+    "route": "/lesson-videos/:videoId",
+    "file": "course-catalog.routes.ts",
+    "line": 135
+  },
+  {
+    "method": "GET",
+    "route": "/admin/testimonials",
+    "file": "course-catalog.routes.ts",
+    "line": 136
+  },
+  {
+    "method": "POST",
+    "route": "/admin/testimonials",
+    "file": "course-catalog.routes.ts",
+    "line": 137
+  },
+  {
+    "method": "PUT",
+    "route": "/admin/testimonials/:id",
+    "file": "course-catalog.routes.ts",
+    "line": 138
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/testimonials/:id",
+    "file": "course-catalog.routes.ts",
+    "line": 139
+  },
+  {
+    "method": "POST",
+    "route": "/admin/courses/:courseId/facilitators",
+    "file": "course-catalog.routes.ts",
+    "line": 140
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/courses/:courseId/facilitators/:facilitatorId",
+    "file": "course-catalog.routes.ts",
+    "line": 141
+  },
+  {
+    "method": "GET",
+    "route": "/progress",
+    "file": "progress.routes.ts",
+    "line": 10
+  },
+  {
+    "method": "POST",
+    "route": "/progress",
+    "file": "progress.routes.ts",
+    "line": 11
+  },
+  {
+    "method": "GET",
+    "route": "/legacy-progress",
+    "file": "progress.routes.ts",
+    "line": 12
+  },
+  {
+    "method": "POST",
+    "route": "/weeks/:weekSlug/complete",
+    "file": "progress.routes.ts",
+    "line": 13
+  },
+  {
+    "method": "POST",
+    "route": "/weeks/:weekSlug/rating",
+    "file": "progress.routes.ts",
+    "line": 14
+  },
+  {
+    "method": "POST",
+    "route": "/glossary/save",
+    "file": "progress.routes.ts",
+    "line": 15
+  },
+  {
+    "method": "DELETE",
+    "route": "/glossary/save/:termId",
+    "file": "progress.routes.ts",
+    "line": 16
+  },
+  {
+    "method": "POST",
+    "route": "/resources/:resourceId/mark-read",
+    "file": "progress.routes.ts",
+    "line": 17
+  },
+  {
+    "method": "GET",
+    "route": "/dashboard",
+    "file": "progress.routes.ts",
+    "line": 18
+  },
+  {
+    "method": "GET",
+    "route": "/admin/learners/progress",
+    "file": "progress.routes.ts",
+    "line": 21
+  },
+  {
+    "method": "POST",
+    "route": "/quizzes/:quizId/submit",
+    "file": "quizzes.routes.ts",
+    "line": 11
+  },
+  {
+    "method": "GET",
+    "route": "/quizzes/:quizId/attempt",
+    "file": "quizzes.routes.ts",
+    "line": 12
+  },
+  {
+    "method": "POST",
+    "route": "/admin/quizzes/:quizId/unlock-retake",
+    "file": "quizzes.routes.ts",
+    "line": 15
+  },
+  {
+    "method": "POST",
+    "route": "/admin/courses/:courseId/weeks/:weekId/quiz",
+    "file": "quizzes.routes.ts",
+    "line": 16
+  },
+  {
+    "method": "PATCH",
+    "route": "/admin/courses/:courseId/weeks/:weekId/quiz/settings",
+    "file": "quizzes.routes.ts",
+    "line": 17
+  },
+  {
+    "method": "POST",
+    "route": "/admin/courses/:courseId/weeks/:weekId/quiz/questions",
+    "file": "quizzes.routes.ts",
+    "line": 18
+  },
+  {
+    "method": "PATCH",
+    "route": "/admin/courses/:courseId/weeks/:weekId/quiz/questions/:questionId",
+    "file": "quizzes.routes.ts",
+    "line": 19
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/courses/:courseId/weeks/:weekId/quiz/questions/:questionId",
+    "file": "quizzes.routes.ts",
+    "line": 20
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/courses/:courseId/weeks/:weekId/quiz",
+    "file": "quizzes.routes.ts",
+    "line": 21
+  },
+  {
+    "method": "POST",
+    "route": "/signup",
+    "file": "auth.routes.ts",
+    "line": 10
+  },
+  {
+    "method": "POST",
+    "route": "/login",
+    "file": "auth.routes.ts",
+    "line": 13
+  },
+  {
+    "method": "GET",
+    "route": "/me",
+    "file": "auth.routes.ts",
+    "line": 16
+  },
+  {
+    "method": "POST",
+    "route": "/onboarding",
+    "file": "auth.routes.ts",
+    "line": 19
+  },
+  {
+    "method": "POST",
+    "route": "/forgot-password",
+    "file": "auth.routes.ts",
+    "line": 22
+  },
+  {
+    "method": "POST",
+    "route": "/superadmin/users/:userId/reset-password",
+    "file": "auth.routes.ts",
+    "line": 25
+  },
+  {
+    "method": "POST",
+    "route": "/confirm-reset-password",
+    "file": "auth.routes.ts",
+    "line": 28
+  },
+  {
+    "method": "POST",
+    "route": "/change-password",
+    "file": "auth.routes.ts",
+    "line": 31
+  },
+  {
+    "method": "POST",
+    "route": "/logout",
+    "file": "auth.routes.ts",
+    "line": 34
+  },
+  {
+    "method": "POST",
+    "route": "/logout-all",
+    "file": "auth.routes.ts",
+    "line": 37
+  },
+  {
+    "method": "POST",
+    "route": "/session/start",
+    "file": "games.routes.ts",
+    "line": 10
+  },
+  {
+    "method": "GET",
+    "route": "/session/:id",
+    "file": "games.routes.ts",
+    "line": 13
+  },
+  {
+    "method": "POST",
+    "route": "/score",
+    "file": "games.routes.ts",
+    "line": 16
+  },
+  {
+    "method": "GET",
+    "route": "/leaderboard/:gameId",
+    "file": "games.routes.ts",
+    "line": 19
+  },
+  {
+    "method": "GET",
+    "route": "/leaderboard",
+    "file": "games.routes.ts",
+    "line": 22
+  },
+  {
+    "method": "GET",
+    "route": "/",
+    "file": "gigs.routes.ts",
+    "line": 8
+  },
+  {
+    "method": "GET",
+    "route": "/:id",
+    "file": "gigs.routes.ts",
+    "line": 10
+  },
+  {
+    "method": "POST",
+    "route": "/",
+    "file": "gigs.routes.ts",
+    "line": 12
+  },
+  {
+    "method": "POST",
+    "route": "/apply",
+    "file": "gigs.routes.ts",
+    "line": 14
+  },
+  {
+    "method": "GET",
+    "route": "/:id/applications",
+    "file": "gigs.routes.ts",
+    "line": 16
+  },
+  {
+    "method": "GET",
+    "route": "/admin/stats",
+    "file": "platform.routes.ts",
+    "line": 10
+  },
+  {
+    "method": "GET",
+    "route": "/admin/learners",
+    "file": "user-management.routes.ts",
+    "line": 9
+  },
+  {
+    "method": "GET",
+    "route": "/admin/learners/:userId",
+    "file": "user-management.routes.ts",
+    "line": 10
+  },
+  {
+    "method": "GET",
+    "route": "/admin/facilitators",
+    "file": "user-management.routes.ts",
+    "line": 12
+  },
+  {
+    "method": "POST",
+    "route": "/admin/facilitators",
+    "file": "user-management.routes.ts",
+    "line": 13
+  },
+  {
+    "method": "PUT",
+    "route": "/admin/facilitators/:id",
+    "file": "user-management.routes.ts",
+    "line": 14
+  },
+  {
+    "method": "DELETE",
+    "route": "/admin/facilitators/:id",
+    "file": "user-management.routes.ts",
+    "line": 15
+  },
+  {
+    "method": "GET",
+    "route": "/admin/facilitators/me",
+    "file": "user-management.routes.ts",
+    "line": 17
+  },
+  {
+    "method": "PATCH",
+    "route": "/admin/facilitators/me",
+    "file": "user-management.routes.ts",
+    "line": 18
+  },
+  {
+    "method": "GET",
+    "route": "/admin/admin-users",
+    "file": "user-management.routes.ts",
+    "line": 20
+  },
+  {
+    "method": "GET",
+    "route": "/superadmin/users",
+    "file": "user-management.routes.ts",
+    "line": 22
+  },
+  {
+    "method": "GET",
+    "route": "/superadmin/overview",
+    "file": "user-management.routes.ts",
+    "line": 23
+  },
+  {
+    "method": "PATCH",
+    "route": "/superadmin/users/:userId/role",
+    "file": "user-management.routes.ts",
+    "line": 30
+  },
+  {
+    "method": "DELETE",
+    "route": "/superadmin/users/:userId",
+    "file": "user-management.routes.ts",
+    "line": 31
+  },
+  {
+    "method": "GET",
+    "route": "/superadmin/learners",
+    "file": "user-management.routes.ts",
+    "line": 33
+  },
+  {
+    "method": "GET",
+    "route": "/superadmin/learners/:userId",
+    "file": "user-management.routes.ts",
+    "line": 34
+  }
+]

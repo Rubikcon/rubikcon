@@ -120,6 +120,7 @@ router.get('/superadmin/courses', requireAuth, requireSuperAdmin, courseCatalogC
 router.get('/superadmin/courses/:courseId', requireAuth, requireSuperAdmin, courseCatalogController.getCourseDetailsAdmin.bind(courseCatalogController))
 router.post('/superadmin/courses/:courseId/approve', requireAuth, requireSuperAdmin, courseCatalogController.approveCourse.bind(courseCatalogController))
 router.post('/superadmin/courses/:courseId/reject', requireAuth, requireSuperAdmin, courseCatalogController.rejectCourse.bind(courseCatalogController))
+router.patch('/superadmin/courses/:courseId/featured', requireAuth, requireSuperAdmin, courseCatalogController.setFeaturedCourse.bind(courseCatalogController))
 router.delete('/superadmin/courses/:courseId', requireAuth, requireSuperAdmin, courseCatalogController.deleteCourse.bind(courseCatalogController))
 
 export const courseCatalogRoutes = router

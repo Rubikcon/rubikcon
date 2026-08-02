@@ -1,6 +1,5 @@
 // --- Testimonials ---
 
-
 model Testimonial {
   id        String   @id @default(uuid())
   name      String

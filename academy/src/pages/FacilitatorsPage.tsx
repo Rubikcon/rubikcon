@@ -278,9 +278,30 @@ export default function FacilitatorsPage() {
             Contact Us →
           </a>
         </motion.div>
+
+        {/* Apply to teach */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mt-8 rounded-3xl border border-white/10 bg-white/[0.03] p-8 sm:p-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-8"
+        >
+          <div>
+            <h3 className="font-display font-extrabold text-white text-2xl md:text-3xl mb-4 max-w-xl">You have spent years learning this. Get paid to pass it on.</h3>
+            <p className="text-white/60 text-[15px] leading-relaxed max-w-xl">
+              Applications are reviewed weekly. The next facilitator cohort starts as soon as you do.
+            </p>
+          </div>
+          <a
+            href="/facilitator/apply"
+            className="shrink-0 inline-flex items-center justify-center bg-white text-[#0A0A0A] font-bold px-8 py-4 rounded-full hover:bg-white/90 transition-colors text-base whitespace-nowrap shadow-lg"
+          >
+            Apply to teach
+          </a>
+        </motion.div>
       </main>
+
       <AcademyFooter />
     </div>
   )
 }
-

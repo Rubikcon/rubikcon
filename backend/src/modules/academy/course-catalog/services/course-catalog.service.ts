@@ -705,8 +705,20 @@ export class CourseCatalogService {
   }
 
   // --- SuperAdmin ---
-  async getCoursesAdmin(status?: any) {
-    return courseCatalogRepository.findCoursesAdmin(status)
+  async getCoursesAdmin(status?: any, page = 1, limit = 10) {
+    const skip = (page - 1) * limit
+    const result = await courseCatalogRepository.findCoursesAdmin(status, skip, limit)
+    return {
+      courses: result.courses,
+      pagination: {
+        total: result.total,
+        page,
+        limit,
+        totalPages: Math.ceil(result.total / limit),
+        hasNext: skip + limit < result.total,
+        hasPrev: page > 1,
+      }
+    }
   }
 
   async getCourseDetailsAdmin(courseId: string) {

@@ -35,3 +35,17 @@ export const UpdateFacilitatorSchema = z.object({
 })
 
 export type UpdateFacilitatorDto = z.infer<typeof UpdateFacilitatorSchema>
+
+export const SubmitFacilitatorApplicationSchema = z.object({
+  name: z.string().trim().min(2).max(100),
+  email: z.string().trim().email().toLowerCase().max(255),
+  linkedinUrl: z.string().url().max(255),
+  bio: z.string().trim().max(1000).optional(),
+  whyJoin: z.string().trim().max(1000).optional(),
+})
+export type SubmitFacilitatorApplicationDto = z.infer<typeof SubmitFacilitatorApplicationSchema>
+
+export const UpdateFacilitatorApplicationStatusSchema = z.object({
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED']),
+})
+export type UpdateFacilitatorApplicationStatusDto = z.infer<typeof UpdateFacilitatorApplicationStatusSchema>

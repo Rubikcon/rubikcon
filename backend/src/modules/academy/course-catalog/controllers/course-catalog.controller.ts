@@ -488,8 +488,10 @@ export class CourseCatalogController {
   async getCoursesAdmin(req: Request, res: Response, next: NextFunction) {
     try {
       const status = req.query.status as any
-      const courses = await courseCatalogService.getCoursesAdmin(status)
-      return sendSuccess(res, courses)
+      const page = parseInt(req.query.page as string, 10) || 1
+      const limit = parseInt(req.query.limit as string, 10) || 10
+      const result = await courseCatalogService.getCoursesAdmin(status, page, limit)
+      return sendSuccess(res, result)
     } catch (err) { next(err) }
   }
 

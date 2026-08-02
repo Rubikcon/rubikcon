@@ -461,24 +461,31 @@ export class CourseCatalogRepository {
   }
 
   // --- SuperAdmin ---
-  async findCoursesAdmin(status?: CourseStatus) {
-    return prisma.course.findMany({
-      where: status ? { status } : {},
-      orderBy: { updatedAt: 'desc' },
-      include: {
-        _count: { select: { weeks: true } },
-        courseFacilitators: {
-          include: { facilitator: { select: { id: true, name: true, title: true, photoUrl: true } } },
-          orderBy: { position: 'asc' },
+  async findCoursesAdmin(status?: CourseStatus, skip = 0, limit = 10) {
+    const where = status ? { status } : {}
+    const [courses, total] = await Promise.all([
+      prisma.course.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          _count: { select: { weeks: true } },
+          courseFacilitators: {
+            include: { facilitator: { select: { id: true, name: true, title: true, photoUrl: true } } },
+            orderBy: { position: 'asc' },
+          },
+          createdBy: { select: { id: true, name: true, email: true } },
+          approvals: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            include: { reviewer: { select: { id: true, name: true } } },
+          },
         },
-        createdBy: { select: { id: true, name: true, email: true } },
-        approvals: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          include: { reviewer: { select: { id: true, name: true } } },
-        },
-      },
-    })
+      }),
+      prisma.course.count({ where }),
+    ])
+    return { courses, total }
   }
 
   async findCourseDetailsAdmin(courseId: string) {

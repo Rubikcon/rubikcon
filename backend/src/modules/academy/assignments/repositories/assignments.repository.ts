@@ -43,9 +43,10 @@ export class AssignmentsRepository {
     })
   }
 
-  async findSubmissionsByCourse(courseId: string) {
+  async findSubmissionsByCourse(courseId?: string) {
+    const whereClause = courseId ? { assignment: { week: { courseId } } } : {}
     return prisma.assignmentSubmission.findMany({
-      where: { assignment: { week: { courseId } } },
+      where: whereClause,
       orderBy: { submittedAt: 'desc' },
       include: {
         user: { select: { id: true, name: true, email: true } },

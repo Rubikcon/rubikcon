@@ -100,8 +100,8 @@ export class UserManagementService {
     return { admins }
   }
 
-  async getUsers(q?: string) {
-    const users = await userManagementRepository.findUsers(q)
+  async getUsers(q?: string, role?: string) {
+    const users = await userManagementRepository.findUsers(q, role)
     return { users }
   }
 
@@ -134,6 +134,21 @@ export class UserManagementService {
 
     await userManagementRepository.delete(userId)
     return { success: true }
+  }
+
+  async submitFacilitatorApplication(data: any) {
+    const application = await userManagementRepository.createFacilitatorApplication(data)
+    return { application }
+  }
+
+  async getFacilitatorApplications() {
+    const applications = await userManagementRepository.findFacilitatorApplications()
+    return { applications }
+  }
+
+  async updateFacilitatorApplicationStatus(id: string, status: string) {
+    const application = await userManagementRepository.updateFacilitatorApplicationStatus(id, status)
+    return { application }
   }
 }
 
