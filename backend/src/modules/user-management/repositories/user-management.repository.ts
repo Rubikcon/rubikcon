@@ -2,7 +2,7 @@ import { Role } from '@prisma/client'
 import prisma from '../../../infrastructure/prisma/client'
 
 export class UserManagementRepository {
-  async findLearners(q?: string) {
+  async findLearners(q?: string, skip = 0, limit = 20) {
     const where: any = { role: 'USER' }
     if (q) {
       where.OR = [
@@ -10,11 +10,17 @@ export class UserManagementRepository {
         { email: { contains: q, mode: 'insensitive' } },
       ]
     }
-    return prisma.user.findMany({
-      where,
-      select: { id: true, name: true, email: true, createdAt: true },
-      orderBy: { createdAt: 'desc' },
-    })
+    const [learners, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: { id: true, name: true, email: true, createdAt: true },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.user.count({ where })
+    ])
+    return { learners, total }
   }
 
   async findLearnerById(userId: string) {
@@ -100,7 +106,7 @@ export class UserManagementRepository {
     })
   }
 
-  async findUsers(q?: string, role?: string) {
+  async findUsers(q?: string, role?: string, skip = 0, limit = 20) {
     const where: any = {}
     if (q) {
       where.OR = [
@@ -111,18 +117,24 @@ export class UserManagementRepository {
     if (role) {
       where.role = role
     }
-    return prisma.user.findMany({
-      where,
-      select: { 
-        id: true, 
-        name: true, 
-        email: true, 
-        role: true, 
-        createdAt: true,
-        _count: { select: { courseEnrollments: true } } 
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: { 
+          id: true, 
+          name: true, 
+          email: true, 
+          role: true, 
+          createdAt: true,
+          _count: { select: { courseEnrollments: true } } 
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.user.count({ where })
+    ])
+    return { users, total }
   }
 
   async findById(id: string) {

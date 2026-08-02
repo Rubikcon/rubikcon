@@ -2,9 +2,18 @@ import { NotFoundError, ValidationError } from '../../../shared/errors/AppError'
 import { userManagementRepository } from '../repositories/user-management.repository'
 
 export class UserManagementService {
-  async getLearners(q?: string) {
-    const learners = await userManagementRepository.findLearners(q)
-    return { learners }
+  async getLearners(q?: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit
+    const { learners, total } = await userManagementRepository.findLearners(q, skip, limit)
+    return { 
+      learners, 
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      } 
+    }
   }
 
   async getLearnerById(userId: string) {
@@ -100,9 +109,18 @@ export class UserManagementService {
     return { admins }
   }
 
-  async getUsers(q?: string, role?: string) {
-    const users = await userManagementRepository.findUsers(q, role)
-    return { users }
+  async getUsers(q?: string, role?: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit
+    const { users, total } = await userManagementRepository.findUsers(q, role, skip, limit)
+    return {
+      users,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      }
+    }
   }
 
   private async checkLastSuperAdminGuard(errorMessage: string) {

@@ -43,23 +43,29 @@ export class AssignmentsRepository {
     })
   }
 
-  async findSubmissionsByCourse(courseId?: string) {
+  async findSubmissionsByCourse(courseId?: string, skip = 0, limit = 20) {
     const whereClause = courseId ? { assignment: { week: { courseId } } } : {}
-    return prisma.assignmentSubmission.findMany({
-      where: whereClause,
-      orderBy: { submittedAt: 'desc' },
-      include: {
-        user: { select: { id: true, name: true, email: true } },
-        assignment: {
-          include: { week: { select: { id: true, title: true, slug: true } } },
+    const [submissions, total] = await Promise.all([
+      prisma.assignmentSubmission.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: { submittedAt: 'desc' },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+          assignment: {
+            include: { week: { select: { id: true, title: true, slug: true } } },
+          },
+          choice: true,
+          feedback: {
+            orderBy: { createdAt: 'desc' },
+            include: { reviewer: { select: { name: true } } },
+          },
         },
-        choice: true,
-        feedback: {
-          orderBy: { createdAt: 'desc' },
-          include: { reviewer: { select: { name: true } } },
-        },
-      },
-    })
+      }),
+      prisma.assignmentSubmission.count({ where: whereClause })
+    ])
+    return { submissions, total }
   }
 
   async findSubmissionById(id: string) {

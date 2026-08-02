@@ -102,7 +102,7 @@ export class AssignmentsService {
     }
   }
 
-  async getSubmissions(courseId: string | undefined, userId: string, email: string, role: string) {
+  async getSubmissions(courseId: string | undefined, userId: string, email: string, role: string, page = 1, limit = 20) {
     if (courseId) {
       const access = await assignmentsRepository.findCourseForAdmin(courseId, userId, email, role)
       if (!access) throw new NotFoundError('Course not found or access denied.')
@@ -110,8 +110,17 @@ export class AssignmentsService {
       throw new ForbiddenError('Super Admin role required to fetch all submissions.')
     }
 
-    const submissions = await assignmentsRepository.findSubmissionsByCourse(courseId)
-    return { submissions }
+    const skip = (page - 1) * limit
+    const { submissions, total } = await assignmentsRepository.findSubmissionsByCourse(courseId, skip, limit)
+    return { 
+      submissions,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    }
   }
 
   async provideFeedback(submissionId: string, adminId: string, feedbackText: string, rating?: number) {

@@ -7,8 +7,10 @@ export class UserManagementController {
   async getLearners(req: Request, res: Response, next: NextFunction) {
     try {
       const q = req.query.q as string | undefined
-      const result = await userManagementService.getLearners(q)
-      return sendSuccess(res, { learners: result.learners, total: result.learners.length, pages: 1 })
+      const page = parseInt(req.query.page as string, 10) || 1
+      const limit = parseInt(req.query.limit as string, 10) || 20
+      const result = await userManagementService.getLearners(q, page, limit)
+      return sendSuccess(res, result)
     } catch (err) { next(err) }
   }
 
@@ -78,8 +80,10 @@ export class UserManagementController {
     try {
       const q = req.query.q as string | undefined
       const role = req.query.role as string | undefined
-      const result = await userManagementService.getUsers(q, role)
-      return sendSuccess(res, { users: result.users, total: result.users.length, pages: 1 })
+      const page = parseInt(req.query.page as string, 10) || 1
+      const limit = parseInt(req.query.limit as string, 10) || 20
+      const result = await userManagementService.getUsers(q, role, page, limit)
+      return sendSuccess(res, result)
     } catch (err) { next(err) }
   }
 

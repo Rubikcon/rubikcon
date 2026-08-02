@@ -472,7 +472,7 @@ export default function LessonPage() {
             {activeVideo && (
               <button
                 onClick={() => copyShareLink(activeVideo.id)}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 transition-colors"
                 title="Copy share link"
               >
                 {linkCopied ? (
