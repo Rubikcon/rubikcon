@@ -11,7 +11,7 @@ import { apiRequest } from "../lib/api";
 
 // Set this to the real course-preview video URL (YouTube / Vimeo / Loom / Drive)
 // when supplied - the placeholder frame renders until then.
-const COURSE_PREVIEW_VIDEO_URL = "https://youtu.be/zfpYDYKAckw";
+const COURSE_PREVIEW_VIDEO_URL = "https://drive.google.com/file/d/1hOmYZoO3DhS57_LPnSrUCTER4rqzMwlu/view?usp=sharing";
 
 // Audience photos: drop real images at /public/images/audience/<slug>.jpg and
 // they replace the generated SVG placeholders automatically (same for learner
@@ -26,6 +26,7 @@ type PublicCourse = {
   estimatedDuration: string | null;
   heroImage: string | null;
   weekCount: number;
+  isFeatured: boolean;
   facilitators: Array<{
     id: string;
     name: string;
@@ -413,6 +414,7 @@ export default function LandingPage() {
                   <VideoEmbed
                     url={COURSE_PREVIEW_VIDEO_URL}
                     title="Rubikcon Nexus Academy - course preview"
+                    poster="/images/free_preview.jpg"
                   />
                 </div>
               ) : (
@@ -479,7 +481,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
               <h2 className="font-display text-4xl md:text-6xl font-extrabold text-[#1C1C1C] leading-none">
-                All courses
+                Featured courses
               </h2>
               <p className="text-[#1C1C1C]/60 text-sm max-w-sm leading-relaxed md:text-right">
                 From fundamentals to mainnet launches. Mix and match, learn at
@@ -490,7 +492,7 @@ export default function LandingPage() {
 
           {dynamicCourses.length > 0 ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-              {dynamicCourses.slice(0, 3).map((course, i) => {
+              {[...dynamicCourses].sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0)).slice(0, 3).map((course, i) => {
                 const level = (course.level ?? "").split(" ")[0].toUpperCase();
                 const levelClass =
                   LEVEL_COLORS[level] || "bg-[#E8E0D0] text-[#1C1C1C]";

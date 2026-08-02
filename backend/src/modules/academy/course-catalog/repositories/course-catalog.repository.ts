@@ -97,9 +97,12 @@ export class CourseCatalogRepository {
           tagline: true,
           level: true,
           isPaid: true,
+          isFeatured: true,
           priceUsd: true,
           priceNgn: true,
           discountPercent: true,
+          status: true,
+          published: true,
           estimatedDuration: true,
           phaseLabel: true,
           heroImage: true,
@@ -115,7 +118,7 @@ export class CourseCatalogRepository {
           },
           enrollments: userId
             ? { where: { userId }, select: { id: true } }
-            : false,
+            : undefined,
         },
         orderBy: { createdAt: 'desc' },
         take: limit,
@@ -229,6 +232,7 @@ export class CourseCatalogRepository {
           status: true,
           published: true,
           isPaid: true,
+          isFeatured: true,
           contentUnit: true,
           approvalNotes: true,
           submittedAt: true,
@@ -295,6 +299,18 @@ export class CourseCatalogRepository {
     return prisma.course.update({
       where: { id: courseId },
       data,
+    })
+  }
+
+  async setFeaturedCourse(courseId: string) {
+    return prisma.$transaction(async (tx) => {
+      await tx.course.updateMany({
+        data: { isFeatured: false },
+      })
+      return tx.course.update({
+        where: { id: courseId },
+        data: { isFeatured: true },
+      })
     })
   }
 

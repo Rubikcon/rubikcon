@@ -188,6 +188,15 @@ export class CourseCatalogController {
     }
   }
 
+  async setFeaturedCourse(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await courseCatalogService.setFeaturedCourse(req.params.courseId, req.user!.role)
+      return sendSuccess(res, result, 'Featured course updated.')
+    } catch (err) {
+      next(err)
+    }
+  }
+
   async deleteCourse(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await courseCatalogService.deleteCourse(req.params.courseId, req.user!.userId, req.user!.role)

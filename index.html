@@ -1,0 +1,1394 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Become a Facilitator | Rubikcon Nexus Academy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400;12..96,75..100,600;12..96,75..100,800&family=Public+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #0b0b0b;
+        --ink-soft: #1c1c1c;
+        --yellow: #ffd200;
+        --yellow-deep: #e6bd00;
+        --paper: #fbfaf6;
+        --grey: #6b6b6b;
+        --line: rgba(11, 11, 11, 0.14);
+        --display: "Bricolage Grotesque", system-ui, sans-serif;
+        --body: "Public Sans", system-ui, sans-serif;
+        --mono: "Space Mono", ui-monospace, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--body);
+        font-size: 17px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 1160px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: var(--display);
+        font-weight: 800;
+        line-height: 0.98;
+        letter-spacing: -0.03em;
+        margin: 0;
+      }
+      p {
+        margin: 0 0 1rem;
+      }
+      a {
+        color: inherit;
+      }
+
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 12px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--grey);
+        margin: 0 0 18px;
+      }
+      .eyebrow.on-dark {
+        color: var(--yellow);
+      }
+
+      /* ---------- nav ---------- */
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: var(--ink);
+        color: #fff;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      .nav-in {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 64px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .mark {
+        width: 30px;
+        height: 30px;
+        background: var(--yellow);
+        color: var(--ink);
+        display: grid;
+        place-items: center;
+        font-family: var(--display);
+        font-weight: 800;
+      }
+      .nav-links {
+        display: flex;
+        gap: 26px;
+        align-items: center;
+        font-size: 14px;
+      }
+      .nav-links a {
+        text-decoration: none;
+        opacity: 0.8;
+      }
+      .nav-links a:hover {
+        opacity: 1;
+      }
+      @media (max-width: 760px) {
+        .nav-links a:not(.btn-sm) {
+          display: none;
+        }
+      }
+      .btn-sm {
+        background: var(--yellow);
+        color: var(--ink) !important;
+        opacity: 1 !important;
+        padding: 9px 16px;
+        font-weight: 700;
+        font-size: 14px;
+      }
+
+      /* ---------- hero ---------- */
+      .hero {
+        background: var(--ink);
+        color: #fff;
+        padding: 84px 0 0;
+        overflow: hidden;
+      }
+      .hero h1 {
+        font-size: clamp(44px, 8.4vw, 104px);
+        font-variation-settings: "wdth" 88;
+      }
+      .hero h1 .hl {
+        background: var(--yellow);
+        color: var(--ink);
+        padding: 0 0.12em;
+        display: inline-block;
+      }
+      .hero-lede {
+        max-width: 560px;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 19px;
+        margin-top: 26px;
+      }
+      .hero-grid {
+        display: grid;
+        grid-template-columns: 1.35fr 0.65fr;
+        gap: 48px;
+        align-items: end;
+      }
+      @media (max-width: 900px) {
+        .hero-grid {
+          grid-template-columns: 1fr;
+          gap: 32px;
+        }
+      }
+      .hero-cta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 34px;
+      }
+      .btn {
+        display: inline-block;
+        padding: 16px 28px;
+        font-weight: 700;
+        text-decoration: none;
+        border: 2px solid var(--yellow);
+        font-size: 16px;
+      }
+      .btn-solid {
+        background: var(--yellow);
+        color: var(--ink);
+      }
+      .btn-solid:hover {
+        background: var(--yellow-deep);
+        border-color: var(--yellow-deep);
+      }
+      .btn-ghost {
+        color: var(--yellow);
+      }
+      .btn-ghost:hover {
+        background: var(--yellow);
+        color: var(--ink);
+      }
+
+      /* payoff card */
+      .payoff {
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 26px;
+      }
+      .payoff dt {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--yellow);
+      }
+      .payoff dd {
+        margin: 6px 0 22px;
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 20px;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+      }
+      .payoff dd:last-child {
+        margin-bottom: 0;
+      }
+
+      /* ticker */
+      .ticker {
+        margin-top: 72px;
+        border-top: 1px solid rgba(255, 255, 255, 0.16);
+        background: var(--yellow);
+        color: var(--ink);
+        overflow: hidden;
+      }
+      .ticker-track {
+        display: flex;
+        gap: 44px;
+        white-space: nowrap;
+        padding: 12px 0;
+        font-family: var(--mono);
+        font-size: 12px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        animation: slide 34s linear infinite;
+      }
+      .ticker-track span {
+        display: flex;
+        gap: 44px;
+      }
+      @keyframes slide {
+        to {
+          transform: translateX(-50%);
+        }
+      }
+      /* ---------- sections ---------- */
+      section {
+        padding: 96px 0;
+      }
+      .head {
+        max-width: 720px;
+        margin-bottom: 52px;
+      }
+      .head h2 {
+        font-size: clamp(32px, 4.6vw, 54px);
+      }
+      .head p {
+        color: var(--grey);
+        margin-top: 18px;
+        font-size: 18px;
+      }
+
+      /* pillars */
+      .pillars {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0;
+        border-top: 2px solid var(--ink);
+      }
+      @media (max-width: 860px) {
+        .pillars {
+          grid-template-columns: 1fr;
+        }
+      }
+      .pillar {
+        padding: 36px 28px 40px;
+        border-bottom: 2px solid var(--ink);
+        border-right: 1px solid var(--line);
+      }
+      .pillar:last-child {
+        border-right: none;
+      }
+      .pillar .num {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--yellow-deep);
+        letter-spacing: 0.16em;
+      }
+      .pillar h3 {
+        font-size: 26px;
+        margin: 14px 0 12px;
+      }
+      .pillar p {
+        color: var(--grey);
+        margin: 0;
+        font-size: 16px;
+      }
+
+      /* facilitators */
+      .fac-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+      }
+      @media (max-width: 860px) {
+        .fac-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .fac {
+        background: #fff;
+        border: 1px solid var(--line);
+        padding: 30px;
+      }
+      .fac-top {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+      .avatar {
+        width: 56px;
+        height: 56px;
+        flex: 0 0 56px;
+        background: var(--ink);
+        color: var(--yellow);
+        display: grid;
+        place-items: center;
+        font-family: var(--display);
+        font-weight: 800;
+        font-size: 19px;
+      }
+      .fac h3 {
+        font-size: 22px;
+      }
+      .fac .role {
+        font-size: 14px;
+        color: var(--grey);
+        margin-top: 4px;
+      }
+      .fac p {
+        font-size: 16px;
+        color: var(--ink-soft);
+      }
+      .teaching {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--grey);
+        margin: 22px 0 10px;
+      }
+      .course {
+        display: block;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 15px;
+        padding: 10px 0;
+        border-top: 1px solid var(--line);
+      }
+      .course:hover {
+        color: var(--yellow-deep);
+      }
+      .course::after {
+        content: " \2197";
+        color: var(--yellow-deep);
+      }
+      .linkedin {
+        display: inline-block;
+        margin-top: 20px;
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        text-decoration: none;
+        border-bottom: 2px solid var(--yellow);
+      }
+
+      /* ---------- 14 day path (signature) ---------- */
+      .path {
+        background: var(--ink);
+        color: #fff;
+      }
+      .path .head p {
+        color: rgba(255, 255, 255, 0.65);
+      }
+      .rail {
+        position: relative;
+        margin-top: 20px;
+      }
+      .rail::before {
+        content: "";
+        position: absolute;
+        left: 70px;
+        top: 8px;
+        bottom: 8px;
+        width: 2px;
+        background: rgba(255, 255, 255, 0.18);
+      }
+      @media (max-width: 700px) {
+        .rail::before {
+          left: 10px;
+        }
+      }
+      .step {
+        position: relative;
+        display: grid;
+        grid-template-columns: 70px 1fr;
+        gap: 38px;
+        padding: 22px 0;
+        opacity: 0;
+        transform: translateY(14px);
+        transition:
+          opacity 0.5s ease,
+          transform 0.5s ease;
+      }
+      .step.in {
+        opacity: 1;
+        transform: none;
+      }
+      @media (max-width: 700px) {
+        .step {
+          grid-template-columns: 1fr;
+          gap: 8px;
+          padding-left: 38px;
+        }
+      }
+      .day {
+        font-family: var(--mono);
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        color: var(--yellow);
+        text-align: right;
+        padding-top: 5px;
+      }
+      @media (max-width: 700px) {
+        .day {
+          text-align: left;
+        }
+      }
+      .step-body {
+        position: relative;
+      }
+      .step-body::before {
+        content: "";
+        position: absolute;
+        left: -45px;
+        top: 9px;
+        width: 12px;
+        height: 12px;
+        background: var(--yellow);
+      }
+      @media (max-width: 700px) {
+        .step-body::before {
+          left: -33px;
+        }
+      }
+      .step h3 {
+        font-size: 24px;
+        margin-bottom: 8px;
+      }
+      .step p {
+        color: rgba(255, 255, 255, 0.66);
+        margin: 0;
+        max-width: 620px;
+        font-size: 16px;
+      }
+      .step.final .step-body::before {
+        width: 12px;
+        height: 12px;
+        background: #fff;
+      }
+
+      /* ---------- form checklist ---------- */
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 64px;
+        align-items: start;
+      }
+      @media (max-width: 900px) {
+        .split {
+          grid-template-columns: 1fr;
+          gap: 44px;
+        }
+      }
+      .checklist {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        border-top: 1px solid var(--line);
+      }
+      .checklist li {
+        padding: 13px 0 13px 34px;
+        border-bottom: 1px solid var(--line);
+        position: relative;
+        font-size: 16px;
+      }
+      .checklist li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 20px;
+        width: 16px;
+        height: 2px;
+        background: var(--yellow-deep);
+      }
+      .checklist .opt {
+        color: var(--grey);
+        font-size: 13px;
+      }
+      /* form */
+      .form-card {
+        background: var(--ink);
+        color: #fff;
+        padding: 36px;
+      }
+      .form-card h3 {
+        font-size: 28px;
+        margin-bottom: 10px;
+      }
+      .form-card > p {
+        color: rgba(255, 255, 255, 0.65);
+        font-size: 15px;
+      }
+      .field {
+        margin-top: 18px;
+      }
+      .field label {
+        display: block;
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--yellow);
+        margin-bottom: 7px;
+      }
+      .field input,
+      .field select,
+      .field textarea {
+        width: 100%;
+        padding: 12px 14px;
+        background: transparent;
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        font-family: var(--body);
+        font-size: 16px;
+      }
+      .field textarea {
+        min-height: 88px;
+        resize: vertical;
+      }
+      .field input:focus,
+      .field select:focus,
+      .field textarea:focus {
+        outline: 2px solid var(--yellow);
+        outline-offset: 1px;
+        border-color: transparent;
+      }
+      .field select option {
+        background: var(--ink);
+      }
+      .two {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      @media (max-width: 520px) {
+        .two {
+          grid-template-columns: 1fr;
+        }
+      }
+      .submit {
+        width: 100%;
+        margin-top: 26px;
+        padding: 16px;
+        background: var(--yellow);
+        color: var(--ink);
+        border: none;
+        font-family: var(--body);
+        font-weight: 700;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      .submit:hover {
+        background: var(--yellow-deep);
+      }
+      .note {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.5);
+        margin: 14px 0 0;
+      }
+      .done {
+        display: none;
+        text-align: center;
+        padding: 34px 0;
+      }
+      .done h3 {
+        color: var(--yellow);
+        margin-bottom: 12px;
+      }
+      .done p {
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      /* guest + partner */
+      .band {
+        background: #fff;
+        border: 1px solid var(--line);
+        padding: 38px;
+      }
+      .band h3 {
+        font-size: 26px;
+        margin-bottom: 12px;
+      }
+      .band p {
+        color: var(--grey);
+        margin: 0;
+        font-size: 16px;
+      }
+      .band + .band {
+        margin-top: 20px;
+      }
+      .band a.inline {
+        font-weight: 700;
+        border-bottom: 2px solid var(--yellow);
+        text-decoration: none;
+      }
+
+      /* closing */
+      .close-cta {
+        background: var(--yellow);
+        color: var(--ink);
+        text-align: center;
+      }
+      .close-cta h2 {
+        font-size: clamp(32px, 5.4vw, 64px);
+        max-width: 840px;
+        margin: 0 auto;
+      }
+      .close-cta p {
+        margin: 20px auto 32px;
+        max-width: 520px;
+        font-size: 18px;
+      }
+      .btn-black {
+        background: var(--ink);
+        color: var(--yellow);
+        border-color: var(--ink);
+      }
+      .btn-black:hover {
+        background: #000;
+      }
+
+      /* footer */
+      footer {
+        background: var(--ink);
+        color: rgba(255, 255, 255, 0.7);
+        padding: 60px 0 34px;
+        font-size: 14px;
+      }
+      .f-grid {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr 1fr 1fr;
+        gap: 34px;
+      }
+      @media (max-width: 860px) {
+        .f-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      @media (max-width: 520px) {
+        .f-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      footer h4 {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--yellow);
+        margin: 0 0 14px;
+        font-weight: 400;
+      }
+      footer ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      footer li {
+        margin-bottom: 9px;
+      }
+      footer a {
+        text-decoration: none;
+      }
+      footer a:hover {
+        color: #fff;
+      }
+      .f-bottom {
+        margin-top: 44px;
+        padding-top: 22px;
+        border-top: 1px solid rgba(255, 255, 255, 0.14);
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.45);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+        .step {
+          opacity: 1;
+          transform: none;
+        }
+        html {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="nav">
+      <div class="wrap nav-in">
+        <a class="brand" href="https://www.rubikconacademy.xyz/"
+          ><span class="mark">R</span> Rubikcon Nexus Academy</a
+        >
+        <div class="nav-links">
+          <a href="#why">Why teach here</a>
+          <a href="#facilitators">Facilitators</a>
+          <a href="#path">The 14 day path</a>
+          <a class="btn-sm" href="#apply">Apply to teach</a>
+        </div>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="wrap">
+        <div class="hero-grid">
+          <div>
+            <p class="eyebrow on-dark">Facilitator applications open</p>
+            <h1>
+              Teach your skills.<br />Earn.<br /><span class="hl"
+                >Own your community.</span
+              >
+            </h1>
+            <p class="hero-lede">
+              You already know something people across Africa are trying to
+              learn. Bring it to Rubikcon Nexus Academy, turn it into a course,
+              and get paid every time someone takes it.
+            </p>
+            <div class="hero-cta">
+              <a class="btn btn-solid" href="#apply">Start your application</a>
+              <a class="btn btn-ghost" href="#path">See the 14 day path</a>
+            </div>
+          </div>
+          <dl class="payoff">
+            <dt>Teach</dt>
+            <dd>
+              Turn what you do at work into a course, with our team building it
+              beside you.
+            </dd>
+            <dt>Earn</dt>
+            <dd>
+              Get paid per enrolment, in local currency or crypto. No hosting
+              fees taken from you.
+            </dd>
+            <dt>Manage</dt>
+            <dd>
+              Keep your own learner community on the platform and grow it cohort
+              after cohort.
+            </dd>
+          </dl>
+        </div>
+      </div>
+      <div class="ticker">
+        <div class="ticker-track">
+          <span>
+            Blockchain &nbsp;/&nbsp; Artificial intelligence &nbsp;/&nbsp;
+            Product management &nbsp;/&nbsp; Smart contracts &nbsp;/&nbsp; Data
+            &nbsp;/&nbsp; Tokenomics &nbsp;/&nbsp; Cybersecurity &nbsp;/&nbsp;
+            Design &nbsp;/&nbsp;
+          </span>
+          <span aria-hidden="true">
+            Blockchain &nbsp;/&nbsp; Artificial intelligence &nbsp;/&nbsp;
+            Product management &nbsp;/&nbsp; Smart contracts &nbsp;/&nbsp; Data
+            &nbsp;/&nbsp; Tokenomics &nbsp;/&nbsp; Cybersecurity &nbsp;/&nbsp;
+            Design &nbsp;/&nbsp;
+          </span>
+        </div>
+      </div>
+    </header>
+
+    <section id="why">
+      <div class="wrap">
+        <div class="head">
+          <p class="eyebrow">What you get</p>
+          <h2>Three reasons practitioners teach with us</h2>
+          <p>
+            We are not looking for full time trainers. We are looking for people
+            doing the work who can explain it well.
+          </p>
+        </div>
+        <div class="pillars">
+          <div class="pillar">
+            <div class="num">01</div>
+            <h3>Teach your skills</h3>
+            <p>
+              You bring the expertise. Our team helps you shape the curriculum,
+              structure the lessons, and record the material. You do not need
+              teaching experience to start.
+            </p>
+          </div>
+          <div class="pillar">
+            <div class="num">02</div>
+            <h3>Earn from it</h3>
+            <p>
+              You earn a share of every enrolment on your course, paid in local
+              currency or crypto. Your course keeps selling long after the first
+              cohort ends.
+            </p>
+          </div>
+          <div class="pillar">
+            <div class="num">03</div>
+            <h3>Manage your community</h3>
+            <p>
+              Your learners stay connected to you through your own community
+              space. Run sessions, answer questions, and build an audience that
+              follows your next course.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section
+      id="facilitators"
+      style="
+        background: #fff;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      "
+    >
+      <div class="wrap">
+        <div class="head">
+          <p class="eyebrow">Already teaching</p>
+          <h2>The people who got here first</h2>
+          <p>
+            Behind every learning experience is a practitioner who has built,
+            led, and delivered real technology solutions. Here is what our
+            current facilitators are running.
+          </p>
+        </div>
+        <div class="fac-grid">
+          <article class="fac">
+            <div class="fac-top">
+              <div class="avatar">JE</div>
+              <div>
+                <h3>Joy Egbu</h3>
+                <div class="role">
+                  Project Manager and Operations Lead, Rubikcon Nexus
+                </div>
+              </div>
+            </div>
+            <p>
+              Joy leads the Blockchain for Social Impact programme, driving end
+              to end planning, stakeholder coordination, and programme delivery.
+              She manages timelines and keeps cohorts moving from first session
+              to capstone.
+            </p>
+            <div class="teaching">Teaching</div>
+            <a
+              class="course"
+              href="https://www.rubikconacademy.xyz/course/blockchain-technology-for-social-impact-businesses"
+              >Blockchain Technology for Social Impact Businesses</a
+            >
+            <a
+              class="course"
+              href="https://www.rubikconacademy.xyz/course/blockchain-fundamentals-for-everyday-people"
+              >Blockchain Essentials: Understanding Blockchain in Everyday
+              Life</a
+            >
+            <a class="linkedin" href="https://www.linkedin.com/in/joy-egbu/"
+              >LinkedIn</a
+            >
+          </article>
+
+          <article class="fac">
+            <div class="fac-top">
+              <div class="avatar">OO</div>
+              <div>
+                <h3>Ozioma Onukogu</h3>
+                <div class="role">
+                  Programme Lead and Ecosystem Builder, Rubikcon Nexus
+                </div>
+              </div>
+            </div>
+            <p>
+              Ozioma is a blockchain founder and product manager. She supports
+              facilitation, cohort delivery, and capstone framing, with a focus
+              on ecosystem strategy and participant growth.
+            </p>
+            <div class="teaching">Teaching</div>
+            <a
+              class="course"
+              href="https://www.rubikconacademy.xyz/course/blockchain-technology-for-social-impact-businesses"
+              >Blockchain Technology for Social Impact Businesses</a
+            >
+            <a
+              class="course"
+              href="https://www.rubikconacademy.xyz/course/tokenomics-101"
+              >Introduction to Token Economics</a
+            >
+            <a
+              class="linkedin"
+              href="https://www.linkedin.com/in/oziomaonukogu/"
+              >LinkedIn</a
+            >
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="path" class="path">
+      <div class="wrap">
+        <div class="head">
+          <p class="eyebrow on-dark">Interest form to live course</p>
+          <h2>From application to your first cohort in 14 days</h2>
+          <p>
+            Every facilitator goes through the same path. You are never doing
+            any of it alone.
+          </p>
+        </div>
+
+        <div class="rail">
+          <div class="step">
+            <div class="day">DAY 01</div>
+            <div class="step-body">
+              <h3>Submit the interest form</h3>
+              <p>
+                Ten minutes. Tell us who you are, what you want to teach, and
+                who you want to teach it to.
+              </p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="day">DAY 02 &ndash; 03</div>
+            <div class="step-body">
+              <h3>We review your application</h3>
+              <p>
+                Our team checks your experience and how your topic fits what our
+                learners are asking for. You hear back either way.
+              </p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="day">DAY 04</div>
+            <div class="step-body">
+              <h3>Discovery call</h3>
+              <p>
+                A 30 minute call to understand your expertise, your
+                availability, and the learners you want to reach.
+              </p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="day">DAY 05 &ndash; 06</div>
+            <div class="step-body">
+              <h3>Agree how we work together</h3>
+              <p>
+                We confirm your course scope, delivery format, teaching
+                schedule, and how you get paid. You sign a facilitator
+                agreement.
+              </p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="day">DAY 07</div>
+            <div class="step-body">
+              <h3>Your first virtual training workshop</h3>
+              <p>
+                A live session with our team on the Rubikcon teaching method,
+                the platform tools, and how to structure a lesson that holds
+                attention.
+              </p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="day">DAY 08 &ndash; 10</div>
+            <div class="step-body">
+              <h3>Build your curriculum</h3>
+              <p>
+                You draft your modules, lessons, and assessments using what you
+                learnt in the workshop. Our team works with you through it.
+              </p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="day">DAY 11 &ndash; 12</div>
+            <div class="step-body">
+              <h3>Quality review</h3>
+              <p>
+                We review your curriculum against the Rubikcon standard for
+                clarity, practical value, and learner outcomes, then send notes
+                for you to apply.
+              </p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="day">DAY 13</div>
+            <div class="step-body">
+              <h3>Upload and go live</h3>
+              <p>
+                Your course goes onto the platform with your facilitator
+                profile, and we open enrolment.
+              </p>
+            </div>
+          </div>
+          <div class="step final">
+            <div class="day">DAY 14 &rarr;</div>
+            <div class="step-body">
+              <h3>Build your community</h3>
+              <p>
+                We help you set up your learner community, bring your first
+                cohort in, and keep supporting you as it grows. This part does
+                not end on day 14.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="apply">
+      <div class="wrap">
+        <div class="split">
+          <div>
+            <p class="eyebrow">Before you start</p>
+            <h2 style="font-size: clamp(30px, 4.2vw, 46px)">
+              What the interest form asks
+            </h2>
+            <p style="color: var(--grey); margin: 18px 0 30px">
+              Have these ready and the form takes about ten minutes.
+            </p>
+            <ul class="checklist">
+              <li>Full name</li>
+              <li>Email address</li>
+              <li>Phone or WhatsApp number</li>
+              <li>Country and city</li>
+              <li>LinkedIn profile or portfolio link</li>
+              <li>Current role and organisation</li>
+              <li>Years of experience in your field</li>
+              <li>
+                Area of expertise, for example blockchain, AI, product, data,
+                design, cybersecurity
+              </li>
+              <li>Proposed course title and a one line description</li>
+              <li>
+                Who the course is for and what they will be able to do after it
+              </li>
+              <li>Any teaching, training, or speaking experience</li>
+              <li>Preferred format: live cohort, self paced, or both</li>
+              <li>Hours you can commit each week</li>
+              <li>Languages you can teach in</li>
+              <li>
+                Whether you already have a community or audience, and its size
+              </li>
+              <li>
+                A two minute intro video link
+                <span class="opt">(optional but it helps)</span>
+              </li>
+              <li>How you heard about Rubikcon</li>
+            </ul>
+          </div>
+
+          <div class="form-card">
+            <div id="form-live">
+              <h3>Apply to teach</h3>
+              <p>
+                Start here. We review every application and reply within three
+                days.
+              </p>
+
+              <div class="two">
+                <div class="field">
+                  <label for="name">Full name</label>
+                  <input id="name" type="text" placeholder="Your name" />
+                </div>
+                <div class="field">
+                  <label for="email">Email</label>
+                  <input id="email" type="email" placeholder="you@email.com" />
+                </div>
+              </div>
+
+              <div class="two">
+                <div class="field">
+                  <label for="phone">Phone or WhatsApp</label>
+                  <input id="phone" type="tel" placeholder="+234" />
+                </div>
+                <div class="field">
+                  <label for="country">Country and city</label>
+                  <input
+                    id="country"
+                    type="text"
+                    placeholder="Nigeria, Lagos"
+                  />
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="linkedin">LinkedIn or portfolio link</label>
+                <input id="linkedin" type="url" placeholder="https://" />
+              </div>
+
+              <div class="two">
+                <div class="field">
+                  <label for="role">Current role and organisation</label>
+                  <input
+                    id="role"
+                    type="text"
+                    placeholder="Product Manager, Company"
+                  />
+                </div>
+                <div class="field">
+                  <label for="years">Years of experience</label>
+                  <select id="years">
+                    <option>1 to 3</option>
+                    <option>3 to 5</option>
+                    <option>5 to 10</option>
+                    <option>10 or more</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="two">
+                <div class="field">
+                  <label for="area">Area of expertise</label>
+                  <select id="area">
+                    <option>Blockchain and Web3</option>
+                    <option>Artificial intelligence</option>
+                    <option>Product management</option>
+                    <option>Data</option>
+                    <option>Cybersecurity</option>
+                    <option>Design</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="format">Preferred format</label>
+                  <select id="format">
+                    <option>Live cohort</option>
+                    <option>Self paced</option>
+                    <option>Both</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="course">Proposed course title</label>
+                <input
+                  id="course"
+                  type="text"
+                  placeholder="What you want to teach"
+                />
+              </div>
+
+              <div class="field">
+                <label for="who"
+                  >Who is it for and what will they be able to do after</label
+                >
+                <textarea
+                  id="who"
+                  placeholder="Two or three sentences"
+                ></textarea>
+              </div>
+
+              <div class="two">
+                <div class="field">
+                  <label for="hours">Hours available per week</label>
+                  <select id="hours">
+                    <option>Under 3</option>
+                    <option>3 to 5</option>
+                    <option>5 to 10</option>
+                    <option>10 or more</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="languages">Languages you can teach in</label>
+                  <input
+                    id="languages"
+                    type="text"
+                    placeholder="English, French, Yoruba"
+                  />
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="community"
+                  >Existing community or audience and its size</label
+                >
+                <input id="community" type="text" placeholder="Optional" />
+              </div>
+
+              <div class="field">
+                <label for="video">Two minute intro video link</label>
+                <input id="video" type="url" placeholder="Optional" />
+              </div>
+
+              <div class="field">
+                <label for="source">How did you hear about Rubikcon</label>
+                <input
+                  id="source"
+                  type="text"
+                  placeholder="Partner, social media, a friend"
+                />
+              </div>
+
+              <button class="submit" type="button" id="send">
+                Submit application
+              </button>
+              <p class="note">
+                We reply within three days. If it is a fit, we book your
+                discovery call straight away.
+              </p>
+            </div>
+
+            <div class="done" id="form-done">
+              <h3>Application received</h3>
+              <p>
+                Check your email for a confirmation. Our team reviews
+                applications within three days and will send you a discovery
+                call link if your topic is a fit.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding-top: 0">
+      <div class="wrap">
+        <div class="band">
+          <h3>Guest facilitators</h3>
+          <p>
+            Each cohort may include guest facilitators: industry experts,
+            founders, researchers, and technology leaders who bring specialised
+            knowledge to selected sessions. If you would rather start with a
+            single guest session than a full course, say so in the form.
+          </p>
+        </div>
+        <div class="band">
+          <h3>Partner with our facilitators</h3>
+          <p>
+            Bringing Rubikcon Nexus Academy to your organisation? We collaborate
+            on corporate training, funded learning programmes, university
+            partnerships, workshops, speaking engagements, and technology
+            capacity building across Africa.
+            <a class="inline" href="https://www.rubikconacademy.xyz/contact"
+              >Contact us</a
+            >
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="close-cta">
+      <div class="wrap">
+        <h2>You have spent years learning this. Get paid to pass it on.</h2>
+        <p>
+          Applications are reviewed weekly. The next facilitator cohort starts
+          as soon as you do.
+        </p>
+        <a class="btn btn-black" href="#apply">Apply to teach</a>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        <div class="f-grid">
+          <div>
+            <a
+              class="brand"
+              style="color: #fff; text-decoration: none"
+              href="https://www.rubikconacademy.xyz/"
+              ><span class="mark">R</span> Rubikcon Nexus Academy</a
+            >
+            <p style="margin-top: 16px; max-width: 320px">
+              Practical, industry focused training in AI, blockchain, product
+              management, and emerging technologies, helping Africans build
+              careers and drive innovation.
+            </p>
+          </div>
+          <div>
+            <h4>Explore</h4>
+            <ul>
+              <li>
+                <a href="https://www.rubikconacademy.xyz/courses"
+                  >All courses</a
+                >
+              </li>
+              <li>
+                <a href="https://www.rubikconacademy.xyz/about">About us</a>
+              </li>
+              <li>
+                <a href="https://www.rubikconacademy.xyz/facilitators"
+                  >Facilitators</a
+                >
+              </li>
+              <li>
+                <a href="https://www.rubikconacademy.xyz/contact">Contact</a>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h4>Teach</h4>
+            <ul>
+              <li><a href="#apply">Apply to teach</a></li>
+              <li><a href="#path">The 14 day path</a></li>
+              <li><a href="#why">Why teach here</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Get in touch</h4>
+            <ul>
+              <li>
+                <a href="mailto:rubikconnexus@gmail.com"
+                  >rubikconnexus@gmail.com</a
+                >
+              </li>
+              <li><a href="tel:+233535832843">+233 535 832843 (Ghana)</a></li>
+              <li>
+                <a href="tel:+2348107678025">+234 810 767 8025 (Nigeria)</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="f-bottom">
+          <span
+            >&copy; 2026 Rubikcon Nexus Academy, part of Rubikcon Nexus,
+            Nigeria</span
+          >
+          <span>Building Africa's next generation of technology leaders</span>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      (function () {
+        var steps = document.querySelectorAll(".step");
+        if ("IntersectionObserver" in window) {
+          var io = new IntersectionObserver(
+            function (entries) {
+              entries.forEach(function (e, i) {
+                if (e.isIntersecting) {
+                  setTimeout(function () {
+                    e.target.classList.add("in");
+                  }, i * 70);
+                  io.unobserve(e.target);
+                }
+              });
+            },
+            { threshold: 0.25 },
+          );
+          steps.forEach(function (s) {
+            io.observe(s);
+          });
+        } else {
+          steps.forEach(function (s) {
+            s.classList.add("in");
+          });
+        }
+
+        document.getElementById("send").addEventListener("click", function () {
+          var name = document.getElementById("name").value.trim();
+          var email = document.getElementById("email").value.trim();
+          if (!name || !email) {
+            alert("Add your name and email so we can reply to you.");
+            return;
+          }
+          document.getElementById("form-live").style.display = "none";
+          document.getElementById("form-done").style.display = "block";
+        });
+      })();
+    </script>
+  </body>
+</html>

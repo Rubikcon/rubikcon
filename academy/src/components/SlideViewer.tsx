@@ -1,6 +1,6 @@
 import { X, ExternalLink } from 'lucide-react'
 
-function getGoogleSlidesEmbedUrl(url: string): string | null {
+export function getGoogleSlidesEmbedUrl(url: string): string | null {
   try {
     const u = new URL(url)
     // Google Slides share URL
@@ -23,7 +23,7 @@ type Props = {
   title: string
   slideCount: number
   sections?: string[]
-  viewerType: 'MODAL' | 'EXTERNAL'
+  viewerType: 'MODAL' | 'EXTERNAL' | 'INLINE'
   onClose?: () => void
 }
 
@@ -69,6 +69,17 @@ export default function SlideViewer({
           </a>
         </div>
       </div>
+    )
+  }
+
+  if (viewerType === 'INLINE') {
+    return (
+      <iframe
+        src={embedUrl}
+        className="w-full h-full border-0"
+        allowFullScreen
+        title={title}
+      />
     )
   }
 

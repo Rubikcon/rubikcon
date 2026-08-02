@@ -32,7 +32,7 @@ export class AssignmentsRepository {
       data: {
         userId,
         assignmentId,
-        choiceId,
+        choiceId: choiceId || undefined,
         status: AssignmentSubmissionStatus.SUBMITTED,
         textResponse: data.textResponse,
         attachmentName: data.attachmentName,

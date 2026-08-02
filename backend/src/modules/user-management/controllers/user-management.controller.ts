@@ -6,8 +6,9 @@ import { UpdateRoleSchema, CreateFacilitatorSchema, UpdateFacilitatorSchema } fr
 export class UserManagementController {
   async getLearners(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await userManagementService.getLearners()
-      return sendSuccess(res, result.learners)
+      const q = req.query.q as string | undefined
+      const result = await userManagementService.getLearners(q)
+      return sendSuccess(res, { learners: result.learners, total: result.learners.length, pages: 1 })
     } catch (err) { next(err) }
   }
 
@@ -75,8 +76,9 @@ export class UserManagementController {
 
   async getUsers(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await userManagementService.getUsers()
-      return sendSuccess(res, result.users)
+      const q = req.query.q as string | undefined
+      const result = await userManagementService.getUsers(q)
+      return sendSuccess(res, { users: result.users, total: result.users.length, pages: 1 })
     } catch (err) { next(err) }
   }
 

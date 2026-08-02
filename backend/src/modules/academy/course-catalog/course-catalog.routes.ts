@@ -139,3 +139,4 @@ router.put('/admin/testimonials/:id', requireAuth, requireAdmin, courseCatalogCo
 router.delete('/admin/testimonials/:id', requireAuth, requireAdmin, courseCatalogController.legacy_delete_admin_testimonials_id.bind(courseCatalogController));
 router.post('/admin/courses/:courseId/facilitators', requireAuth, requireAdmin, courseCatalogController.legacy_post_admin_courses_courseId_facilitators.bind(courseCatalogController));
 router.delete('/admin/courses/:courseId/facilitators/:facilitatorId', requireAuth, requireAdmin, courseCatalogController.legacy_delete_admin_courses_courseId_facilitators_facilitatorId.bind(courseCatalogController));
+

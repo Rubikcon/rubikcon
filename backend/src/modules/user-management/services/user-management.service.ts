@@ -2,15 +2,60 @@ import { NotFoundError, ValidationError } from '../../../shared/errors/AppError'
 import { userManagementRepository } from '../repositories/user-management.repository'
 
 export class UserManagementService {
-  async getLearners() {
-    const learners = await userManagementRepository.findLearners()
+  async getLearners(q?: string) {
+    const learners = await userManagementRepository.findLearners(q)
     return { learners }
   }
 
   async getLearnerById(userId: string) {
     const learner = await userManagementRepository.findLearnerById(userId)
     if (!learner) throw new NotFoundError('Learner not found.')
-    return { learner }
+    
+    // Format into the structure expected by SuperAdminPage
+    const enrollments = learner.courseEnrollments.map((enr: any) => {
+      const course = enr.course
+      const weeks = (course.weeks || []).map((w: any) => {
+        const wp = learner.weekProgress.find((p: any) => p.week.id === w.id)
+        return {
+          id: w.id,
+          slug: w.slug,
+          number: w.number,
+          title: w.title,
+          status: wp ? wp.status : 'NOT_STARTED',
+          completedAt: wp ? wp.completedAt : null,
+          quizSubmitted: wp ? wp.quizSubmitted : false,
+          assignmentSubmitted: wp ? wp.assignmentSubmitted : false,
+          manuallyCompleted: wp ? wp.manuallyCompleted : false,
+          firstOpenedAt: wp ? wp.firstOpenedAt : null,
+        }
+      })
+      const completedCount = weeks.filter((w: any) => w.status === 'COMPLETE').length
+      const totalCount = weeks.length
+      return {
+        course: { id: course.id, slug: course.slug, title: course.title, contentUnit: course.contentUnit },
+        enrolledAt: enr.enrolledAt,
+        progressPercent: totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0,
+        completedCount,
+        totalCount,
+        weeks
+      }
+    })
+
+    const formattedLearner = {
+      user: {
+        id: learner.id,
+        name: learner.name,
+        email: learner.email,
+        role: learner.role,
+        createdAt: learner.createdAt,
+        profile: learner.profile
+      },
+      enrollments,
+      submissions: learner.assignmentSubmissions,
+      quizAttempts: learner.quizAttempts
+    }
+    
+    return { learner: formattedLearner }
   }
 
   async getFacilitators() {
@@ -55,8 +100,8 @@ export class UserManagementService {
     return { admins }
   }
 
-  async getUsers() {
-    const users = await userManagementRepository.findUsers()
+  async getUsers(q?: string) {
+    const users = await userManagementRepository.findUsers(q)
     return { users }
   }
 

@@ -1,4 +1,5 @@
 import { Film, Play } from 'lucide-react'
+import { useState } from 'react'
 import EmbedFrame from './EmbedFrame'
 
 export type SupportedVideoSource = 'youtube' | 'vimeo' | 'loom' | 'google-drive' | 'unknown'
@@ -25,13 +26,14 @@ export function getEmbedUrl(url: string): string | null {
       const id = u.hostname.includes('youtu.be')
         ? u.pathname.slice(1).split('?')[0]
         : (u.searchParams.get('v') ?? u.pathname.split('/').pop())
-      if (id) return `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1`
+      // Use autoplay when loading via poster click
+      if (id) return `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&autoplay=1`
     }
     // Vimeo
     if (u.hostname.includes('vimeo.com')) {
       if (u.hostname.includes('player.vimeo.com')) return url
       const id = u.pathname.replace(/^\//, '').split('/')[0]
-      if (id && /^\d+$/.test(id)) return `https://player.vimeo.com/video/${id}?dnt=1`
+      if (id && /^\d+$/.test(id)) return `https://player.vimeo.com/video/${id}?dnt=1&autoplay=1`
     }
     // Loom
     if (u.hostname.includes('loom.com')) {
@@ -56,9 +58,11 @@ type Props = {
   url: string
   title?: string
   className?: string
+  poster?: string
 }
 
-export default function VideoEmbed({ url, title, className = '' }: Props) {
+export default function VideoEmbed({ url, title, className = '', poster }: Props) {
+  const [isPlaying, setIsPlaying] = useState(!poster)
   const embedUrl = getEmbedUrl(url)
 
   if (!embedUrl) {
@@ -70,6 +74,22 @@ export default function VideoEmbed({ url, title, className = '' }: Props) {
           <a href={url} target="_blank" rel="noreferrer" className="text-xs text-[#F5C518] hover:underline mt-1">
             Open in new tab
           </a>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isPlaying && poster) {
+    return (
+      <div 
+        className={`relative cursor-pointer group aspect-video overflow-hidden rounded-xl bg-black ${className}`}
+        onClick={() => setIsPlaying(true)}
+      >
+        <img src={poster} alt={title || "Video thumbnail"} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-16 h-16 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/20 group-hover:bg-[#F5C518] group-hover:border-[#F5C518]/50 group-hover:text-black transition-all transform group-hover:scale-110">
+            <Play size={24} className="ml-1" />
+          </div>
         </div>
       </div>
     )

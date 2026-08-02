@@ -17,6 +17,7 @@ model Course {
   published         Boolean      @default(false)
   publishedAt       DateTime?
   isPaid            Boolean      @default(false)
+  isFeatured        Boolean      @default(false)
   // Pricing — set by super admins. Both currencies are stored explicitly so the
   // team controls the NGN figure rather than relying on a live FX rate.
   // discountPercent (0-100) slashes the displayed price; the original stays

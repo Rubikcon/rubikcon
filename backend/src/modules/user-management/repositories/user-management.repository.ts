@@ -2,9 +2,16 @@ import { Role } from '@prisma/client'
 import prisma from '../../../infrastructure/prisma/client'
 
 export class UserManagementRepository {
-  async findLearners() {
+  async findLearners(q?: string) {
+    const where: any = { role: 'USER' }
+    if (q) {
+      where.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+      ]
+    }
     return prisma.user.findMany({
-      where: { role: 'USER' },
+      where,
       select: { id: true, name: true, email: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     })
@@ -14,24 +21,42 @@ export class UserManagementRepository {
     return prisma.user.findUnique({
       where: { id: userId, role: 'USER' },
       include: {
+        profile: true,
         courseEnrollments: {
           include: {
-            course: { select: { id: true, title: true, slug: true } }
+            course: {
+              select: {
+                id: true, title: true, slug: true, contentUnit: true,
+                weeks: {
+                  select: { id: true, slug: true, number: true, title: true }
+                }
+              }
+            }
           }
         },
         weekProgress: {
           include: {
-            week: { select: { id: true, title: true, courseId: true } }
+            week: { select: { id: true, title: true, courseId: true, number: true, slug: true } }
           }
         },
         quizAttempts: {
           include: {
-            quiz: { select: { id: true, title: true, passMark: true } }
+            quiz: {
+              select: {
+                id: true, title: true, passMark: true,
+                week: { select: { id: true, slug: true, number: true, title: true, course: { select: { id: true, slug: true, title: true } } } }
+              }
+            }
           }
         },
         assignmentSubmissions: {
           include: {
-            assignment: { select: { id: true, title: true } }
+            assignment: {
+              select: {
+                id: true, title: true,
+                week: { select: { id: true, slug: true, number: true, title: true, course: { select: { id: true, slug: true, title: true } } } }
+              }
+            }
           }
         }
       }
@@ -75,8 +100,16 @@ export class UserManagementRepository {
     })
   }
 
-  async findUsers() {
+  async findUsers(q?: string) {
+    const where: any = {}
+    if (q) {
+      where.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+      ]
+    }
     return prisma.user.findMany({
+      where,
       select: { id: true, name: true, email: true, role: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     })

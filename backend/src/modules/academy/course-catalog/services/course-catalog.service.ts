@@ -70,6 +70,7 @@ export class CourseCatalogService {
       title: c.title,
       tagline: c.tagline,
       level: c.level,
+      isFeatured: c.isFeatured,
       ...serializeCoursePricing(c as any),
       estimatedDuration: c.estimatedDuration,
       phaseLabel: c.phaseLabel,
@@ -229,6 +230,7 @@ export class CourseCatalogService {
       status: c.status,
       published: c.published,
       isPaid: c.isPaid,
+      isFeatured: c.isFeatured,
       contentUnit: c.contentUnit,
       weekCount: c._count.weeks,
       facilitators: c.courseFacilitators.map(cf => cf.facilitator),
@@ -269,6 +271,14 @@ export class CourseCatalogService {
     const updateData = { ...data, ...pricingData }
     const updated = await courseCatalogRepository.update(courseId, updateData)
     await this.markCourseDirtyIfNeeded(course.id, role, course.status)
+    return updated
+  }
+
+  async setFeaturedCourse(courseId: string, role: string) {
+    if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
+      throw new AppError('Only administrators can set featured courses.', 403)
+    }
+    const updated = await courseCatalogRepository.setFeaturedCourse(courseId)
     return updated
   }
 

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "npx prisma generate && npx prisma migrate deploy && tsc",
+    "build": "npx prisma generate && tsc",
     "test": "vitest",
     "lint": "eslint \"src/**/*.ts\"",
     "find-deadcode": "ts-prune",
