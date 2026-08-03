@@ -124,8 +124,8 @@ export class UserManagementService {
   }
 
   private async checkLastSuperAdminGuard(errorMessage: string) {
-    const superAdmins = (await userManagementRepository.findUsers()).filter((u) => u.role === 'SUPER_ADMIN')
-    if (superAdmins.length <= 1) {
+    const { total } = await userManagementRepository.findUsers(undefined, 'SUPER_ADMIN', 0, 1)
+    if (total <= 1) {
       throw new ValidationError(errorMessage)
     }
   }
