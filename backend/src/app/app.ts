@@ -109,16 +109,16 @@ app.get("/health/db", async (_req, res, next) => {
 
 // API Routes
 
-app.use("/auth", authRoutes);
-app.use("/academy", courseCatalogRoutes);
-app.use("/academy", enrollmentRoutes);
-app.use("/academy", progressRoutes);
-app.use("/academy", quizzesRoutes);
-app.use("/academy", assignmentsRoutes);
-app.use("/games", gamesRoutes);
-app.use("/gigs", gigsRoutes);
-app.use("/academy", userManagementRoutes);
-app.use("/platform", platformRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/academy", courseCatalogRoutes);
+app.use("/api/academy", enrollmentRoutes);
+app.use("/api/academy", progressRoutes);
+app.use("/api/academy", quizzesRoutes);
+app.use("/api/academy", assignmentsRoutes);
+app.use("/api/games", gamesRoutes);
+app.use("/api/gigs", gigsRoutes);
+app.use("/api/academy", userManagementRoutes);
+app.use("/api/platform", platformRoutes);
 
 // 404 + Error Handlers
 
