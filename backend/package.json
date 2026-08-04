@@ -11,10 +11,11 @@
     "start": "node dist/index.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma migrate resolve --rolled-back 20260804164414_resolve_drift || true && prisma migrate deploy",
+    "db:deploy": "prisma migrate resolve --rolled-back 20260804164414_resolve_drift || true && prisma migrate deploy && npm run promote-superadmin",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seeds/seed.ts",
-    "create-superadmin": "tsx scripts/create-superadmin.ts"
+    "create-superadmin": "tsx scripts/create-superadmin.ts",
+    "promote-superadmin": "tsx scripts/promote-superadmin.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.4",
