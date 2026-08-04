@@ -15,7 +15,7 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seeds/seed.ts",
     "create-superadmin": "tsx scripts/create-superadmin.ts",
-    "promote-superadmin": "tsx scripts/promote-superadmin.ts"
+    "promote-superadmin": "npx tsx scripts/promote-superadmin.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.4",
