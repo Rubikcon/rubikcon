@@ -34,7 +34,7 @@ export async function sendEmail(input: SendEmailInput): Promise<{ ok: boolean; s
     const { error } = await resend.emails.send({
       from: config.emailFrom,
       to: input.to,
-      subject: input.subject,
+      subject: input.subject.replace(/\r?\n|\r/g, ' ').trim(),
       html: input.html,
       text: input.text,
       replyTo: input.replyTo,
