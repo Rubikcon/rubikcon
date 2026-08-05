@@ -1208,6 +1208,8 @@ export class CourseCatalogController {
           data: { userId, courseId: course.id }
         })
         
+        await prisma.user.update({ where: { id: userId }, data: { lastActivityAt: new Date() } })
+
         return sendSuccess(res, enrollment, 'Successfully enrolled.')
       } catch (err) {
         next(err)

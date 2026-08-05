@@ -2,11 +2,62 @@ import { NotFoundError, ValidationError } from '../../../shared/errors/AppError'
 import { userManagementRepository } from '../repositories/user-management.repository'
 
 export class UserManagementService {
-  async getLearners(q?: string, page = 1, limit = 20) {
+  async getLearners(q?: string, page = 1, limit = 20, status?: string) {
     const skip = (page - 1) * limit
-    const { learners, total } = await userManagementRepository.findLearners(q, skip, limit)
+    const { learners, total } = await userManagementRepository.findLearners(q, skip, limit, status)
+    
+    const mappedLearners = learners.map((learner: any) => {
+      const now = new Date()
+      const lastActive = learner.lastActivityAt || learner.createdAt
+      const daysSinceActive = (now.getTime() - lastActive.getTime()) / (1000 * 3600 * 24)
+      
+      const enrollmentCount = learner._count.courseEnrollments
+      const completedLessons = learner.weekProgress.filter((wp: any) => wp.status === 'COMPLETE').length
+      const inProgressLessons = learner.weekProgress.filter((wp: any) => wp.status === 'IN_PROGRESS').length
+      
+      const totalSubmissions = learner.assignmentSubmissions.length
+      const quizAttempts = learner.quizAttempts.length
+
+      const hasStarted = completedLessons > 0 || inProgressLessons > 0 || totalSubmissions > 0 || quizAttempts > 0
+      
+      let status = 'Not Started'
+      let statusReason = undefined
+
+      if (daysSinceActive >= 30) {
+        status = 'Inactive'
+        statusReason = `No activity for ${Math.floor(daysSinceActive)} days`
+      } else if (hasStarted && daysSinceActive >= 14) {
+        status = 'At Risk'
+        statusReason = `Started learning but stalled for ${Math.floor(daysSinceActive)} days`
+      } else if (!hasStarted && enrollmentCount > 0 && daysSinceActive >= 7) {
+        status = 'At Risk'
+        statusReason = `Enrolled but never started (inactive for ${Math.floor(daysSinceActive)} days)`
+      } else if (hasStarted) {
+        status = 'In Progress'
+      }
+
+      return {
+        id: learner.id,
+        name: learner.name,
+        email: learner.email,
+        country: learner.profile?.country || null,
+        createdAt: learner.createdAt,
+        lastActivityAt: learner.lastActivityAt,
+        signupSource: learner.signupSource,
+        onboardingCompleted: learner.profile?.onboardingCompleted || false,
+        enrollmentCount,
+        completedLessons,
+        inProgressLessons,
+        totalSubmissions,
+        quizAttempts,
+        gigApplications: 0, // Mock for now if not tracked
+        status,
+        statusReason
+      }
+    })
+
     return { 
-      learners, 
+      learners: mappedLearners, 
       pagination: {
         total,
         page,
@@ -50,6 +101,35 @@ export class UserManagementService {
       }
     })
 
+    const now = new Date()
+    const lastActive = learner.lastActivityAt || learner.createdAt
+    const daysSinceActive = (now.getTime() - lastActive.getTime()) / (1000 * 3600 * 24)
+
+    const enrollmentCount = learner.courseEnrollments.length
+    const completedLessons = learner.weekProgress.filter((wp: any) => wp.status === 'COMPLETE').length
+    const inProgressLessons = learner.weekProgress.filter((wp: any) => wp.status === 'IN_PROGRESS').length
+    
+    const totalSubmissions = learner.assignmentSubmissions.length
+    const quizAttempts = learner.quizAttempts.length
+
+    const hasStarted = completedLessons > 0 || inProgressLessons > 0 || totalSubmissions > 0 || quizAttempts > 0
+    
+    let status = 'Not Started'
+    let statusReason = undefined
+
+    if (daysSinceActive >= 30) {
+      status = 'Inactive'
+      statusReason = `No activity for ${Math.floor(daysSinceActive)} days`
+    } else if (hasStarted && daysSinceActive >= 14) {
+      status = 'At Risk'
+      statusReason = `Started learning but stalled for ${Math.floor(daysSinceActive)} days`
+    } else if (!hasStarted && enrollmentCount > 0 && daysSinceActive >= 7) {
+      status = 'At Risk'
+      statusReason = `Enrolled but never started (inactive for ${Math.floor(daysSinceActive)} days)`
+    } else if (hasStarted) {
+      status = 'In Progress'
+    }
+
     const formattedLearner = {
       user: {
         id: learner.id,
@@ -57,6 +137,10 @@ export class UserManagementService {
         email: learner.email,
         role: learner.role,
         createdAt: learner.createdAt,
+        lastActivityAt: learner.lastActivityAt,
+        signupSource: learner.signupSource,
+        status,
+        statusReason,
         profile: learner.profile
       },
       enrollments,

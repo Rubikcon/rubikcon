@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
+import prisma from '../../../../infrastructure/prisma/client'
 import { sendSuccess, sendError } from '../../../../shared/api/response'
 import { progressService } from '../services/progress.service'
 import { SubmitLegacyProgressSchema, AdminWeekFilterSchema, SubmitRatingSchema, SaveGlossaryTermSchema } from '../schemas/progress.schemas'
@@ -84,6 +85,8 @@ export class ProgressController {
       if (!progress) {
         return sendError(res, 'Lesson not found.', 404)
       }
+
+      await prisma.user.update({ where: { id: req.user!.userId }, data: { lastActivityAt: new Date() } })
 
       return sendSuccess(res, {
         lessonId: progress.lessonId,

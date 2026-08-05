@@ -7,9 +7,10 @@ export class UserManagementController {
   async getLearners(req: Request, res: Response, next: NextFunction) {
     try {
       const q = req.query.q as string | undefined
+      const status = req.query.status as string | undefined
       const page = parseInt(req.query.page as string, 10) || 1
       const limit = parseInt(req.query.limit as string, 10) || 20
-      const result = await userManagementService.getLearners(q, page, limit)
+      const result = await userManagementService.getLearners(q, page, limit, status)
       return sendSuccess(res, result)
     } catch (err) { next(err) }
   }
