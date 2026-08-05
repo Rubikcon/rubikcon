@@ -2,7 +2,7 @@ import { Role } from '@prisma/client'
 import prisma from '../../../infrastructure/prisma/client'
 
 export class UserManagementRepository {
-  async findLearners(q?: string, skip = 0, limit = 20) {
+  async findLearners(q?: string, skip = 0, limit = 20, status?: string) {
     const where: any = { role: 'USER' }
     if (q) {
       where.OR = [
@@ -10,10 +10,59 @@ export class UserManagementRepository {
         { email: { contains: q, mode: 'insensitive' } },
       ]
     }
+
+    if (status) {
+      const now = new Date()
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+      if (status === 'Inactive') {
+        where.lastActivityAt = { lt: thirtyDaysAgo }
+      } else if (status === 'At Risk') {
+        // We approximate At Risk for DB query:
+        // Inactive for 14 days OR (enrolled but no activity for 7 days)
+        where.OR = [
+          ...(where.OR || []),
+          {
+            AND: [
+              { lastActivityAt: { lt: fourteenDaysAgo } },
+              { lastActivityAt: { not: null } }
+            ]
+          },
+          {
+            AND: [
+              { createdAt: { lt: sevenDaysAgo } },
+              { lastActivityAt: null },
+              { courseEnrollments: { some: {} } }
+            ]
+          }
+        ]
+      }
+    }
+
     const [learners, total] = await Promise.all([
       prisma.user.findMany({
         where,
-        select: { id: true, name: true, email: true, createdAt: true },
+        select: { 
+          id: true, 
+          name: true, 
+          email: true, 
+          createdAt: true,
+          lastActivityAt: true,
+          signupSource: true,
+          profile: {
+            select: { country: true, onboardingCompleted: true }
+          },
+          _count: {
+            select: { courseEnrollments: true }
+          },
+          weekProgress: {
+            select: { status: true }
+          },
+          assignmentSubmissions: { select: { id: true } },
+          quizAttempts: { select: { id: true } }
+        },
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },

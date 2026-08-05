@@ -1,5 +1,6 @@
 
 import { Request, Response, NextFunction } from 'express'
+import prisma from '../../../../infrastructure/prisma/client'
 import { sendSuccess, sendError } from '../../../../shared/api/response'
 import { quizzesService } from '../services/quizzes.service'
 import { QuizSubmissionSchema, QuizSettingsSchema, QuizQuestionInputSchema } from '../schemas/quizzes.schemas'
@@ -11,6 +12,8 @@ export class QuizzesController {
       if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
 
       const result = await quizzesService.submitQuiz(req.user!.userId, req.params.quizId, parsed.data.answers)
+      await prisma.user.update({ where: { id: req.user!.userId }, data: { lastActivityAt: new Date() } })
+
 
       const { attempt, quiz, answersByQuestion } = result
       return sendSuccess(res, {

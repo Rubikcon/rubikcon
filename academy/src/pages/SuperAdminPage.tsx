@@ -161,6 +161,8 @@ type LearnerSummary = {
   quizAttempts: number;
   gigApplications: number;
   lastActivityAt: string | null;
+  status: "Not Started" | "In Progress" | "Inactive" | "At Risk";
+  statusReason?: string;
 };
 
 type LearnerDetail = {
@@ -170,6 +172,10 @@ type LearnerDetail = {
     email: string;
     role: string;
     createdAt: string;
+    lastActivityAt: string | null;
+    signupSource: string | null;
+    status: "Not Started" | "In Progress" | "Inactive" | "At Risk";
+    statusReason?: string;
     profile: {
       country: string | null;
       experienceLevel: string | null;
@@ -352,6 +358,7 @@ export default function SuperAdminPage() {
   const [learnersPage, setLearnersPage] = useState(1);
   const [learnersTotalPages, setLearnersTotalPages] = useState(1);
   const [learnerSearch, setLearnerSearch] = useState("");
+  const [learnerStatus, setLearnerStatus] = useState("");
   const [learnerDetail, setLearnerDetail] = useState<LearnerDetail | null>(
     null,
   );
@@ -452,7 +459,7 @@ export default function SuperAdminPage() {
 
   useEffect(() => {
     if (activeTab === "learners") void loadLearners();
-  }, [activeTab, learnerSearch, learnersPage]);
+  }, [activeTab, learnerSearch, learnerStatus, learnersPage]);
 
   useEffect(() => {
     if (activeTab === "facilitators") void loadFacilitators();
@@ -594,6 +601,7 @@ export default function SuperAdminPage() {
       setError(null);
       const params = new URLSearchParams();
       if (learnerSearch) params.set("q", learnerSearch);
+      if (learnerStatus) params.set("status", learnerStatus);
       params.set("page", learnersPage.toString());
       params.set("limit", "20");
       const data = await apiRequest<{
@@ -1979,6 +1987,19 @@ export default function SuperAdminPage() {
                     className="w-full rounded-full border border-white/12 bg-black/30 pl-9 pr-4 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/30"
                   />
                 </div>
+                <div className="w-48 shrink-0">
+                  <select
+                    value={learnerStatus}
+                    onChange={(e) => setLearnerStatus(e.target.value)}
+                    className="w-full rounded-full border border-white/12 bg-black/30 px-4 py-2 text-sm text-white focus:outline-none focus:border-white/30"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="Not Started">Not Started</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Inactive">Inactive</option>
+                    <option value="At Risk">At Risk</option>
+                  </select>
+                </div>
                 <div className="text-xs text-white/40">
                   {learnersTotal} total
                 </div>
@@ -2016,16 +2037,38 @@ export default function SuperAdminPage() {
                             {initials}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-semibold text-white truncate">
-                              {l.name || "Unnamed learner"}
-                            </p>
-                            <p className="text-xs text-white/35 truncate">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="font-semibold text-white truncate">
+                                {l.name || "Unnamed learner"}
+                              </p>
+                              <span
+                                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium border ${
+                                  l.status === "At Risk"
+                                    ? "bg-red-500/10 text-red-400 border-red-500/20"
+                                    : l.status === "Inactive"
+                                    ? "bg-white/5 text-white/40 border-white/10"
+                                    : l.status === "Completed"
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                    : l.status === "In Progress"
+                                    ? "bg-[#F5C518]/10 text-[#F5C518] border-[#F5C518]/20"
+                                    : "bg-white/5 text-white/60 border-white/10"
+                                }`}
+                              >
+                                {l.status}
+                              </span>
+                            </div>
+                            <p className="text-xs text-white/35 truncate mt-0.5">
                               {l.email}
                             </p>
-                            {l.country && (
-                              <p className="text-[11px] text-white/30 mt-0.5">
-                                📍 {l.country}
-                              </p>
+                            {(l.country || l.statusReason) && (
+                              <div className="text-[11px] text-white/40 mt-1.5 space-y-0.5">
+                                {l.country && <p>📍 {l.country}</p>}
+                                {l.statusReason && (
+                                  <p className="text-red-400/80">
+                                    ⚠️ {l.statusReason}
+                                  </p>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -2806,6 +2849,41 @@ export default function SuperAdminPage() {
                         {learnerDetail.user.profile?.experienceLevel &&
                           ` · ${learnerDetail.user.profile.experienceLevel}`}
                       </p>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium border ${
+                            learnerDetail.user.status === "At Risk"
+                              ? "bg-red-500/10 text-red-400 border-red-500/20"
+                              : learnerDetail.user.status === "Inactive"
+                              ? "bg-white/5 text-white/40 border-white/10"
+                              : learnerDetail.user.status === "Completed"
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                              : learnerDetail.user.status === "In Progress"
+                              ? "bg-[#F5C518]/10 text-[#F5C518] border-[#F5C518]/20"
+                              : "bg-white/5 text-white/60 border-white/10"
+                          }`}
+                        >
+                          {learnerDetail.user.status}
+                        </span>
+                        {learnerDetail.user.lastActivityAt && (
+                          <span className="text-[10px] text-white/40">
+                            Last active:{" "}
+                            {new Date(
+                              learnerDetail.user.lastActivityAt,
+                            ).toLocaleDateString()}
+                          </span>
+                        )}
+                        {learnerDetail.user.signupSource && (
+                          <span className="text-[10px] text-white/30">
+                            · Via {learnerDetail.user.signupSource}
+                          </span>
+                        )}
+                      </div>
+                      {learnerDetail.user.statusReason && (
+                        <p className="text-[11px] text-red-400/80 mt-1.5">
+                          ⚠️ {learnerDetail.user.statusReason}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <button

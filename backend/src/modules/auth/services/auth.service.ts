@@ -65,6 +65,8 @@ export class AuthService {
       profile: { create: {} },
     })
 
+    await authRepository.update(user.id, { lastActivityAt: new Date() })
+
     const token = await this.issueTokenFor(user)
 
     return {
@@ -106,6 +108,9 @@ export class AuthService {
     const onboardingCompleted = user.profile?.onboardingCompleted ?? false
     const token = await this.issueTokenFor(user)
     
+    // Update last activity timestamp
+    await authRepository.update(user.id, { lastActivityAt: new Date() })
+
     const resetData = hasActiveReset && password === '' ? { resetToken: user.passwordResetToken } : {}
 
     return {

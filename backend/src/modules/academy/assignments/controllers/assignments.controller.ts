@@ -1,7 +1,6 @@
-
 import { Request, Response, NextFunction } from 'express'
-
 import { sendSuccess, sendError } from '../../../../shared/api/response'
+import prisma from '../../../../infrastructure/prisma/client'
 import { assignmentsService } from '../services/assignments.service'
 import { AssignmentSubmissionSchema, FeedbackSchema, CreateAssignmentSchema } from '../schemas/assignments.schemas'
 
@@ -11,6 +10,7 @@ export class AssignmentsController {
       const parsed = AssignmentSubmissionSchema.safeParse(req.body)
       if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
       const result = await assignmentsService.submitAssignment(req.user!.userId, req.params.assignmentId, parsed.data)
+      await prisma.user.update({ where: { id: req.user!.userId }, data: { lastActivityAt: new Date() } })
       return sendSuccess(res, result.submission, 'Assignment submitted successfully.', 201)
     } catch (err) { next(err) }
   }

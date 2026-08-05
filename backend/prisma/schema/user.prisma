@@ -6,6 +6,8 @@ model User {
   password               String
   name                   String?
   role                   Role      @default(USER)
+  signupSource           String    @default("EMAIL")
+  lastActivityAt         DateTime?
   passwordResetToken     String?
   passwordResetExpiresAt DateTime?
   createdAt              DateTime  @default(now())
