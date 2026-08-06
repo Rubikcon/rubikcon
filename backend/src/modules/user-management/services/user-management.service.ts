@@ -255,6 +255,9 @@ export class UserManagementService {
           await userManagementRepository.updateFacilitator(existingByEmail.id, { userId: user.id })
         }
       }
+    } else if (user.role === 'FACILITATOR') {
+      // If the user was a facilitator and is being demoted to something else, remove their facilitator profile
+      await userManagementRepository.deleteFacilitatorByUserId(userId)
     }
 
     return { user: updatedUser }
@@ -266,6 +269,10 @@ export class UserManagementService {
 
     if (user.role === 'SUPER_ADMIN') {
       await this.checkLastSuperAdminGuard('Cannot delete the last super admin.')
+    }
+
+    if (user.role === 'FACILITATOR') {
+      await userManagementRepository.deleteFacilitatorByUserId(userId)
     }
 
     await userManagementRepository.delete(userId)
