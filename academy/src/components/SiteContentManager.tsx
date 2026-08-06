@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getDirectImageUrl } from '../utils/imageUtils'
 import { apiRequest } from '../lib/api'
 import { Plus, Edit2, Trash2, Loader2, Save, X, Image as ImageIcon, CheckCircle2 } from 'lucide-react'
 
