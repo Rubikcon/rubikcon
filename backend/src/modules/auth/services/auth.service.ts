@@ -17,13 +17,19 @@ import { SanitizeUserResult } from '../types/auth.types'
 
 export class AuthService {
   private sanitizeUser(user: any, onboardingCompleted = false): SanitizeUserResult {
+    // For FACILITATOR, onboarding is complete if isProfileComplete is true.
+    // Otherwise fallback to the provided onboardingCompleted (which uses userProfile).
+    const resolvedOnboarding = user.role === 'FACILITATOR' && user.facilitatorProfile 
+      ? user.facilitatorProfile.isProfileComplete 
+      : onboardingCompleted
+
     return {
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
       createdAt: user.createdAt.toISOString(),
-      onboardingCompleted,
+      onboardingCompleted: resolvedOnboarding,
     }
   }
 

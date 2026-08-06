@@ -42,8 +42,7 @@ export default function CourseBuilderPage() {
   // Facilitators
   const [allFacilitators, setAllFacilitators] = useState<FacilitatorSummary[]>([])
   const [showFacilitatorPanel, setShowFacilitatorPanel] = useState(false)
-  const [addingFacilitator, setAddingFacilitator] = useState(false)
-  const [newFacForm, setNewFacForm] = useState({ name: '', title: '', organization: '', email: '', linkedinUrl: '', photoUrl: '', bio: '' })
+
 
   // Weeks
   const [expandedWeekId, setExpandedWeekId] = useState<string | null>(null)
@@ -205,23 +204,7 @@ export default function CourseBuilderPage() {
     }
   }
 
-  async function createFacilitator(e: FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    try {
-      const fac = await apiRequest<FacilitatorSummary>('/academy/admin/facilitators', {
-        method: 'POST',
-        body: JSON.stringify(newFacForm),
-      })
-      setAllFacilitators(prev => [...prev, fac])
-      setNewFacForm({ name: '', title: '', organization: '', email: '', linkedinUrl: '', photoUrl: '', bio: '' })
-      setAddingFacilitator(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create facilitator.')
-    } finally {
-      setSaving(false)
-    }
-  }
+
 
   async function handleCourseImageUpload(file: File | null) {
     if (!file) return
@@ -234,20 +217,6 @@ export default function CourseBuilderPage() {
       setError(err instanceof Error ? err.message : 'Failed to process course thumbnail.')
     } finally {
       setUploadingCourseImage(false)
-    }
-  }
-
-  async function handleNewFacilitatorPhotoUpload(file: File | null) {
-    if (!file) return
-    setSaving(true)
-    setError(null)
-    try {
-      const dataUrl = await compressImageToBase64(file, { maxBase64KB: 100 })
-      setNewFacForm(prev => ({ ...prev, photoUrl: dataUrl }))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to process facilitator icon.')
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -768,66 +737,6 @@ export default function CourseBuilderPage() {
                     </div>
                   </div>
                 )}
-
-                <div className="border-t border-white/8 pt-3">
-                  <button onClick={() => setAddingFacilitator(!addingFacilitator)} className="text-xs text-[#F5C518]">
-                    {addingFacilitator ? '— Cancel new facilitator' : '+ Create new facilitator'}
-                  </button>
-                  {addingFacilitator && (
-                    <form onSubmit={createFacilitator} className="mt-3 space-y-3">
-                      <div className="grid md:grid-cols-2 gap-3">
-                        {(['name', 'title', 'organization', 'email', 'linkedinUrl'] as const).map(field => (
-                          <div key={field}>
-                            <label className="block text-xs text-white/40 mb-1 capitalize">{field.replace(/Url$/, 'URL')}</label>
-                            <input
-                              value={newFacForm[field]}
-                              onChange={e => setNewFacForm(prev => ({ ...prev, [field]: e.target.value }))}
-                              required
-                              type={field === 'email' ? 'email' : field.includes('Url') ? 'url' : 'text'}
-                              className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      <div>
-                        <label className="block text-xs text-white/40 mb-1">Photo URL</label>
-                        <input
-                          value={newFacForm.photoUrl}
-                          onChange={e => setNewFacForm(prev => ({ ...prev, photoUrl: e.target.value }))}
-                          placeholder="https://example.com/photo.jpg or upload below"
-                          className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
-                        />
-                        <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-xs text-white/60 hover:border-[#F5C518]/30 hover:text-white transition-colors">
-                          <Image size={12} />
-                          Upload facilitator icon
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            onChange={e => void handleNewFacilitatorPhotoUpload(e.target.files?.[0] ?? null)}
-                            className="hidden"
-                          />
-                        </label>
-                        {newFacForm.photoUrl && (
-                          <div className="mt-2 rounded-xl overflow-hidden border border-white/10 w-20 h-20">
-                            <img src={newFacForm.photoUrl} alt="Preview" className="w-full h-full object-cover" />
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-xs text-white/40 mb-1">Bio</label>
-                        <textarea
-                          value={newFacForm.bio}
-                          onChange={e => setNewFacForm(prev => ({ ...prev, bio: e.target.value }))}
-                          rows={2}
-                          className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
-                        />
-                      </div>
-                      <button type="submit" disabled={saving} className="rounded-full bg-[#F5C518] px-4 py-2 text-sm font-semibold text-[#0A0A0A] disabled:opacity-50">
-                        {saving ? 'Creating...' : 'Create facilitator'}
-                      </button>
-                    </form>
-                  )}
-                </div>
               </div>
             )}
           </section>

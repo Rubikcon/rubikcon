@@ -29,12 +29,10 @@ export class UserManagementController {
     } catch (err) { next(err) }
   }
 
-  async createFacilitator(req: Request, res: Response, next: NextFunction) {
+  async getActiveFacilitators(req: Request, res: Response, next: NextFunction) {
     try {
-      const parsed = CreateFacilitatorSchema.safeParse(req.body)
-      if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
-      const result = await userManagementService.createFacilitator(parsed.data)
-      return sendSuccess(res, result.facilitator, 'Facilitator created.', 201)
+      const result = await userManagementService.getActiveFacilitators()
+      return sendSuccess(res, result.facilitators)
     } catch (err) { next(err) }
   }
 
@@ -44,13 +42,6 @@ export class UserManagementController {
       if (!parsed.success) return sendError(res, 'Validation failed', 400, parsed.error.flatten().fieldErrors)
       const result = await userManagementService.updateFacilitator(req.params.id, parsed.data)
       return sendSuccess(res, result.facilitator, 'Facilitator updated.')
-    } catch (err) { next(err) }
-  }
-
-  async deleteFacilitator(req: Request, res: Response, next: NextFunction) {
-    try {
-      await userManagementService.deleteFacilitator(req.params.id)
-      return sendSuccess(res, null, 'Facilitator deleted.')
     } catch (err) { next(err) }
   }
 

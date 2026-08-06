@@ -25,6 +25,8 @@ const SuperAdminPage = lazy(() => import('./pages/SuperAdminPage'))
 const SuperAdminCourseDetailPage = lazy(() => import('./pages/SuperAdminCourseDetailPage'))
 const FacilitatorsPage = lazy(() => import('./pages/FacilitatorsPage'))
 const FacilitatorApplyPage = lazy(() => import('./pages/FacilitatorApplyPage'))
+const FacilitatorOnboardingPage = lazy(() => import('./pages/FacilitatorOnboardingPage'))
+const FacilitatorPortalPage = lazy(() => import('./pages/FacilitatorPortalPage'))
 const AboutPage = lazy(() => import('./pages/AboutPage'))
 const ContactPage = lazy(() => import('./pages/ContactPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
@@ -64,7 +66,11 @@ export default function App() {
           {/* ─── Learner ────────────────────────────────────────────────── */}
           <Route path="/dashboard" component={DashboardPage} />
 
-          {/* ─── Facilitator admin ──────────────────────────────────────── */}
+          {/* ─── Facilitator ────────────────────────────────────────────── */}
+          <Route path="/facilitator/onboarding" component={FacilitatorOnboardingPage} />
+          <Route path="/facilitator" component={FacilitatorPortalPage} />
+
+          {/* ─── Admin (Internal Tool) ──────────────────────────────────── */}
           <Route path="/admin" component={AdminAcademyPage} />
           <Route path="/admin/academy" component={AdminAcademyPage} />
           <Route path="/admin/courses/:courseId" component={CourseBuilderWizard} />
