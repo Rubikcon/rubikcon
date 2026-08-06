@@ -159,6 +159,10 @@ export class UserManagementRepository {
     return prisma.facilitator.findUnique({ where: { email } })
   }
 
+  async deleteFacilitatorByUserId(userId: string) {
+    return prisma.facilitator.deleteMany({ where: { userId } })
+  }
+
   async createFacilitator(data: any) {
     return prisma.facilitator.create({ data })
   }
