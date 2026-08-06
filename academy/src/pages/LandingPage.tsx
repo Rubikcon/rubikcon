@@ -938,7 +938,7 @@ export default function LandingPage() {
                         {facilitator.role || facilitator.title}
                       </p>
                     </div>
-                    <p className="text-white/55 text-[15px] leading-relaxed flex-1">
+                    <p className="text-white/55 text-[15px] leading-relaxed flex-1 line-clamp-4">
                       {facilitator.bio}
                     </p>
                     <div className="flex flex-wrap gap-2 pt-1 mb-4">

@@ -126,7 +126,7 @@ function TestimonialManager() {
         {testimonials.sort((a,b) => a.position - b.position).map(t => (
           <div key={t.id} className={`bg-white/[0.02] border border-white/5 rounded-xl p-4 flex gap-4 ${!t.isActive ? 'opacity-50' : ''}`}>
             <div className="w-16 h-16 rounded-full bg-white/10 flex-shrink-0 overflow-hidden">
-              {t.photoUrl ? <img src={t.photoUrl} alt={t.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="text-white/30" /></div>}
+              {t.photoUrl ? <img src={getDirectImageUrl(t.photoUrl)} alt={t.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="text-white/30" /></div>}
             </div>
             <div className="flex-grow">
               {editingId === t.id ? (

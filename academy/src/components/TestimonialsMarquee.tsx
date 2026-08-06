@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { apiRequest } from "../lib/api";
+import { getDirectImageUrl } from "../utils/imageUtils";
 
 export type Testimonial = {
   id: string;
@@ -64,7 +65,7 @@ function Slide({ t, active }: SlideProps) {
       {/* ── Left: photo panel ────────────────────────────────────────────── */}
       <div className="relative md:w-[42%] shrink-0 min-h-[260px] md:min-h-[380px] overflow-hidden">
         <img
-          src={t.photoUrl || "/placeholders/testimonial-fallback.jpg"}
+          src={getDirectImageUrl(t.photoUrl) || "/placeholders/testimonial-fallback.jpg"}
           alt={t.name}
           draggable={false}
           loading="lazy"
@@ -96,7 +97,7 @@ function Slide({ t, active }: SlideProps) {
         <div className="flex items-center gap-4">
           {/* Avatar (mobile only — desktop shows the photo panel) */}
           <img
-            src={t.photoUrl || "/placeholders/testimonial-fallback.jpg"}
+            src={getDirectImageUrl(t.photoUrl) || "/placeholders/testimonial-fallback.jpg"}
             alt={t.name}
             draggable={false}
             loading="lazy"
