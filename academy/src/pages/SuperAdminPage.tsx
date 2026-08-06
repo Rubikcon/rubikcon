@@ -111,6 +111,7 @@ const ROLE_CONFIG: Record<string, { label: string; color: string }> = {
     label: "Super Admin",
     color: "text-purple-300 border-purple-400/30",
   },
+  FACILITATOR: { label: "Facilitator", color: "text-cyan-300 border-cyan-400/30" },
 };
 
 const STATUS_FILTERS = [
@@ -143,6 +144,7 @@ type SuperAdminFacilitator = {
   bio: string | null;
   createdAt: string;
   _count: { courses: number; weeks: number; lessons: number };
+  user?: { role: string; profile?: { onboardingCompleted: boolean } | null };
 };
 
 // ─── Learner activity types (matches GET /superadmin/learners response) ───
@@ -161,7 +163,7 @@ type LearnerSummary = {
   quizAttempts: number;
   gigApplications: number;
   lastActivityAt: string | null;
-  status: "Not Started" | "In Progress" | "Inactive" | "At Risk";
+  status: "Not Started" | "In Progress" | "Completed" | "Inactive" | "At Risk";
   statusReason?: string;
 };
 
@@ -174,7 +176,7 @@ type LearnerDetail = {
     createdAt: string;
     lastActivityAt: string | null;
     signupSource: string | null;
-    status: "Not Started" | "In Progress" | "Inactive" | "At Risk";
+    status: "Not Started" | "In Progress" | "Completed" | "Inactive" | "At Risk";
     statusReason?: string;
     profile: {
       country: string | null;
@@ -316,14 +318,7 @@ export default function SuperAdminPage() {
   // Featured Course
   const [settingFeatured, setSettingFeatured] = useState<string | null>(null);
 
-  // Create admin form
-  const [showCreateAdmin, setShowCreateAdmin] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-  });
-  const [creating, setCreating] = useState(false);
+
 
   // Delete actions
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -884,25 +879,6 @@ export default function SuperAdminPage() {
     }
   }
 
-  async function createAdmin(e: FormEvent) {
-    e.preventDefault();
-    setCreating(true);
-    setError(null);
-    try {
-      await apiRequest("/academy/superadmin/users", {
-        method: "POST",
-        body: JSON.stringify(createForm),
-      });
-      setShowCreateAdmin(false);
-      setCreateForm({ name: "", email: "", password: "" });
-      await loadUsers();
-      await loadOverview();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create admin.");
-    } finally {
-      setCreating(false);
-    }
-  }
 
   async function changeRole(userId: string, role: string) {
     setChangingRoleId(userId);
@@ -1038,6 +1014,7 @@ export default function SuperAdminPage() {
     { id: "submissions", label: "Submissions", icon: ClipboardList },
     { id: "learners", label: "Learners", icon: Users },
     { id: "users", label: "Users", icon: Users },
+    { id: "facilitators", label: "Facilitators", icon: UserCog },
     { id: "content", label: "Site Content", icon: Database },
   ];
 
@@ -1285,7 +1262,7 @@ export default function SuperAdminPage() {
                   <button
                     onClick={() => {
                       setActiveTab("users");
-                      setShowCreateAdmin(true);
+                      /* removed */
                     }}
                     className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white/70 hover:text-white hover:border-white/30 transition-colors"
                   >
@@ -2154,101 +2131,12 @@ export default function SuperAdminPage() {
                 >
                   <option value="">All roles</option>
                   <option value="USER">Learners</option>
+                  <option value="FACILITATOR">Facilitators</option>
                   <option value="ADMIN">Admins</option>
                   <option value="SUPER_ADMIN">Super Admins</option>
                 </select>
-                <button
-                  onClick={() => setShowCreateAdmin(!showCreateAdmin)}
-                  className="inline-flex items-center gap-2 rounded-full bg-[#F5C518] px-5 py-2.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors"
-                >
-                  <Plus size={14} /> Create admin
-                </button>
+
               </div>
-
-              {/* Create admin form */}
-              {showCreateAdmin && (
-                <form
-                  onSubmit={createAdmin}
-                  className="mb-6 rounded-[24px] border border-[#F5C518]/20 bg-[#F5C518]/5 p-6 space-y-4"
-                >
-                  <h3 className="text-sm font-semibold text-[#F5C518] mb-1">
-                    Create admin / facilitator account
-                  </h3>
-                  <p className="text-xs text-white/40">
-                    This user will have full admin access — they can build
-                    courses, review submissions, and manage learners.
-                  </p>
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs text-white/40 mb-1">
-                        Full name *
-                      </label>
-                      <input
-                        required
-                        value={createForm.name}
-                        onChange={(e) =>
-                          setCreateForm((p) => ({ ...p, name: e.target.value }))
-                        }
-                        placeholder="Dr. Jane Doe"
-                        className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-white/40 mb-1">
-                        Email address *
-                      </label>
-                      <input
-                        required
-                        type="email"
-                        value={createForm.email}
-                        onChange={(e) =>
-                          setCreateForm((p) => ({
-                            ...p,
-                            email: e.target.value,
-                          }))
-                        }
-                        placeholder="facilitator@org.com"
-                        className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-white/40 mb-1">
-                        Temporary password *
-                      </label>
-                      <input
-                        required
-                        type="password"
-                        value={createForm.password}
-                        onChange={(e) =>
-                          setCreateForm((p) => ({
-                            ...p,
-                            password: e.target.value,
-                          }))
-                        }
-                        placeholder="Min. 8 characters"
-                        className="w-full rounded-xl border border-white/12 bg-black/20 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      type="submit"
-                      disabled={creating}
-                      className="rounded-full bg-[#F5C518] px-5 py-2.5 text-sm font-semibold text-[#0A0A0A] disabled:opacity-50"
-                    >
-                      {creating ? "Creating…" : "Create admin account"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateAdmin(false)}
-                      className="rounded-full border border-white/10 px-5 py-2.5 text-sm text-white/50 hover:border-white/20"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              )}
-
               {/* User count */}
               <p className="text-xs text-white/35 mb-4">
                 {usersTotal} user{usersTotal !== 1 ? "s" : ""} found
@@ -2325,7 +2213,7 @@ export default function SuperAdminPage() {
                                   />
                                 </button>
                                 <div className="absolute right-0 top-full mt-1 w-36 rounded-xl border border-white/12 bg-[#111] shadow-xl z-10 py-1 hidden group-hover/role:block">
-                                  {["USER", "ADMIN", "SUPER_ADMIN"].map((r) => {
+                                  {["USER", "FACILITATOR", "ADMIN", "SUPER_ADMIN"].map((r) => {
                                     const rc = ROLE_CONFIG[r];
                                     return (
                                       <button
@@ -2404,6 +2292,82 @@ export default function SuperAdminPage() {
                   >
                     Next
                   </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── FACILITATORS TAB ────────────────────────────────────────────── */}
+          {activeTab === "facilitators" && (
+            <div>
+              <div className="mb-6">
+                <h2 className="font-display text-xl font-bold text-white">
+                  Facilitators Directory
+                </h2>
+                <p className="text-sm text-white/50">
+                  Manage profiles of active facilitators. To create a new one, go to the Users tab, search by email, and change their role to Facilitator.
+                </p>
+              </div>
+
+              {facilitatorsLoading ? (
+                <div className="flex justify-center py-20">
+                  <Loader2 size={32} className="animate-spin text-[#F5C518]" />
+                </div>
+              ) : facilitators.length === 0 ? (
+                <div className="rounded-[24px] border border-white/5 bg-white/[0.02] p-10 text-center">
+                  <p className="text-sm text-white/50">No facilitators found.</p>
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {facilitators.map((f) => (
+                    <div
+                      key={f.id}
+                      className="rounded-3xl border border-white/10 bg-[#141414] overflow-hidden hover:border-white/20 transition-all flex flex-col"
+                    >
+                      <div className="aspect-square relative overflow-hidden bg-black">
+                          {!f.user?.profile?.onboardingCompleted && (
+                            <div className="absolute top-4 right-4 z-20">
+                              <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider shadow-lg">
+                                Pending Onboarding
+                              </span>
+                            </div>
+                          )}
+                        {f.photoUrl ? (
+                          <img
+                            src={f.photoUrl}
+                            alt={f.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-5xl font-display font-extrabold text-white/20">
+                            {f.name.charAt(0)}
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+                      </div>
+                      <div className="p-6 -mt-20 relative z-10 flex-1 flex flex-col">
+                        <h3 className="font-display text-2xl font-bold text-white mb-1">
+                          {f.name}
+                        </h3>
+                        <p className="text-[#F5C518] text-sm font-semibold mb-2">
+                          {f.title}
+                          {f.organization ? ` · ${f.organization}` : ""}
+                        </p>
+                        <p className="text-xs text-white/40 mb-4 truncate">
+                          {f.email}
+                        </p>
+                        <p className="text-sm text-white/60 mb-6 flex-1 line-clamp-3">
+                          {f.bio || "No bio provided."}
+                        </p>
+                        <button
+                          onClick={() => openFacilitatorEditor(f)}
+                          className="w-full rounded-full border border-white/15 py-3 text-sm font-medium text-white hover:bg-white/5 transition-colors mt-auto"
+                        >
+                          Edit Profile
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -2798,6 +2762,188 @@ export default function SuperAdminPage() {
         </div>
       )}
 
+      {/* ─── Facilitator Edit Modal ────────────────────────────────────────── */}
+      {editingFacilitator && (
+        <div
+          onClick={closeFacilitatorEditor}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-[28px] border border-white/10 bg-[#0F0F11] p-6 space-y-5"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-display text-2xl font-extrabold text-white">
+                  Edit Facilitator Profile
+                </h2>
+                <p className="text-sm text-white/45 mt-0.5">
+                  {editingFacilitator.email}
+                </p>
+              </div>
+              <button
+                onClick={closeFacilitatorEditor}
+                className="text-white/30 hover:text-white transition-colors mt-1"
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            {/* Photo section */}
+            <div className="flex items-center gap-4">
+              <div className="relative shrink-0">
+                <div className="w-20 h-20 rounded-2xl overflow-hidden bg-black border border-white/10">
+                  {editingFacilitator.photoUrl ? (
+                    <img
+                      src={editingFacilitator.photoUrl}
+                      alt={editingFacilitator.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-3xl font-display font-extrabold text-white/20">
+                      {editingFacilitator.name.charAt(0)}
+                    </div>
+                  )}
+                </div>
+                {uploadingFacilitatorPhoto && (
+                  <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center">
+                    <Loader2 size={16} className="animate-spin text-[#F5C518]" />
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <input
+                  ref={facilitatorFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFacilitatorPhotoChange}
+                />
+                <button
+                  onClick={() => facilitatorFileInputRef.current?.click()}
+                  disabled={uploadingFacilitatorPhoto}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs font-medium text-white/70 hover:bg-white/5 transition-colors disabled:opacity-40"
+                >
+                  <Camera size={12} />
+                  {uploadingFacilitatorPhoto ? "Uploading…" : "Change photo"}
+                </button>
+                {editingFacilitator.photoUrl && (
+                  <button
+                    onClick={removeFacilitatorPhoto}
+                    disabled={uploadingFacilitatorPhoto}
+                    className="text-xs text-red-400/70 hover:text-red-400 transition-colors"
+                  >
+                    Remove photo
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Fields */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-white/40 mb-1">Full name *</label>
+                <input
+                  value={facilitatorForm.name}
+                  onChange={(e) =>
+                    setFacilitatorForm((p) => ({ ...p, name: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-white/40 mb-1">Title / Role *</label>
+                <input
+                  value={facilitatorForm.title}
+                  onChange={(e) =>
+                    setFacilitatorForm((p) => ({ ...p, title: e.target.value }))
+                  }
+                  placeholder="e.g. Blockchain Engineer"
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-white/40 mb-1">Organization</label>
+                <input
+                  value={facilitatorForm.organization}
+                  onChange={(e) =>
+                    setFacilitatorForm((p) => ({ ...p, organization: e.target.value }))
+                  }
+                  placeholder="e.g. Rubikcon Labs"
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-white/40 mb-1">Email *</label>
+                <input
+                  type="email"
+                  value={facilitatorForm.email}
+                  onChange={(e) =>
+                    setFacilitatorForm((p) => ({ ...p, email: e.target.value }))
+                  }
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs text-white/40 mb-1">LinkedIn URL</label>
+                <input
+                  type="url"
+                  value={facilitatorForm.linkedinUrl}
+                  onChange={(e) =>
+                    setFacilitatorForm((p) => ({ ...p, linkedinUrl: e.target.value }))
+                  }
+                  placeholder="https://linkedin.com/in/…"
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#F5C518]/40"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs text-white/40 mb-1">Bio</label>
+                <textarea
+                  rows={4}
+                  value={facilitatorForm.bio}
+                  onChange={(e) =>
+                    setFacilitatorForm((p) => ({ ...p, bio: e.target.value }))
+                  }
+                  placeholder="A short professional biography…"
+                  className="w-full rounded-xl border border-white/12 bg-black/30 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#F5C518]/40 resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Feedback */}
+            {facilitatorModalError && (
+              <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-xs text-red-200">
+                {facilitatorModalError}
+              </div>
+            )}
+            {facilitatorModalMessage && (
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-xs text-emerald-200 flex items-center gap-2">
+                <CheckCircle2 size={12} />
+                {facilitatorModalMessage}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={saveFacilitatorFields}
+                disabled={savingFacilitator || uploadingFacilitatorPhoto}
+                className="flex-1 rounded-full bg-[#F5C518] py-3 text-sm font-semibold text-[#0A0A0A] hover:bg-[#E8B800] transition-colors disabled:opacity-50"
+              >
+                {savingFacilitator ? "Saving…" : "Save changes"}
+              </button>
+              <button
+                onClick={closeFacilitatorEditor}
+                className="rounded-full border border-white/10 px-6 py-3 text-sm text-white/60 hover:border-white/20 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── Learner Detail Modal ─────────────────────────────────────────── */}
       {openLearnerId && (
         <div
@@ -3129,3 +3275,7 @@ function Section({
     </section>
   );
 }
+
+
+
+

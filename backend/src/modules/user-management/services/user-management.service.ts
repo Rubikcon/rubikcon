@@ -1,3 +1,4 @@
+import { Role } from '@prisma/client'
 import { NotFoundError, ValidationError } from '../../../shared/errors/AppError'
 import { userManagementRepository } from '../repositories/user-management.repository'
 
@@ -156,9 +157,9 @@ export class UserManagementService {
     return { facilitators }
   }
 
-  async createFacilitator(data: any) {
-    const facilitator = await userManagementRepository.createFacilitator(data)
-    return { facilitator }
+  async getActiveFacilitators() {
+    const facilitators = await userManagementRepository.findActiveFacilitators()
+    return { facilitators }
   }
 
   async updateFacilitator(id: string, data: any) {
@@ -166,13 +167,6 @@ export class UserManagementService {
     if (!existing) throw new NotFoundError('Facilitator not found.')
     const facilitator = await userManagementRepository.updateFacilitator(id, data)
     return { facilitator }
-  }
-
-  async deleteFacilitator(id: string) {
-    const existing = await userManagementRepository.findFacilitatorById(id)
-    if (!existing) throw new NotFoundError('Facilitator not found.')
-    await userManagementRepository.deleteFacilitator(id)
-    return { success: true }
   }
 
   async getFacilitatorMe(email: string) {
@@ -184,7 +178,23 @@ export class UserManagementService {
   async updateFacilitatorMe(email: string, data: any) {
     const facilitator = await userManagementRepository.findFacilitatorByEmail(email)
     if (!facilitator) throw new NotFoundError('Facilitator profile not found.')
-    const updated = await userManagementRepository.updateFacilitator(facilitator.id, data)
+
+    const mergedData = { ...facilitator, ...data }
+    const isProfileComplete = Boolean(
+      mergedData.name && 
+      mergedData.title && 
+      mergedData.bio && 
+      mergedData.photoUrl
+    )
+    
+    const updateData = { ...data, isProfileComplete }
+
+    const updated = await userManagementRepository.updateFacilitator(facilitator.id, updateData)
+
+    if (isProfileComplete && facilitator.userId) {
+      await userManagementRepository.updateUserProfile(facilitator.userId, { onboardingCompleted: true })
+    }
+
     return { facilitator: updated }
   }
 
@@ -214,7 +224,7 @@ export class UserManagementService {
     }
   }
 
-  async updateUserRole(userId: string, role: 'SUPER_ADMIN' | 'ADMIN' | 'USER') {
+  async updateUserRole(userId: string, role: 'SUPER_ADMIN' | 'ADMIN' | 'FACILITATOR' | 'USER') {
     const user = await userManagementRepository.findById(userId)
     if (!user) throw new NotFoundError('User not found.')
     
@@ -222,7 +232,31 @@ export class UserManagementService {
       await this.checkLastSuperAdminGuard('Cannot demote the last super admin.')
     }
     
-    const updatedUser = await userManagementRepository.updateUserRole(userId, role)
+    const updatedUser = await userManagementRepository.updateUserRole(userId, role as Role)
+
+    if (role === 'FACILITATOR') {
+      const existingProfile = await userManagementRepository.findFacilitatorByUserId(userId)
+      if (!existingProfile) {
+        // Check if a facilitator profile already exists for this email (edge case)
+        const existingByEmail = await userManagementRepository.findFacilitatorByEmail(user.email)
+        if (!existingByEmail) {
+          await userManagementRepository.createFacilitator({
+            userId: user.id,
+            email: user.email,
+            name: user.name ?? user.email.split('@')[0], // name is required; fall back to email prefix
+            title: '',          // required field — filled during onboarding
+            organization: '',   // required field — filled during onboarding
+            linkedinUrl: '',    // required field — filled during onboarding
+            bio: '',
+            isProfileComplete: false,
+          })
+        } else {
+          // Link the existing facilitator profile to this user
+          await userManagementRepository.updateFacilitator(existingByEmail.id, { userId: user.id })
+        }
+      }
+    }
+
     return { user: updatedUser }
   }
 

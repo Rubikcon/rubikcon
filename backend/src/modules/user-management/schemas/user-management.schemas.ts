@@ -2,7 +2,7 @@ import { z } from 'zod'
 import '@asteasolutions/zod-to-openapi'
 
 export const UpdateRoleSchema = z.object({
-  role: z.enum(['SUPER_ADMIN', 'ADMIN', 'USER'], { errorMap: () => ({ message: 'Invalid role' }) }),
+  role: z.enum(['SUPER_ADMIN', 'ADMIN', 'FACILITATOR', 'USER'], { errorMap: () => ({ message: 'Invalid role' }) }),
 }).openapi('UpdateRoleSchema', {
   title: 'Update Role',
   description: 'Payload for updating user role',

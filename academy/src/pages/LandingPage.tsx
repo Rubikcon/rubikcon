@@ -868,13 +868,18 @@ export default function LandingPage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
-            {HOME_FACILITATORS.map((facilitator, i) => {
+            { (facilitators.length > 0 ? facilitators.slice(0,2) : HOME_FACILITATORS).map((facilitator: any, i) => {
               const initials = facilitator.name
                 .split(" ")
-                .map((n) => n[0])
+                .map((n: string) => n[0])
                 .join("")
                 .slice(0, 2)
                 .toUpperCase();
+              let finalPhotoUrl = facilitator.photoUrl;
+              if (!finalPhotoUrl && facilitator.name?.toLowerCase().includes("joy egbu")) {
+                finalPhotoUrl = "/icons/joy-egbu.jpeg";
+              }
+              
               return (
                 <motion.div
                   key={facilitator.name}
@@ -885,9 +890,9 @@ export default function LandingPage() {
                   className="rounded-3xl border border-white/10 bg-white/[0.03] overflow-hidden hover:border-white/20 transition-colors flex flex-col"
                 >
                   <a href="/facilitators" className="block w-full">
-                    {facilitator.photoUrl ? (
+                    {finalPhotoUrl ? (
                       <img
-                        src={facilitator.photoUrl}
+                        src={finalPhotoUrl}
                         alt={facilitator.name}
                         loading="lazy"
                         decoding="async"
@@ -914,14 +919,14 @@ export default function LandingPage() {
                         </h3>
                       </a>
                       <p className="text-[#F5C518] text-sm font-semibold">
-                        {facilitator.role}
+                        {facilitator.role || facilitator.title}
                       </p>
                     </div>
                     <p className="text-white/55 text-[15px] leading-relaxed flex-1">
                       {facilitator.bio}
                     </p>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {facilitator.expertise.map((tag) => (
+                    <div className="flex flex-wrap gap-2 pt-1 mb-4">
+                      {(facilitator.expertise || []).map((tag: string) => (
                         <span
                           key={tag}
                           className="text-[11px] font-medium text-white/60 border border-white/12 bg-white/[0.04] px-3 py-1.5 rounded-full"
@@ -930,6 +935,16 @@ export default function LandingPage() {
                         </span>
                       ))}
                     </div>
+                    {facilitator.linkedinUrl && (
+                      <a 
+                        href={facilitator.linkedinUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block mt-auto text-[13px] text-[#F5C518] hover:text-[#E8B800] transition-colors font-medium border-b border-[#F5C518]/30 hover:border-[#E8B800] pb-0.5 w-fit"
+                      >
+                        LinkedIn ↗
+                      </a>
+                    )}
                   </div>
                 </motion.div>
               );

@@ -113,3 +113,12 @@ export const requireSuperAdmin = (req: Request, res: Response, next: NextFunctio
   }
   next()
 }
+
+// Facilitator-only guard (must be used after requireAuth)
+export const requireFacilitator = (req: Request, res: Response, next: NextFunction): void => {
+  if (req.user?.role !== 'FACILITATOR' && req.user?.role !== 'ADMIN' && req.user?.role !== 'SUPER_ADMIN') {
+    sendError(res, 'Forbidden. Facilitator access required.', 403)
+    return
+  }
+  next()
+}

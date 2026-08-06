@@ -4,14 +4,14 @@ export class AuthRepository {
   async findUserByEmail(email: string) {
     return prisma.user.findUnique({
       where: { email },
-      include: { profile: true },
+      include: { profile: true, facilitatorProfile: true },
     })
   }
 
   async findById(id: string) {
     return prisma.user.findUnique({
       where: { id },
-      include: { profile: true },
+      include: { profile: true, facilitatorProfile: true },
     })
   }
 

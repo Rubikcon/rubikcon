@@ -120,16 +120,32 @@ export class UserManagementRepository {
 
   async findFacilitators() {
     return prisma.facilitator.findMany({
+      where: {
+        user: {
+          role: { in: ['FACILITATOR', 'ADMIN', 'SUPER_ADMIN'] },
+        },
+      },
+      include: {
+        _count: { select: { courses: true, weeks: true, lessons: true } },
+        user: { select: { role: true, profile: { select: { onboardingCompleted: true } } } },
+      },
       orderBy: { name: 'asc' },
     })
   }
 
-  async createFacilitator(data: any) {
-    return prisma.facilitator.create({ data })
+  async findActiveFacilitators() {
+    return prisma.facilitator.findMany({
+      where: { user: { role: { in: ['FACILITATOR', 'ADMIN', 'SUPER_ADMIN'] } } },
+      orderBy: { name: 'asc' },
+    })
   }
 
   async findFacilitatorById(id: string) {
     return prisma.facilitator.findUnique({ where: { id } })
+  }
+
+  async findFacilitatorByUserId(userId: string) {
+    return prisma.facilitator.findUnique({ where: { userId } })
   }
 
   async updateFacilitator(id: string, data: any) {
@@ -139,12 +155,19 @@ export class UserManagementRepository {
     })
   }
 
-  async deleteFacilitator(id: string) {
-    return prisma.facilitator.delete({ where: { id } })
-  }
-
   async findFacilitatorByEmail(email: string) {
     return prisma.facilitator.findUnique({ where: { email } })
+  }
+
+  async createFacilitator(data: any) {
+    return prisma.facilitator.create({ data })
+  }
+
+  async updateUserProfile(userId: string, data: any) {
+    return prisma.userProfile.update({
+      where: { userId },
+      data,
+    })
   }
 
   async findAdminUsers() {

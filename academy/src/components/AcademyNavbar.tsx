@@ -16,7 +16,7 @@ const NAV_LINKS = [
   { href: "/courses", label: "Courses" },
   { href: "/about", label: "About" },
   { href: "/facilitators", label: "Facilitators" },
-  { href: "/contact", label: "Contact" },
+  { href: "/facilitator/apply", label: "Apply to Teach" },
 ] as const;
 
 export default function AcademyNavbar({

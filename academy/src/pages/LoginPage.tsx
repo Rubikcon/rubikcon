@@ -124,6 +124,10 @@ export default function LoginPage() {
     }
     if (user.role === 'SUPER_ADMIN') return setLocation('/admin/superadmin')
     if (user.role === 'ADMIN') return setLocation('/admin/academy')
+    if (user.role === 'FACILITATOR') {
+      if (!user.onboardingCompleted) return setLocation('/facilitator/onboarding')
+      return setLocation('/facilitator')
+    }
     if (!user.onboardingCompleted) return setLocation('/onboarding')
     setLocation('/dashboard')
   }
