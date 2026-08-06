@@ -33,8 +33,8 @@ function TestimonialManager() {
 
   const load = () => {
     setLoading(true)
-    apiRequest<{testimonials: Testimonial[]}>('/academy/public/testimonials')
-      .then(res => setTestimonials(res.testimonials))
+    apiRequest<Testimonial[]>('/academy/admin/testimonials')
+      .then(res => setTestimonials(res || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false))
   }
@@ -45,9 +45,9 @@ function TestimonialManager() {
     setSaving(true)
     try {
       if (id) {
-        await apiRequest(`/academy/superadmin/testimonials/${id}`, { method: 'PUT', body: JSON.stringify(editForm) })
+        await apiRequest(`/academy/admin/testimonials/${id}`, { method: 'PUT', body: JSON.stringify(editForm) })
       } else {
-        await apiRequest('/academy/superadmin/testimonials', { method: 'POST', body: JSON.stringify(editForm) })
+        await apiRequest('/academy/admin/testimonials', { method: 'POST', body: JSON.stringify(editForm) })
       }
       setEditingId(null)
       setEditForm({})
@@ -62,7 +62,7 @@ function TestimonialManager() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this testimonial?')) return
     try {
-      await apiRequest(`/academy/superadmin/testimonials/${id}`, { method: 'DELETE' })
+      await apiRequest(`/academy/admin/testimonials/${id}`, { method: 'DELETE' })
       load()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error deleting testimonial')
@@ -71,7 +71,7 @@ function TestimonialManager() {
 
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
-      await apiRequest(`/academy/superadmin/testimonials/${id}`, { 
+      await apiRequest(`/academy/admin/testimonials/${id}`, { 
         method: 'PUT', 
         body: JSON.stringify({ isActive: !current }) 
       })
