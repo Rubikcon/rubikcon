@@ -11,7 +11,8 @@ import { apiRequest } from "../lib/api";
 
 // Set this to the real course-preview video URL (YouTube / Vimeo / Loom / Drive)
 // when supplied - the placeholder frame renders until then.
-const COURSE_PREVIEW_VIDEO_URL = "https://drive.google.com/file/d/1hOmYZoO3DhS57_LPnSrUCTER4rqzMwlu/view?usp=sharing";
+const COURSE_PREVIEW_VIDEO_URL =
+  "https://drive.google.com/file/d/1hOmYZoO3DhS57_LPnSrUCTER4rqzMwlu/view?usp=sharing";
 
 // Audience photos: drop real images at /public/images/audience/<slug>.jpg and
 // they replace the generated SVG placeholders automatically (same for learner
@@ -189,26 +190,31 @@ const HOME_FACILITATORS = [
 const AUDIENCE_ITEMS = [
   {
     slug: "students",
+    photo: "H35A7516",
     label: "Students",
     desc: "Build tech skills that make you employable from day one - while you study.",
   },
   {
     slug: "professionals",
+    photo: "H35A7517",
     label: "Professionals",
     desc: "Leverage your existing expertise and add in-demand digital skills.",
   },
   {
     slug: "entrepreneurs",
+    photo: "H35A7518",
     label: "Entrepreneurs",
     desc: "Understand the technologies that will power your next venture.",
   },
   {
     slug: "blockchain-enthusiasts",
+    photo: "H35A7519",
     label: "Blockchain Enthusiasts",
     desc: "Turn curiosity into real, structured understanding of how blockchain works.",
   },
   {
     slug: "blockchain-experts",
+    photo: "H35A7520",
     label: "Blockchain Professionals & Experts",
     desc: "Go deeper - product development, real-world use cases, and ecosystem strategy.",
   },
@@ -377,9 +383,8 @@ export default function LandingPage() {
                 className="group flex flex-col items-center gap-3 w-[100px] sm:w-[120px]"
               >
                 <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/[0.03] border border-white/10 flex items-center justify-center group-hover:bg-[#1C1C1C] group-hover:border-[#F5C518]/30 group-hover:shadow-[0_0_25px_rgba(245,197,24,0.15)] transition-all duration-300 group-hover:-translate-y-1">
-                  
                   {/* Rotating Clock Orbit */}
-                  <div 
+                  <div
                     className="absolute inset-[-4px] rounded-full border border-transparent border-t-white/10 group-hover:border-t-[#F5C518]/60 motion-safe:animate-[spin_15s_linear_infinite] transition-colors duration-300 pointer-events-none"
                     style={{ animationDelay: `${i * -3.75}s` }}
                   >
@@ -492,86 +497,91 @@ export default function LandingPage() {
 
           {dynamicCourses.length > 0 ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-              {[...dynamicCourses].sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0)).slice(0, 3).map((course, i) => {
-                const level = (course.level ?? "").split(" ")[0].toUpperCase();
-                const levelClass =
-                  LEVEL_COLORS[level] || "bg-[#E8E0D0] text-[#1C1C1C]";
-                const primaryFacilitator = course.facilitators[0];
-                const initials = primaryFacilitator
-                  ? primaryFacilitator.name
-                      .split(" ")
-                      .map((n: string) => n[0])
-                      .join("")
-                      .slice(0, 2)
-                      .toUpperCase()
-                  : "?";
-                return (
-                  <motion.a
-                    key={course.id}
-                    href={`/course/${course.slug}`}
-                    initial={{ opacity: 0, y: 16 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.07 }}
-                    className="bg-white rounded-2xl p-6 hover:shadow-lg hover:-translate-y-0.5 transition-all flex flex-col"
-                  >
-                    <CourseThumbnail course={course} index={i} />
-                    <div className="mb-4">
-                      <span
-                        className={`text-xs font-semibold px-2.5 py-1 rounded-full ${levelClass}`}
-                      >
-                        {level || "COURSE"}
-                      </span>
-                    </div>
-                    <h3 className="font-display font-extrabold text-[#1C1C1C] text-lg leading-snug mb-2">
-                      {course.title}
-                    </h3>
-                    <p className="text-[#1C1C1C]/55 text-xs leading-relaxed mb-4 flex-1">
-                      {course.tagline}
-                    </p>
-                    <div className="flex items-center gap-4 text-xs text-[#1C1C1C]/40 mb-4">
-                      <span className="flex items-center gap-1">
-                        <BookOpen aria-hidden="true" size={11} />
-                        {course.weekCount} week
-                        {course.weekCount !== 1 ? "s" : ""}
-                      </span>
-                      {course.estimatedDuration && (
-                        <span className="flex items-center gap-1">
-                          <Clock aria-hidden="true" size={11} />
-                          {course.estimatedDuration}
+              {[...dynamicCourses]
+                .sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0))
+                .slice(0, 3)
+                .map((course, i) => {
+                  const level = (course.level ?? "")
+                    .split(" ")[0]
+                    .toUpperCase();
+                  const levelClass =
+                    LEVEL_COLORS[level] || "bg-[#E8E0D0] text-[#1C1C1C]";
+                  const primaryFacilitator = course.facilitators[0];
+                  const initials = primaryFacilitator
+                    ? primaryFacilitator.name
+                        .split(" ")
+                        .map((n: string) => n[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()
+                    : "?";
+                  return (
+                    <motion.a
+                      key={course.id}
+                      href={`/course/${course.slug}`}
+                      initial={{ opacity: 0, y: 16 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: i * 0.07 }}
+                      className="bg-white rounded-2xl p-6 hover:shadow-lg hover:-translate-y-0.5 transition-all flex flex-col"
+                    >
+                      <CourseThumbnail course={course} index={i} />
+                      <div className="mb-4">
+                        <span
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-full ${levelClass}`}
+                        >
+                          {level || "COURSE"}
                         </span>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between pt-4 border-t border-[#F2EDE2]">
-                      {primaryFacilitator ? (
-                        <div className="flex items-center gap-2">
-                          {facilitatorPhotoUrl(primaryFacilitator) ? (
-                            <img
-                              src={facilitatorPhotoUrl(primaryFacilitator)!}
-                              alt={primaryFacilitator.name}
-                              loading="lazy"
-                              decoding="async"
-                              className="w-7 h-7 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-7 h-7 rounded-full bg-[#0A0A0A] flex items-center justify-center text-[#F5C518] font-display font-extrabold text-[10px]">
-                              {initials}
-                            </div>
-                          )}
-                          <span className="text-xs font-semibold text-[#1C1C1C]/70 truncate max-w-[110px]">
-                            {primaryFacilitator.name}
+                      </div>
+                      <h3 className="font-display font-extrabold text-[#1C1C1C] text-lg leading-snug mb-2">
+                        {course.title}
+                      </h3>
+                      <p className="text-[#1C1C1C]/55 text-xs leading-relaxed mb-4 flex-1">
+                        {course.tagline}
+                      </p>
+                      <div className="flex items-center gap-4 text-xs text-[#1C1C1C]/40 mb-4">
+                        <span className="flex items-center gap-1">
+                          <BookOpen aria-hidden="true" size={11} />
+                          {course.weekCount} week
+                          {course.weekCount !== 1 ? "s" : ""}
+                        </span>
+                        {course.estimatedDuration && (
+                          <span className="flex items-center gap-1">
+                            <Clock aria-hidden="true" size={11} />
+                            {course.estimatedDuration}
                           </span>
-                        </div>
-                      ) : (
-                        <div />
-                      )}
-                      <span className="text-xs font-semibold text-[#1C1C1C] underline underline-offset-2 hover:text-[#C49A00]">
-                        View course →
-                      </span>
-                    </div>
-                  </motion.a>
-                );
-              })}
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between pt-4 border-t border-[#F2EDE2]">
+                        {primaryFacilitator ? (
+                          <div className="flex items-center gap-2">
+                            {facilitatorPhotoUrl(primaryFacilitator) ? (
+                              <img
+                                src={facilitatorPhotoUrl(primaryFacilitator)!}
+                                alt={primaryFacilitator.name}
+                                loading="lazy"
+                                decoding="async"
+                                className="w-7 h-7 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-[#0A0A0A] flex items-center justify-center text-[#F5C518] font-display font-extrabold text-[10px]">
+                                {initials}
+                              </div>
+                            )}
+                            <span className="text-xs font-semibold text-[#1C1C1C]/70 truncate max-w-[110px]">
+                              {primaryFacilitator.name}
+                            </span>
+                          </div>
+                        ) : (
+                          <div />
+                        )}
+                        <span className="text-xs font-semibold text-[#1C1C1C] underline underline-offset-2 hover:text-[#C49A00]">
+                          View course →
+                        </span>
+                      </div>
+                    </motion.a>
+                  );
+                })}
             </div>
           ) : (
             /* Empty state - API returned no courses yet */
@@ -581,7 +591,7 @@ export default function LandingPage() {
                   key={i}
                   className="bg-white p-6 flex flex-col items-center justify-center min-h-[280px] border-2 border-dashed border-[#E8E0D0]"
                   style={{
-                    borderRadius: '255px 15px 225px 15px/15px 225px 15px 255px',
+                    borderRadius: "255px 15px 225px 15px/15px 225px 15px 255px",
                   }}
                 >
                   <div className="w-10 h-10 rounded-full bg-[#F2EDE2] flex items-center justify-center mb-3">
@@ -690,7 +700,7 @@ export default function LandingPage() {
                 className="bg-white rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all flex flex-col"
               >
                 <SwappableImage
-                  base={`/images/audience/${item.slug}`}
+                  base={`/images/audience/${item.photo}`}
                   alt={item.label}
                   className="w-full aspect-[4/3] object-cover"
                 />
@@ -868,7 +878,10 @@ export default function LandingPage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
-            { (facilitators.length > 0 ? facilitators.slice(0,2) : HOME_FACILITATORS).map((facilitator: any, i) => {
+            {(facilitators.length > 0
+              ? facilitators.slice(0, 2)
+              : HOME_FACILITATORS
+            ).map((facilitator: any, i) => {
               const initials = facilitator.name
                 .split(" ")
                 .map((n: string) => n[0])
@@ -876,10 +889,13 @@ export default function LandingPage() {
                 .slice(0, 2)
                 .toUpperCase();
               let finalPhotoUrl = facilitator.photoUrl;
-              if (!finalPhotoUrl && facilitator.name?.toLowerCase().includes("joy egbu")) {
+              if (
+                !finalPhotoUrl &&
+                facilitator.name?.toLowerCase().includes("joy egbu")
+              ) {
                 finalPhotoUrl = "/icons/joy-egbu.jpeg";
               }
-              
+
               return (
                 <motion.div
                   key={facilitator.name}
@@ -936,7 +952,7 @@ export default function LandingPage() {
                       ))}
                     </div>
                     {facilitator.linkedinUrl && (
-                      <a 
+                      <a
                         href={facilitator.linkedinUrl}
                         target="_blank"
                         rel="noopener noreferrer"
