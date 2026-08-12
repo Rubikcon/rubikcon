@@ -14,6 +14,7 @@ import {
   HelpCircle,
   Loader2,
   Mail,
+  Menu,
   Play,
   Presentation,
   Share2,
@@ -141,6 +142,7 @@ export default function LessonPage() {
   const [activeSlideDeckId, setActiveSlideDeckId] = useState<string | null>(null)
   const [isCompleting, setIsCompleting] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const auth = getStoredAuth()
 
@@ -367,6 +369,72 @@ export default function LessonPage() {
     { id: 'assignment',  label: 'Assignment',  icon: ClipboardCheck, hidden: week.assignment.tasks.length === 0 },
   ]
 
+  const SidebarContent = () => (
+    <>
+      {/* Course header */}
+      <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-white/[0.07]">
+        <a
+          href={`/course/${course.slug}`}
+          className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors mb-3"
+        >
+          <X size={13} /> Close player
+        </a>
+        <p className="text-[11px] font-mono uppercase tracking-[0.16em] text-[#F5C518]/60 mb-1">
+          Programme
+        </p>
+        <h2 className="text-sm font-bold text-white leading-snug mb-3 line-clamp-2">{course.title}</h2>
+        {/* Overall progress */}
+        <div className="h-1 rounded-full bg-white/8 overflow-hidden mb-1.5">
+          <div className="h-full bg-[#F5C518] transition-all" style={{ width: `${course.progressPercent}%` }} />
+        </div>
+        <p className="text-[11px] text-white/30">
+          {course.completedCount} / {course.totalWeeks} {units.toLowerCase()} complete
+        </p>
+      </div>
+
+      {/* Week list */}
+      <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+        {sidebarGroups.length > 0 ? (
+          sidebarGroups.map(group => (
+            <SidebarGroup
+              key={group.moduleId ?? 'ungrouped'}
+              label={group.label}
+              weeks={group.weeks}
+              courseSlug={course.slug}
+              currentSlug={weekSlug ?? ''}
+              defaultOpen={group.weeks.some(w => w.slug === weekSlug)}
+              unit={unit}
+            />
+          ))
+        ) : (
+          course.weeks.map(item => {
+            const isActive = item.slug === weekSlug
+            const isDone = item.progress.status === 'COMPLETE'
+            return (
+              <a
+                key={item.id}
+                href={`/course/${course.slug}/week/${item.slug}`}
+                className={`flex items-center gap-3 px-4 py-2.5 border-l-[3px] transition-colors ${
+                  isActive ? 'border-[#F5C518] bg-gradient-to-r from-[#F5C518]/15 to-transparent text-white' : 'border-transparent text-white/50 hover:text-white/80 hover:bg-white/[0.03]'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center flex-shrink-0 transition-colors ${isDone ? 'border-[#F5C518] bg-[#F5C518]/15' : 'border-white/20'}`}>
+                  {isDone && <CheckCircle2 size={10} className="text-[#F5C518]" />}
+                  {isActive && !isDone && <div className="w-2 h-2 rounded-full bg-[#F5C518]" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] text-white/30 font-mono mb-0.5">{unit} {item.number}</p>
+                  <p className="text-[13px] font-semibold truncate">{item.title}</p>
+                  <p className="text-[11px] text-white/40 mt-0.5 flex items-center gap-1"><Clock3 size={10} />{item.durationLabel}</p>
+                </div>
+              </a>
+            )
+          })
+        )}
+      </div>
+    </>
+  )
+
   const isFacilitatorPreview = week.viewerMode === 'facilitator-preview' || course.viewerMode === 'facilitator-preview'
   return (
     <div className="flex flex-col bg-[#0A0A0A]" style={{ height: '100dvh', overflow: 'hidden' }}>
@@ -379,106 +447,75 @@ export default function LessonPage() {
         />
       )}
 
-      <div className="flex flex-1 min-h-0">
-
-      {/* ── Left Sidebar ──────────────────────────────────────────────────── */}
-      <aside className="hidden xl:flex flex-col w-[320px] flex-shrink-0 bg-[#0F0F11] border-r border-white/[0.07] overflow-hidden">
-
-        {/* Course header */}
-        <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-white/[0.07]">
-          <a
-            href={`/course/${course.slug}`}
-            className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors mb-3"
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 flex xl:hidden">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+          <motion.div
+            initial={{ x: '-100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '-100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="relative flex flex-col w-[300px] max-w-[80vw] h-full bg-[#0F0F11] border-r border-white/10 shadow-2xl z-10"
           >
-            <X size={13} /> Close player
-          </a>
-          <p className="text-[11px] font-mono uppercase tracking-[0.16em] text-[#F5C518]/60 mb-1">
-            Programme
-          </p>
-          <h2 className="text-sm font-bold text-white leading-snug mb-3 line-clamp-2">{course.title}</h2>
-          {/* Overall progress */}
-          <div className="h-1 rounded-full bg-white/8 overflow-hidden mb-1.5">
-            <div className="h-full bg-[#F5C518] transition-all" style={{ width: `${course.progressPercent}%` }} />
-          </div>
-          <p className="text-[11px] text-white/30">
-            {course.completedCount} / {course.totalWeeks} {units.toLowerCase()} complete
-          </p>
+            <SidebarContent />
+          </motion.div>
         </div>
+      )}
 
-        {/* Week list */}
-        <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
-          {sidebarGroups.length > 0 ? (
-            sidebarGroups.map(group => (
-              <SidebarGroup
-                key={group.moduleId ?? 'ungrouped'}
-                label={group.label}
-                weeks={group.weeks}
-                courseSlug={course.slug}
-                currentSlug={weekSlug ?? ''}
-                defaultOpen={group.weeks.some(w => w.slug === weekSlug)}
-                unit={unit}
-              />
-            ))
-          ) : (
-            // Flat list fallback (no modules)
-            course.weeks.map(item => {
-              const isActive = item.slug === weekSlug
-              const isDone = item.progress.status === 'COMPLETE'
-              return (
-                <a
-                  key={item.id}
-                  href={`/course/${course.slug}/week/${item.slug}`}
-                  className={`flex items-center gap-3 px-4 py-2.5 border-l-2 transition-colors ${
-                    isActive ? 'border-[#F5C518] bg-[#F5C518]/8 text-white' : 'border-transparent text-white/50 hover:text-white/80 hover:bg-white/[0.03]'
-                  }`}
-                >
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${isDone ? 'border-[#F5C518] bg-[#F5C518]/15' : 'border-white/15'}`}>
-                    {isDone && <CheckCircle2 size={10} className="text-[#F5C518]" />}
-                    {isActive && !isDone && <div className="w-2 h-2 rounded-full bg-[#F5C518]" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] text-white/25 font-mono mb-0.5">{unit} {item.number}</p>
-                    <p className="text-[13px] font-medium truncate">{item.title}</p>
-                    <p className="text-[11px] text-white/30 mt-0.5 flex items-center gap-1"><Play size={8} />{item.durationLabel}</p>
-                  </div>
-                </a>
-              )
-            })
-          )}
-        </div>
+      <div className="flex flex-1 min-h-0 relative">
+
+      {/* ── Left Sidebar (Desktop) ── */}
+      <aside className="hidden xl:flex flex-col w-[320px] flex-shrink-0 bg-[#0A0A0A] border-r border-white/10 overflow-hidden relative z-10">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#F5C518]/[0.02] to-transparent pointer-events-none" />
+        <SidebarContent />
       </aside>
 
-      {/* ── Main content ──────────────────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+      {/* ── Main content ── */}
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[#0A0A0A] relative z-10">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#F5C518]/5 via-[#0A0A0A]/0 to-transparent pointer-events-none z-0" />
 
         {/* Top bar */}
-        <div className="flex-shrink-0 flex items-center gap-3 px-4 md:px-6 py-3 bg-[#0F0F11] border-b border-white/[0.07] z-10">
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 md:px-6 py-3 bg-[#0A0A0A]/80 backdrop-blur-xl border-b border-white/10 z-20 relative">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className="xl:hidden p-1.5 -ml-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0"
+          >
+            <Menu size={20} />
+          </button>
+          
           <a
             href={`/course/${course.slug}`}
-            className="flex items-center gap-1 text-sm text-white/45 hover:text-white transition-colors shrink-0"
+            className="flex items-center gap-1 text-sm font-medium text-white/50 hover:text-white transition-colors shrink-0"
           >
-            <ChevronLeft size={15} />
+            <ChevronLeft size={16} />
             <span className="hidden sm:inline max-w-[160px] truncate">{course.title}</span>
           </a>
-          <div className="w-px h-4 bg-white/10 hidden sm:block" />
-          <p className="text-sm text-white/60 truncate min-w-0">
-            {week.module && <span className="text-white/35">{week.module.title} {' · '} </span>}
-            <span className="text-white/35">{unit} {week.number} {' · '} </span>
+          <div className="w-px h-4 bg-white/15 hidden sm:block" />
+          <p className="text-sm font-medium text-white/80 truncate min-w-0">
+            {week.module && <span className="text-white/40">{week.module.title} {' · '} </span>}
+            <span className="text-white/40">{unit} {week.number} {' · '} </span>
             <span className="text-white/70">{week.title}</span>
           </p>
 
           {/* Progress controls */}
-          <div className="ml-auto flex items-center gap-2 shrink-0">
+          <div className="ml-auto flex items-center gap-3 shrink-0 relative z-20">
             {activeVideo && (
               <button
                 onClick={() => copyShareLink(activeVideo.id)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 transition-colors"
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold text-white hover:bg-white/20 transition-colors"
                 title="Copy share link"
               >
                 {linkCopied ? (
-                  <CheckCircle2 size={13} className="text-emerald-400" />
+                  <>
+                    <CheckCircle2 size={14} className="text-emerald-400" />
+                    <span className="hidden sm:inline text-emerald-400">Copied</span>
+                  </>
                 ) : (
-                  <Share2 size={13} />
+                  <>
+                    <Share2 size={14} />
+                    <span className="hidden sm:inline">Share</span>
+                  </>
                 )}
               </button>
             )}
@@ -486,18 +523,18 @@ export default function LessonPage() {
             {week.progress.status === 'COMPLETE' ? (
               <span
                 title={week.progress.completedAt ? `Completed ${new Date(week.progress.completedAt).toLocaleDateString()}` : 'Completed'}
-                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-300"
+                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-xs font-bold text-emerald-300"
               >
-                <CheckCircle2 size={12} /> Completed
+                <CheckCircle2 size={14} /> Completed
               </span>
             ) : (
               <button
                 onClick={() => void handleMarkComplete()}
                 disabled={isCompleting || !auth}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.05] px-3 py-1.5 text-xs font-semibold text-white/70 hover:border-white/25 hover:text-white transition-colors disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#F5C518]/30 bg-[#F5C518]/10 px-4 py-2 text-xs font-bold text-[#F5C518] hover:bg-[#F5C518]/20 transition-colors disabled:opacity-40"
                 title={auth ? 'Mark this lesson as complete' : 'Sign in to track progress'}
               >
-                {isCompleting ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                {isCompleting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                 Mark complete
               </button>
             )}
@@ -524,44 +561,13 @@ export default function LessonPage() {
         </div>
 
         {/* Scrollable area */}
-        <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+        <div className="flex-1 overflow-y-auto relative z-10" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
 
-          {/* ── Video Player (with horizontal tabs for ≤4 videos, sidebar for >4) ── */}
+          {/* ── Video Player ── */}
           {week.videos.length > 0 && (
             <div className="bg-black">
-              {/* Horizontal video tab strip — shown only when 2–4 videos */}
-              {week.videos.length > 1 && week.videos.length <= 4 && (
-                <div className="border-b border-white/[0.07] bg-black/80 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-                  <div className="flex items-stretch min-w-max">
-                    {week.videos.map((v, i) => (
-                      <button
-                        key={v.id}
-                        onClick={() => setActiveVideoIdx(i)}
-                        className={`group relative flex items-center gap-2.5 px-5 py-3.5 text-sm transition-all border-b-2 ${
-                          i === activeVideoIdx
-                            ? 'border-[#F5C518] text-white bg-white/[0.04]'
-                            : 'border-transparent text-white/40 hover:text-white/70 hover:bg-white/[0.02]'
-                        }`}
-                      >
-                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 transition-colors ${
-                          i === activeVideoIdx
-                            ? 'bg-[#F5C518] text-[#0A0A0A]'
-                            : 'bg-white/10 text-white/50 group-hover:bg-white/15'
-                        }`}>
-                          {i === activeVideoIdx ? <Play size={8} fill="currentColor" /> : i + 1}
-                        </span>
-                        <span className="max-w-[180px] truncate font-medium leading-tight">{v.title}</span>
-                        {i === activeVideoIdx && (
-                          <span className="text-[9px] font-semibold uppercase tracking-widest text-[#F5C518]/80 ml-1 flex-shrink-0">Playing</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Player + sidebar layout (sidebar only for >4 videos) */}
-              <div className={`flex flex-col ${week.videos.length > 4 ? 'lg:flex-row' : ''}`}>
+              {/* Player + sidebar layout */}
+              <div className={`flex flex-col ${week.videos.length > 1 ? 'lg:flex-row' : ''}`}>
                 {/* Primary player */}
                 <div className="flex-1 min-w-0">
                   {activeVideo && (
@@ -582,7 +588,7 @@ export default function LessonPage() {
                       />
                     )
                   )}
-                  {/* Video title + description strip — shown under the player for all multi-video lessons */}
+                  {/* Video title + description strip - shown under the player for all multi-video lessons */}
                   {activeVideo && week.videos.length > 1 && (
                     <div className="px-4 py-3 border-t border-white/[0.06] bg-black/40 flex items-start justify-between gap-4">
                       <div className="min-w-0">
@@ -616,8 +622,8 @@ export default function LessonPage() {
                   )}
                 </div>
 
-                {/* Sidebar playlist — only for >4 videos */}
-                {week.videos.length > 4 && (
+                {/* Sidebar playlist — only for >1 videos */}
+                {week.videos.length > 1 && (
                   <aside className="lg:w-[300px] lg:flex-shrink-0 lg:border-l border-t lg:border-t-0 border-white/[0.07] bg-black/60 lg:max-h-[56.25vw] lg:overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
                     <div className="sticky top-0 z-10 bg-black/95 backdrop-blur-sm px-4 py-3 border-b border-white/[0.07]">
                       <div className="flex items-center gap-2">
@@ -657,22 +663,29 @@ export default function LessonPage() {
           )}
 
           {/* ── Tabs ── */}
-          <div className="sticky top-0 z-10 bg-[#0F0F11]/95 backdrop-blur-sm border-b border-white/[0.07]">
-            <div className="max-w-4xl mx-auto px-4 md:px-8 flex items-center gap-0 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+          <div className="sticky top-0 z-10 bg-[#0A0A0A]/90 backdrop-blur-xl border-b border-white/[0.07]">
+            <div className="max-w-4xl mx-auto px-4 md:px-8 flex items-center gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
               {TABS.filter(t => !t.hidden).map(tab => {
                 const Icon = tab.icon
+                const isActive = activeTab === tab.id
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex-shrink-0 flex items-center gap-2 px-4 py-3.5 text-sm font-medium border-b-2 transition-all ${
-                      activeTab === tab.id
-                        ? 'border-[#F5C518] text-white'
-                        : 'border-transparent text-white/40 hover:text-white/70'
+                    className={`relative flex-shrink-0 flex items-center gap-2 px-3 py-3.5 text-sm font-medium transition-colors ${
+                      isActive ? 'text-white' : 'text-white/40 hover:text-white/70'
                     }`}
                   >
-                    <Icon size={14} />
+                    <Icon size={14} className={isActive ? 'text-[#F5C518]' : ''} />
                     {tab.label}
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeLessonTab"
+                        className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#F5C518]"
+                        initial={false}
+                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      />
+                    )}
                   </button>
                 )
               })}
@@ -699,21 +712,28 @@ export default function LessonPage() {
 
             {/* ── Overview tab ── */}
             {activeTab === 'overview' && (
-              <div className="space-y-8">
+              <div className="space-y-10">
                 {/* Lesson header */}
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-3 mb-4">
                     {week.module && (
-                      <span className="text-xs font-mono uppercase tracking-widest text-[#F5C518]/70 bg-[#F5C518]/10 border border-[#F5C518]/20 rounded-full px-3 py-0.5">
+                      <span className="text-xs font-semibold tracking-wide text-[#0A0A0A] bg-[#F5C518] rounded-full px-3 py-1">
                         {week.module.title}
                       </span>
                     )}
-                    <span className="text-xs text-white/30 font-mono">{unit} {week.number}</span>
-                    <span className="text-xs text-white/20 font-mono">·</span>
-                    <span className="text-xs text-white/30 font-mono flex items-center gap-1"><Clock3 size={10} /> {week.durationLabel}</span>
+                    <span className="text-xs font-medium text-white/50 bg-white/5 rounded-full px-3 py-1 border border-white/10">
+                      {unit} {week.number}
+                    </span>
+                    <span className="text-xs font-medium text-white/50 flex items-center gap-1.5 bg-white/5 rounded-full px-3 py-1 border border-white/10">
+                      <Clock3 size={12} /> {week.durationLabel}
+                    </span>
                   </div>
-                  <h1 className="font-display text-2xl md:text-3xl font-extrabold text-white mb-3 leading-tight">{week.title}</h1>
-                  <p className="text-white/55 leading-relaxed text-base">{week.summary}</p>
+                  <h1 className="font-display text-3xl md:text-4xl font-extrabold text-white mb-4 leading-tight tracking-tight">
+                    {week.title}
+                  </h1>
+                  <p className="text-white/60 leading-relaxed text-lg max-w-3xl">
+                    {week.summary}
+                  </p>
                 </div>
 
                 {/* Lesson rich-text content */}
@@ -741,28 +761,31 @@ export default function LessonPage() {
 
                 {/* Instructor(s) */}
                 {week.lessonDetails.facilitators.length > 0 && (
-                  <div>
-                    <p className="text-xs font-mono uppercase tracking-widest text-white/30 mb-3">Instructor{week.lessonDetails.facilitators.length > 1 ? 's' : ''}</p>
+                  <div className="mt-8">
+                    <p className="text-[11px] font-mono uppercase tracking-widest text-white/30 mb-4">Instructor{week.lessonDetails.facilitators.length > 1 ? 's' : ''}</p>
                     <div className="grid gap-4 md:grid-cols-2">
                       {week.lessonDetails.facilitators.map(f => (
-                        <div key={f.id} className="flex items-start gap-4 rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-                          <div className="w-12 h-12 rounded-xl bg-[#F5C518]/15 text-[#F5C518] flex items-center justify-center font-display font-extrabold text-base shrink-0">
-                            {f.name.split(' ').map((p: string) => p[0]).join('').slice(0, 2)}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-white">{f.name}</p>
-                            <p className="text-sm text-white/50">{f.title}</p>
-                            <p className="text-sm text-white/35">{f.organization}</p>
-                            {f.bio && <p className="text-xs text-white/40 mt-1 leading-relaxed">{f.bio}</p>}
-                            <div className="flex flex-wrap gap-3 mt-2 text-sm">
-                              <a href={f.emailMailto} className="inline-flex items-center gap-1.5 text-white/50 hover:text-white transition-colors text-xs">
-                                <Mail size={12} /> {f.emailMasked}
-                              </a>
-                              {f.linkedinUrl && (
-                                <a href={f.linkedinUrl} target="_blank" rel="noreferrer" className="text-xs text-[#F5C518] hover:text-[#FFE070] transition-colors">
-                                  LinkedIn
+                        <div key={f.id} className="relative group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] p-5 hover:bg-white/[0.04] transition-all">
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-[#F5C518]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                          <div className="relative flex items-start gap-4">
+                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#F5C518]/20 to-transparent border border-[#F5C518]/30 text-[#F5C518] flex items-center justify-center font-display font-extrabold text-lg shrink-0 shadow-lg">
+                              {f.name.split(' ').map((p: string) => p[0]).join('').slice(0, 2)}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-white text-base">{f.name}</p>
+                              <p className="text-sm font-medium text-[#F5C518]/90">{f.title}</p>
+                              <p className="text-xs text-white/40 mb-2">{f.organization}</p>
+                              {f.bio && <p className="text-sm text-white/60 leading-relaxed mb-3 line-clamp-2">{f.bio}</p>}
+                              <div className="flex flex-wrap gap-3 text-sm">
+                                <a href={f.emailMailto} className="inline-flex items-center gap-1.5 text-white/50 hover:text-white transition-colors text-xs bg-white/5 rounded-full px-3 py-1 border border-white/10">
+                                  <Mail size={12} /> {f.emailMasked}
                                 </a>
-                              )}
+                                {f.linkedinUrl && (
+                                  <a href={f.linkedinUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[#F5C518] hover:text-[#0A0A0A] hover:bg-[#F5C518] transition-colors text-xs bg-[#F5C518]/10 rounded-full px-3 py-1 border border-[#F5C518]/20">
+                                    LinkedIn
+                                  </a>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1008,50 +1031,72 @@ export default function LessonPage() {
             {/* ── Quiz tab ── */}
             {activeTab === 'quiz' && week.assignment.quiz && (
               <div className="space-y-6">
-                <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-6 bg-gradient-to-r from-white/[0.03] to-transparent p-6 rounded-3xl border border-white/5">
                   <div>
-                    <p className="text-[11px] font-mono uppercase tracking-widest text-white/30 mb-2">Weekly quiz</p>
-                    <h4 className="font-display text-2xl font-bold text-white">{week.assignment.quiz.title}</h4>
-                    <p className="text-sm text-white/45 mt-1">
-                      Pass mark {week.assignment.quiz.passMark}% {' · '} {week.assignment.quiz.questions.length} question{week.assignment.quiz.questions.length !== 1 ? 's' : ''}
+                    <p className="text-[11px] font-mono uppercase tracking-widest text-[#F5C518]/80 mb-2">Weekly Assessment</p>
+                    <h4 className="font-display text-3xl font-extrabold text-white mb-1.5">{week.assignment.quiz.title}</h4>
+                    <p className="text-sm font-medium text-white/50">
+                      Pass mark {week.assignment.quiz.passMark}% <span className="mx-2 text-white/20">•</span> {week.assignment.quiz.questions.length} question{week.assignment.quiz.questions.length !== 1 ? 's' : ''}
                     </p>
                   </div>
                   {week.assignment.quiz.latestAttempt && (
-                    <div className="rounded-2xl border border-[#F5C518]/20 bg-[#F5C518]/8 px-5 py-3 text-right">
-                      <p className="text-[10px] uppercase tracking-widest text-white/35 mb-0.5">Your score</p>
-                      <p className="font-display text-3xl font-extrabold text-[#F5C518]">{week.assignment.quiz.latestAttempt.percentage}%</p>
-                      <p className={`text-xs mt-0.5 ${week.assignment.quiz.latestAttempt.percentage >= week.assignment.quiz.passMark ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {week.assignment.quiz.latestAttempt.percentage >= week.assignment.quiz.passMark ? 'Passed' : 'Not passed'}
-                      </p>
+                    <div className="relative overflow-hidden rounded-2xl border border-[#F5C518]/20 bg-[#F5C518]/10 px-6 py-4 text-right shadow-lg shadow-[#F5C518]/5">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-[#F5C518]/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+                      <div className="relative">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-1">Your score</p>
+                        <p className="font-display text-4xl font-extrabold text-[#F5C518] drop-shadow-md">{week.assignment.quiz.latestAttempt.percentage}%</p>
+                        <p className={`text-xs font-semibold mt-1 ${week.assignment.quiz.latestAttempt.percentage >= week.assignment.quiz.passMark ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {week.assignment.quiz.latestAttempt.percentage >= week.assignment.quiz.passMark ? 'Passed' : 'Not passed'}
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {week.assignment.quiz.questions.map((question, index) => (
-                    <div key={question.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-5">
-                      <p className="text-[10px] font-mono uppercase tracking-widest text-white/30 mb-2">Question {index + 1}</p>
-                      <h5 className="text-white font-semibold mb-4 leading-relaxed">{question.prompt}</h5>
-                      <div className="space-y-2">
+                    <div key={question.id} className="rounded-3xl border border-white/10 bg-white/[0.02] p-6 md:p-8">
+                      <p className="text-[11px] font-semibold tracking-widest text-white/40 mb-3">QUESTION {index + 1}</p>
+                      <h5 className="text-white text-lg font-semibold mb-6 leading-relaxed">{question.prompt}</h5>
+                      <div className="space-y-3">
                         {question.options.map(option => {
                           const submitted = week.assignment.quiz?.submitted
                           const selected = submitted ? option.isSelected : quizSelections[question.id] === option.id
                           const optionCls = submitted
                             ? option.isCorrect
-                              ? 'border-emerald-400/40 bg-emerald-400/10 text-white'
+                              ? 'border-emerald-400/50 bg-emerald-400/10 text-white shadow-[0_0_15px_rgba(52,211,153,0.1)]'
                               : option.isSelected
-                                ? 'border-red-400/30 bg-red-400/10 text-white'
-                                : 'border-white/6 bg-white/[0.02] text-white/40'
+                                ? 'border-red-400/40 bg-red-400/10 text-white shadow-[0_0_15px_rgba(248,113,113,0.1)]'
+                                : 'border-white/5 bg-white/[0.01] text-white/30 opacity-70'
                             : selected
-                              ? 'border-[#F5C518]/40 bg-[#F5C518]/10 text-white'
-                              : 'border-white/8 bg-white/[0.02] text-white/60 hover:border-white/18 hover:text-white/80'
+                              ? 'border-[#F5C518]/50 bg-[#F5C518]/10 text-white shadow-[0_0_15px_rgba(245,197,24,0.1)] -translate-y-0.5'
+                              : 'border-white/10 bg-white/[0.02] text-white/60 hover:border-white/20 hover:bg-white/[0.04] hover:text-white hover:-translate-y-0.5'
+                          
                           return (
                             <button
                               key={option.id}
-                              onClick={() => setQuizSelections(c => ({ ...c, [question.id]: option.id }))}
-                              className={`w-full text-left rounded-xl border px-4 py-3 text-sm transition-colors ${optionCls}`}
+                              onClick={() => !submitted && setQuizSelections(c => ({ ...c, [question.id]: option.id }))}
+                              disabled={submitted}
+                              className={`w-full text-left rounded-2xl border px-5 py-4 text-sm font-medium transition-all active:scale-[0.99] ${optionCls}`}
                             >
-                              {option.label}
+                              <div className="flex items-center gap-3">
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                                  submitted
+                                    ? option.isCorrect
+                                      ? 'border-emerald-400 bg-emerald-400/20'
+                                      : option.isSelected
+                                        ? 'border-red-400 bg-red-400/20'
+                                        : 'border-white/10'
+                                    : selected
+                                      ? 'border-[#F5C518] bg-[#F5C518]/20'
+                                      : 'border-white/20 group-hover:border-white/40'
+                                }`}>
+                                  {submitted && option.isCorrect && <CheckCircle2 size={12} className="text-emerald-400" />}
+                                  {submitted && option.isSelected && !option.isCorrect && <X size={12} className="text-red-400" />}
+                                  {!submitted && selected && <div className="w-2.5 h-2.5 rounded-full bg-[#F5C518]" />}
+                                </div>
+                                <span className="leading-snug">{option.label}</span>
+                              </div>
                             </button>
                           )
                         })}
@@ -1082,10 +1127,10 @@ export default function LessonPage() {
 
             {/* ── Assignment tab ── */}
             {activeTab === 'assignment' && (
-              <div className="space-y-5">
-                <div>
-                  <p className="text-[11px] font-mono uppercase tracking-widest text-white/30 mb-2">Assignments</p>
-                  <h4 className="font-display text-2xl font-bold text-white">This week's deliverable</h4>
+              <div className="space-y-8">
+                <div className="mb-8">
+                  <p className="text-[11px] font-mono uppercase tracking-widest text-[#F5C518]/80 mb-2">Assignments</p>
+                  <h4 className="font-display text-3xl font-extrabold text-white">This week's deliverable</h4>
                 </div>
 
                 {week.assignment.tasks.map(task => {
@@ -1094,33 +1139,38 @@ export default function LessonPage() {
                     textResponse: task.latestSubmission?.textResponse || '',
                   }
                   return (
-                    <div key={task.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-5">
-                      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                    <div key={task.id} className="rounded-3xl border border-white/10 bg-white/[0.02] p-6 md:p-8">
+                      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
                         <div>
-                          <h5 className="text-lg font-semibold text-white">{task.title}</h5>
-                          <p className="text-xs text-white/35 mt-0.5">Deadline: {new Date(task.deadline).toLocaleString()}</p>
+                          <h5 className="text-xl font-bold text-white leading-tight">{task.title}</h5>
+                          <p className="text-sm text-[#F5C518]/80 mt-1">Deadline: {new Date(task.deadline).toLocaleString()}</p>
                         </div>
-                        <span className={`rounded-full border px-3 py-1 text-xs font-mono ${
-                          task.status === 'SUBMITTED' ? 'border-[#F5C518]/30 text-[#F5C518]'
-                          : task.status === 'REVIEWED' ? 'border-emerald-400/30 text-emerald-400'
-                          : 'border-white/10 text-white/45'
+                        <span className={`rounded-full px-4 py-1.5 text-xs font-bold tracking-wide shadow-lg ${
+                          task.status === 'SUBMITTED' ? 'bg-[#F5C518]/20 text-[#F5C518] border border-[#F5C518]/30 shadow-[#F5C518]/5'
+                          : task.status === 'REVIEWED' ? 'bg-emerald-400/20 text-emerald-400 border border-emerald-400/30 shadow-emerald-400/5'
+                          : 'bg-white/10 text-white/70 border border-white/20'
                         }`}>
                           {task.status.replace('_', ' ')}
                         </span>
                       </div>
 
-                      <p className="text-sm text-white/55 leading-relaxed mb-5">{task.instructions}</p>
+                      <p className="text-base text-white/60 leading-relaxed mb-8">{task.instructions}</p>
 
                       {!!task.choices.length && (
-                        <div className="grid gap-3 md:grid-cols-2 mb-5">
+                        <div className="grid gap-4 md:grid-cols-2 mb-8">
                           {task.choices.map(choice => (
                             <button
                               key={choice.id}
                               onClick={() => setAssignmentDrafts(c => ({ ...c, [task.id]: { ...draft, choiceId: choice.id } }))}
-                              className={`rounded-2xl border p-4 text-left transition-colors ${draft.choiceId === choice.id ? 'border-[#F5C518]/35 bg-[#F5C518]/8' : 'border-white/8 bg-black/20 hover:border-white/15'}`}
+                              className={`group relative overflow-hidden rounded-2xl border p-5 text-left transition-all active:scale-[0.99] ${
+                                draft.choiceId === choice.id 
+                                  ? 'border-[#F5C518] bg-[#F5C518]/10 shadow-[0_0_20px_rgba(245,197,24,0.15)] -translate-y-1' 
+                                  : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04] hover:-translate-y-1'
+                              }`}
                             >
-                              <h6 className="font-semibold text-white text-sm mb-1">{choice.title}</h6>
-                              <p className="text-xs text-white/50">{choice.description}</p>
+                              <div className={`absolute top-0 right-0 w-2 h-2 rounded-full m-4 transition-colors ${draft.choiceId === choice.id ? 'bg-[#F5C518]' : 'bg-transparent'}`} />
+                              <h6 className={`font-semibold text-base mb-2 transition-colors ${draft.choiceId === choice.id ? 'text-[#F5C518]' : 'text-white'}`}>{choice.title}</h6>
+                              <p className="text-sm text-white/50 leading-relaxed">{choice.description}</p>
                             </button>
                           ))}
                         </div>
