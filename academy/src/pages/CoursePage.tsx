@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'wouter'
 import { motion } from 'framer-motion'
-import { ArrowRight, Award, BookOpen, CheckCircle2, ChevronDown, Clock3, Loader2, PlayCircle, Users } from 'lucide-react'
+import { ArrowRight, Award, BookOpen, CheckCircle2, ChevronDown, Clock3, Loader2, PlayCircle, Users, Lock } from 'lucide-react'
 import AcademyNavbar from '../components/AcademyNavbar'
 import PreviewBanner from '../components/PreviewBanner'
 import VideoEmbed from '../components/VideoEmbed'
@@ -42,11 +42,11 @@ function getSlideEmbedUrl(url: string): string {
 
 function facilitatorPhotoUrl(facilitator: { name: string; photoUrl: string | null }) {
   if (facilitator.photoUrl) return facilitator.photoUrl
-  if (facilitator.name.toLowerCase().includes('joy egbu')) return '/icons/joy-egbu.jpeg'
+  if ((facilitator.name || '').toLowerCase().includes('joy egbu')) return '/icons/joy-egbu.jpeg'
   return null
 }
 
-export default function CoursePage() {
+function CoursePageInner() {
   const params = useParams<{ slug?: string }>()
   const slug = params.slug || DEFAULT_COURSE_SLUG
 
@@ -92,26 +92,32 @@ export default function CoursePage() {
   }
 
   const continueWeek = useMemo(() => {
-    if (!course?.weeks.length) return null
-    return course.weeks.find(w => w.progress.status !== 'COMPLETE') || course.weeks[0]
+    if (!(course?.weeks || []).length) return null
+    return (course?.weeks || []).find(w => w?.progress?.status !== 'COMPLETE') || (course?.weeks || [])[0]
   }, [course])
 
   // Group weeks by module (preserving week order)
   const weekGroups = useMemo(() => {
     if (!course) return []
-    const hasModules = course.modules.length > 0 && course.weeks.some(w => w.moduleId)
-    if (!hasModules) return [{ module: null, weeks: course.weeks }]
+    const hasModules = (course.modules?.length ?? 0) > 0 && (course.weeks || []).some(w => w.moduleId)
+    if (!hasModules) return [{ module: null, weeks: course.weeks || [] }]
 
     const groups: Array<{ module: CourseSummary['modules'][number] | null; weeks: typeof course.weeks }> = []
-    const unassigned = course.weeks.filter(w => !w.moduleId)
+    const unassigned = (course.weeks || []).filter(w => !w.moduleId)
 
-    for (const mod of course.modules) {
-      const modWeeks = course.weeks.filter(w => w.moduleId === mod.id)
+    for (const mod of (course.modules || [])) {
+      const modWeeks = (course.weeks || []).filter(w => w.moduleId === mod.id)
       if (modWeeks.length > 0) groups.push({ module: mod, weeks: modWeeks })
     }
     if (unassigned.length > 0) groups.push({ module: null, weeks: unassigned })
     return groups
   }, [course])
+
+  const defaultExpandedModuleId = useMemo(() => {
+    if (!course) return null
+    if (continueWeek && continueWeek.moduleId) return continueWeek.moduleId
+    return course.modules?.[0]?.id || null
+  }, [course, continueWeek])
 
   if (loading) {
     return (
@@ -140,7 +146,7 @@ export default function CoursePage() {
     )
   }
 
-  const unit = course.contentUnit
+  const unit = course.contentUnit || 'Lesson'
   const learnerUnit = 'Module'
   const learnerUnits = 'Modules'
   const units = `${unit}s`
@@ -185,7 +191,7 @@ export default function CoursePage() {
               <div className="flex flex-wrap gap-6 text-sm text-white/40 mb-8">
                 <span className="inline-flex items-center gap-2">
                   <BookOpen size={14} className="text-[#F5C518]" />
-                  {course.modules.length || course.totalWeeks} {learnerUnit.toLowerCase()}{(course.modules.length || course.totalWeeks) !== 1 ? 's' : ''}
+                  {(course.modules?.length || 0) || course.totalWeeks} {learnerUnit.toLowerCase()}{((course.modules?.length || 0) || course.totalWeeks) !== 1 ? 's' : ''}
                 </span>
                 {course.estimatedDuration && (
                   <span className="inline-flex items-center gap-2">
@@ -193,10 +199,10 @@ export default function CoursePage() {
                     {course.estimatedDuration}
                   </span>
                 )}
-                {course.facilitators.length > 0 && (
+                {(course.facilitators?.length || 0) > 0 && (
                   <span className="inline-flex items-center gap-2">
                     <Users size={14} className="text-[#F5C518]" />
-                    {course.facilitators.length} facilitator{course.facilitators.length !== 1 ? 's' : ''}
+                    {(course.facilitators?.length || 0)} facilitator{(course.facilitators?.length || 0) !== 1 ? 's' : ''}
                   </span>
                 )}
               </div>
@@ -249,12 +255,12 @@ export default function CoursePage() {
             </motion.div>
 
             {/* Facilitators */}
-            {course.facilitators.length > 0 && (
+            {(course.facilitators?.length || 0) > 0 && (
               <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-6 mb-6">
                 <p className="text-xs font-mono uppercase tracking-widest text-white/30 mb-4">Taught by</p>
                 <div className="flex flex-wrap gap-4">
-                  {course.facilitators.map(f => {
-                    const initials = f.name.replace(/^(Dr|Mr|Ms|Prof)\.\s*/i, '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                  {(course.facilitators || []).map(f => {
+                    const initials = (f.name || '').replace(/^(Dr|Mr|Ms|Prof)\.\s*/i, '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
                     return (
                       <div key={f.id} className="flex items-center gap-3">
                         {facilitatorPhotoUrl(f) ? (
@@ -278,7 +284,7 @@ export default function CoursePage() {
             {/* Course outline preview */}
             <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-6">
               <p className="text-xs font-mono uppercase tracking-widest text-white/30 mb-4">
-                Course outline — {course.modules.length || course.totalWeeks} {learnerUnit.toLowerCase()}{(course.modules.length || course.totalWeeks) !== 1 ? 's' : ''}
+                Course outline — {(course.modules?.length || 0) || course.totalWeeks} {learnerUnit.toLowerCase()}{((course.modules?.length || 0) || course.totalWeeks) !== 1 ? 's' : ''}
               </p>
               <div className="space-y-5">
                 {weekGroups.map((group, gi) => (
@@ -291,13 +297,13 @@ export default function CoursePage() {
                     <div className="space-y-2">
                       {group.weeks.map((week, i) => {
                         return (
-                          <div key={week.id} className="flex items-center gap-4 rounded-2xl border border-white/8 bg-black/20 px-5 py-4">
+                          <div key={week?.id} className="flex items-center gap-4 rounded-2xl border border-white/8 bg-black/20 px-5 py-4">
                             <div className="font-display text-2xl font-extrabold text-[#F5C518]/40 w-10 shrink-0">
-                              {String(week.number).padStart(2, '0')}
+                              {String(week?.number).padStart(2, '0')}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-white/70">{week.title}</p>
-                              <p className="text-xs text-white/30 mt-0.5">{week.durationLabel} · {week.estimatedCompletionMinutes} min</p>
+                              <p className="text-sm font-medium text-white/70">{week?.title}</p>
+                              <p className="text-xs text-white/30 mt-0.5">{week?.durationLabel} · {week?.estimatedCompletionMinutes} min</p>
                             </div>
                           </div>
                         )
@@ -326,8 +332,24 @@ export default function CoursePage() {
 
   // ── Enrolled: show full course with progress sidebar ──────────────────────
   const isFacilitatorPreview = course.viewerMode === 'facilitator-preview'
+
+  // Determine which module to expand by default
+
+
+  const toggleModule = (moduleId: string) => {
+    setExpandedModules(prev => ({
+      ...prev,
+      [moduleId]: prev[moduleId] !== undefined ? !prev[moduleId] : moduleId !== defaultExpandedModuleId
+    }))
+  }
+
+  const isModuleExpanded = (moduleId: string) => {
+    if (expandedModules[moduleId] !== undefined) return expandedModules[moduleId]
+    return moduleId === defaultExpandedModuleId
+  }
+
   return (
-    <div className="min-h-screen bg-[#0A0A0A]">
+    <div className="min-h-screen bg-[#0A0A0A] flex flex-col">
       {isFacilitatorPreview && (
         <PreviewBanner
           status={course.status}
@@ -336,154 +358,185 @@ export default function CoursePage() {
           contextMessage="You're seeing this course exactly as learners will. Unpublished weeks are included."
         />
       )}
-      <AcademyNavbar showBack backHref="/" backLabel="Home" solid />
+      <AcademyNavbar solid />
+      
+      {/* 1. Header Banner */}
+      <header className="pt-28 pb-10 px-4 md:px-6 border-b border-white/10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#F5C518]/10 via-[#0A0A0A] to-[#0A0A0A]">
+        <div className="max-w-[1100px] mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="flex-1">
+            <p className="text-xs font-mono uppercase tracking-widest text-[#F5C518] mb-3">
+              {course.level || 'Programme'}{course.estimatedDuration ? ` • ${course.estimatedDuration}` : ''}
+            </p>
+            <h1 className="font-display text-3xl md:text-4xl font-extrabold text-white mb-4 leading-tight">
+              {course.title}
+            </h1>
+            
+            {/* Contextual Description */}
+            {course.description && (
+              <p className="text-white/60 text-sm md:text-base max-w-2xl leading-relaxed line-clamp-2 mb-6">
+                {course.description}
+              </p>
+            )}
 
-      <main className="pt-24 pb-16 px-6">
-        <div className="max-w-6xl mx-auto grid gap-8 lg:grid-cols-[300px_minmax(0,1fr)]">
-
-          {/* Progress sidebar */}
-          <aside className="bg-white/[0.04] border border-white/10 rounded-[28px] p-5 h-fit lg:sticky lg:top-24">
-            <div className="mb-5">
-              <h1 className="font-display text-xl font-extrabold text-white leading-tight mb-1">{course.title}</h1>
-              <p className="text-xs text-white/40 leading-relaxed">{course.tagline}</p>
-            </div>
-
-            {/* Progress bar */}
-            <div className="mb-5 rounded-2xl bg-[#F5C518]/8 border border-[#F5C518]/15 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-white">Your progress</span>
-                <span className="text-2xl font-display font-extrabold text-[#F5C518]">{course.progressPercent}%</span>
-              </div>
-              <div className="h-2.5 rounded-full bg-white/8 overflow-hidden mb-2">
-                <motion.div
+            <div className="flex items-center gap-4 max-w-md">
+              <div className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden">
+                <div
                   className="h-full bg-gradient-to-r from-[#F5C518] to-[#E8B800] rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${course.progressPercent}%` }}
-                  transition={{ duration: 0.8, ease: 'easeOut' }}
+                  style={{ width: `${course.progressPercent}%` }}
                 />
               </div>
-              <p className="text-xs text-white/40">
-                {course.completedCount} of {course.totalWeeks} {unit.toLowerCase()}{course.totalWeeks !== 1 ? 's' : ''} complete
-              </p>
+              <span className="text-sm font-bold text-white shrink-0">{course.progressPercent}%</span>
             </div>
+            <p className="text-xs text-white/40 mt-2">
+              {course.completedCount} of {course.totalWeeks} {unit.toLowerCase()}{course.totalWeeks !== 1 ? 's' : ''} complete
+            </p>
+          </div>
+          
+          <div className="shrink-0 flex flex-col items-start md:items-end">
+            {continueWeek && (
+              <a
+                href={`/course/${course.slug}/week/${continueWeek?.slug}`}
+                className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-bold px-8 py-3.5 rounded-full hover:bg-[#E8B800] transition-colors whitespace-nowrap mb-2"
+              >
+                {course.progressPercent === 100 
+                  ? 'Review Course' 
+                  : course.progressPercent > 0 
+                    ? 'Continue Learning' 
+                    : 'Start Learning'}
+                <ArrowRight size={16} />
+              </a>
+            )}
+            {continueWeek && course.progressPercent < 100 && (
+              <p className="text-xs text-white/50 pl-2 md:pl-0 mt-2 md:mt-3">
+                Up next: <span className="text-white/80 font-medium">{learnerUnit} {continueWeek?.number}</span>
+              </p>
+            )}
+          </div>
+        </div>
+      </header>
 
-            {/* Module list */}
+      {/* 2. Main Content Grid */}
+      <main className="flex-1 px-4 md:px-6 py-10 md:py-12">
+        <div className="max-w-[1100px] mx-auto grid lg:grid-cols-[1fr_320px] gap-10 items-start">
+          
+          {/* Left Column: Curriculum */}
+          <section className="min-w-0 order-2 lg:order-1">
+            <h2 className="text-xl font-display font-extrabold text-white mb-6">Course Curriculum</h2>
+            
             <div className="space-y-4">
-              {weekGroups.map((group, gi) => (
-                <div key={group.module?.id ?? 'unassigned'}>
-                  {(() => {
-                    const completed = group.weeks.filter(w => w.progress.status === 'COMPLETE').length
-                    const inProgress = group.weeks.some(w => w.progress.status === 'IN_PROGRESS')
-                    const allDone = completed === group.weeks.length && group.weeks.length > 0
-                    const target = group.weeks.find(w => w.progress.status !== 'COMPLETE') ?? group.weeks[0]
-                    const title = group.module?.title ?? `${learnerUnit} ${gi + 1}`
-
-                    return (
-                      <a
-                        href={target ? `/course/${course.slug}/week/${target.slug}` : undefined}
-                        className={`flex items-start gap-3 rounded-2xl border p-3.5 hover:border-white/25 transition-colors ${
-                          allDone
-                            ? 'border-[#F5C518]/20 bg-[#F5C518]/8'
-                            : inProgress
-                              ? 'border-teal-400/20 bg-teal-400/8'
-                              : 'border-white/8 bg-white/[0.02]'
-                        }`}
-                      >
-                        <div className="shrink-0 mt-0.5">
-                          {allDone
-                            ? <CheckCircle2 size={16} className="text-[#F5C518]" />
-                            : <PlayCircle size={16} className={inProgress ? 'text-teal-400' : 'text-white/25'} />
-                          }
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[10px] font-mono uppercase tracking-widest text-white/30 mb-0.5">
+              {weekGroups.map((group, gi) => {
+                const moduleId = group.module?.id ?? `unassigned-${gi}`
+                const isExpanded = isModuleExpanded(moduleId)
+                const moduleWeeks = group.weeks
+                const completedCount = moduleWeeks.filter(w => w?.progress?.status === 'COMPLETE').length
+                const totalMin = moduleWeeks.reduce((s, w) => s + w.estimatedCompletionMinutes, 0)
+                const allDone = completedCount === moduleWeeks.length && moduleWeeks.length > 0
+                
+                return (
+                  <div key={moduleId} className="rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden transition-colors hover:border-white/20">
+                    <button
+                      onClick={() => toggleModule(moduleId)}
+                      className="w-full text-left px-5 py-4 flex items-center justify-between gap-4 focus:outline-none focus:bg-white/[0.04]"
+                      aria-expanded={isExpanded}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className={`text-[10px] font-mono uppercase tracking-[0.15em] ${allDone ? 'text-[#F5C518]' : 'text-white/40'}`}>
                             {learnerUnit} {gi + 1}
-                          </div>
-                          <div className="text-sm font-medium text-white leading-snug truncate">{title}</div>
-                          <div className="flex items-center gap-2 mt-1 text-[10px] text-white/30">
-                            <Clock3 size={10} /> {completed}/{group.weeks.length} complete
-                          </div>
+                          </span>
+                          {allDone && <span className="text-[10px] font-bold text-[#F5C518] uppercase tracking-wider bg-[#F5C518]/10 px-2 py-0.5 rounded">Complete</span>}
                         </div>
-                      </a>
-                    )
-                  })()}
-                </div>
-              ))}
+                        <h3 className="text-base font-semibold text-white leading-snug pr-4">
+                          {group.module?.title ?? 'Additional Lessons'}
+                        </h3>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-white/40">
+                          <span className="flex items-center gap-1.5"><BookOpen size={12} /> {moduleWeeks.length} lessons</span>
+                          {totalMin > 0 && <span className="flex items-center gap-1.5"><Clock3 size={12} /> {totalMin >= 60 ? `${Math.round(totalMin / 60)}h` : `${totalMin}m`}</span>}
+                          <span>{completedCount}/{moduleWeeks.length} done</span>
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-white/40 transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }}>
+                        <ChevronDown size={20} />
+                      </div>
+                    </button>
+                    
+                    {/* Lessons List (Progressive Disclosure) */}
+                    {isExpanded && (
+                      <div className="border-t border-white/5 bg-black/20">
+                        {moduleWeeks.map((week, wi) => {
+                          const isComplete = week?.progress?.status === 'COMPLETE'
+                          const isCurrent = week?.id === continueWeek?.id
+                          const isLocked = false
+                          
+                          return (
+                            <a
+                              key={week?.id}
+                              href={isLocked ? '#' : `/course/${course.slug}/week/${week?.slug}`}
+                              className={`flex items-center gap-4 p-4 border-b border-white/5 last:border-b-0 transition-colors ${
+                                isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/[0.04]'
+                              }`}
+                              aria-disabled={isLocked}
+                              tabIndex={isLocked ? -1 : 0}
+                            >
+                              <div className="shrink-0">
+                                {isComplete ? (
+                                  <CheckCircle2 size={18} className="text-[#F5C518]" />
+                                ) : isCurrent ? (
+                                  <PlayCircle size={18} className="text-[#F5C518]" />
+                                ) : isLocked ? (
+                                  <Lock size={18} className="text-white/20" />
+                                ) : (
+                                  <div className="w-[18px] h-[18px] rounded-full border-2 border-white/20" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-medium truncate ${isCurrent ? 'text-[#F5C518]' : 'text-white'}`}>
+                                  <span className="text-white/40 font-normal mr-2">{wi + 1}.</span>
+                                  {week?.title}
+                                </p>
+                              </div>
+                              {week?.durationLabel && (
+                                <span className="shrink-0 text-xs text-white/30">{week?.durationLabel}</span>
+                              )}
+                            </a>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-          </aside>
+          </section>
 
-          {/* Main content */}
-          <section className="min-w-0">
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_right,_rgba(245,197,24,0.15),_transparent_35%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-8 md:p-10 mb-6"
-            >
-              <p className="text-xs font-mono uppercase tracking-[0.2em] text-[#F5C518] mb-3">
-                {course.level || 'Programme'}{course.estimatedDuration ? ` · ${course.estimatedDuration}` : ''}
-              </p>
-              <h2 className="font-display text-3xl md:text-4xl font-extrabold text-white leading-tight mb-3">{course.title}</h2>
-              <p className="text-white/55 leading-relaxed mb-5">{course.description}</p>
+          {/* Right Column: Resources Sidebar */}
+          <aside className="order-1 lg:order-2 space-y-6">
 
-              {/* Certificate of Completion highlight */}
-              <div className="mb-6 flex items-start gap-3.5 rounded-2xl border border-[#F5C518]/25 bg-[#F5C518]/[0.07] px-5 py-4">
-                <div className="w-10 h-10 rounded-xl bg-[#F5C518]/15 border border-[#F5C518]/30 flex items-center justify-center shrink-0">
-                  <Award size={20} className="text-[#F5C518]" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-white mb-0.5">Certificate of Completion</p>
-                  <p className="text-xs text-white/55 leading-relaxed">
-                    Earn a certificate after completing this course — finish every lesson, assignment, and quiz to unlock it, then showcase it on LinkedIn and your CV.
-                  </p>
-                </div>
+            {/* Certificate Highlight */}
+            <div className="rounded-2xl border border-[#F5C518]/20 bg-[#F5C518]/[0.05] p-5">
+              <div className="w-10 h-10 rounded-xl bg-[#F5C518]/15 border border-[#F5C518]/30 flex items-center justify-center mb-3">
+                <Award size={20} className="text-[#F5C518]" />
               </div>
-
-              {course.heroImage && (
-                <div className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-                  <img src={course.heroImage} alt={`${course.title} preview`} loading="lazy" decoding="async" className="aspect-[16/9] w-full object-cover" />
-                </div>
-              )}
-
-              {/* Course preview video — blended into the hero, sits between the description and the CTAs */}
-              {course.introVideoUrl && (
-                <div className="mb-6 rounded-2xl overflow-hidden border border-white/10 bg-black/40">
-                  <VideoEmbed url={course.introVideoUrl} title={`${course.title} — preview`} />
-                </div>
-              )}
-
-              {continueWeek && (
-                <div className="flex flex-wrap items-center gap-3">
-                  <a
-                    href={`/course/${course.slug}/week/${continueWeek.slug}`}
-                    className="inline-flex items-center gap-2 bg-[#F5C518] text-[#0A0A0A] font-semibold px-6 py-3 rounded-full hover:bg-[#E8B800] transition-colors"
-                  >
-                    {course.progressPercent > 0 ? `Continue ${learnerUnit} ${continueWeek.number}` : `Start ${learnerUnit} ${continueWeek.number}`}
-                    <ArrowRight size={15} />
-                  </a>
-                  <a
-                    href="/dashboard"
-                    className="inline-flex items-center gap-2 border border-white/15 text-white/70 px-5 py-3 rounded-full hover:border-white/30 hover:text-white transition-colors text-sm"
-                  >
-                    My dashboard
-                  </a>
-                </div>
-              )}
-            </motion.div>
+              <h3 className="text-sm font-bold text-white mb-1.5">Certificate of Completion</h3>
+              <p className="text-xs text-white/60 leading-relaxed mb-4">
+                Finish all lessons, assignments, and quizzes to unlock your certificate and showcase it on LinkedIn.
+              </p>
+              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mb-2">
+                <div className="h-full bg-[#F5C518]" style={{ width: `${course.progressPercent}%` }} />
+              </div>
+              <p className="text-[10px] font-mono uppercase tracking-wider text-[#F5C518] text-right">
+                {course.progressPercent}% Earned
+              </p>
+            </div>
 
             {/* Course Overview Slides */}
             {course.overviewSlideUrl && (
-              <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-[#F5C518]">
-                    <rect x="3" y="4" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="2"/>
-                    <path d="M3 9h18" stroke="currentColor" strokeWidth="2"/>
-                  </svg>
-                  <h3 className="text-sm font-mono uppercase tracking-[0.18em] text-white/40">
-                    Course overview slides
-                  </h3>
-                </div>
-                {/* Embedded slide preview with skeleton + error fallback */}
-                <div className="mb-3">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                  <BookOpen size={16} className="text-[#F5C518]" />
+                  Course Slides
+                </h3>
+                <div className="mb-3 rounded-lg overflow-hidden border border-white/10">
                   <EmbedFrame
                     src={getSlideEmbedUrl(course.overviewSlideUrl)}
                     fallbackUrl={course.overviewSlideUrl}
@@ -496,246 +549,72 @@ export default function CoursePage() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs text-[#F5C518] hover:text-[#E8B800] transition-colors"
                 >
-                  Open slides in full screen <ArrowRight size={12} />
+                  Open in full screen <ArrowRight size={12} />
                 </a>
               </div>
             )}
 
             {/* Facilitators */}
-            {course.facilitators.length > 0 && (
-              <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 mb-6 flex flex-wrap gap-4">
-                {course.facilitators.map(f => {
-                  const initials = f.name.replace(/^(Dr|Mr|Ms|Prof)\.\s*/i, '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-                  return (
+            {(course.facilitators || []).length > 0 && (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                  <Users size={16} className="text-[#F5C518]" />
+                  Facilitators
+                </h3>
+                <div className="space-y-4">
+                  {(course.facilitators || []).map(f => (
                     <div key={f.id} className="flex items-center gap-3">
                       {facilitatorPhotoUrl(f) ? (
-                        <img src={facilitatorPhotoUrl(f)!} alt={f.name} className="w-9 h-9 rounded-full object-cover" />
+                        <img src={facilitatorPhotoUrl(f)!} alt={f.name} className="w-10 h-10 rounded-full object-cover bg-white/10 shrink-0 border border-white/10" />
                       ) : (
-                        <div className="w-9 h-9 rounded-full bg-[#F5C518]/15 border border-[#F5C518]/25 flex items-center justify-center text-[#F5C518] font-extrabold text-xs">
-                          {initials}
+                        <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0 border border-white/10">
+                          <Users size={16} className="text-white/40" />
                         </div>
                       )}
-                      <div>
-                        <p className="text-sm font-semibold text-white">{f.name}</p>
-                        <p className="text-xs text-white/40">{f.title}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-white truncate">{f.name}</p>
+                        <p className="text-xs text-white/50 truncate">{f.title || f.organization}</p>
                       </div>
                     </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Module Browser */}
-            <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 md:p-8 mb-6">
-              <div className="mb-6">
-                <p className="text-xs font-mono uppercase tracking-[0.18em] text-white/30 mb-1">Course modules</p>
-                <h3 className="font-display text-2xl font-extrabold text-white">Explore all {learnerUnits.toLowerCase()}</h3>
-              </div>
-
-              <div className="space-y-3">
-                {weekGroups.map((group) => (
-                  <div key={group.module?.id ?? 'unassigned'}>
-                    {group.module ? (
-                      <>
-                        <button
-                          onClick={() => setExpandedModules(p => ({ ...p, [group.module!.id]: !p[group.module!.id] }))}
-                          className="w-full flex items-center justify-between gap-3 rounded-xl border border-[#F5C518]/20 bg-[#F5C518]/5 p-4 hover:border-[#F5C518]/40 hover:bg-[#F5C518]/10 transition-colors"
-                        >
-                          <div className="text-left min-w-0">
-                            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-[#F5C518] mb-1">
-                              Module {group.module.position ?? ''}
-                            </p>
-                            <p className="text-base font-semibold text-white">{group.module.title}</p>
-                            <p className="text-xs text-white/40 mt-1">{group.weeks.length} {unit.toLowerCase()}{group.weeks.length !== 1 ? 's' : ''}</p>
-                          </div>
-                          <ChevronDown
-                            size={16}
-                            className={`text-white/40 shrink-0 transition-transform duration-200 ${expandedModules[group.module.id] ? 'rotate-180' : ''}`}
-                          />
-                        </button>
-                        {expandedModules[group.module.id] && (
-                          <div className="mt-2 ml-2 space-y-2 pl-4 border-l border-white/10">
-                            {group.weeks.map(week => {
-                              const isComplete = week.progress.status === 'COMPLETE'
-                              const isInProgress = week.progress.status === 'IN_PROGRESS'
-                              return (
-                                <a
-                                  key={week.id}
-                                  href={`/course/${course.slug}/week/${week.slug}`}
-                                  className={`flex items-center justify-between gap-3 rounded-lg p-3 text-sm transition-colors ${
-                                    isComplete
-                                      ? 'border border-[#F5C518]/20 bg-[#F5C518]/5 text-white'
-                                      : isInProgress
-                                        ? 'border border-teal-400/20 bg-teal-400/5 text-white'
-                                        : 'border border-white/8 bg-white/[0.02] text-white/70 hover:bg-white/[0.05]'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    {isComplete && <CheckCircle2 size={14} className="text-[#F5C518] shrink-0" />}
-                                    <div className="min-w-0">
-                                      <p className="text-[11px] font-mono text-white/40">{unit} {week.number}</p>
-                                      <p className="font-medium truncate">{week.title}</p>
-                                    </div>
-                                  </div>
-                                  <span className="text-[11px] text-white/30 shrink-0">{week.durationLabel}</span>
-                                </a>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="space-y-2">
-                        {group.weeks.map(week => {
-                          const isComplete = week.progress.status === 'COMPLETE'
-                          const isInProgress = week.progress.status === 'IN_PROGRESS'
-                          return (
-                            <a
-                              key={week.id}
-                              href={`/course/${course.slug}/week/${week.slug}`}
-                              className={`flex items-center justify-between gap-3 rounded-lg p-3 text-sm transition-colors ${
-                                isComplete
-                                  ? 'border border-[#F5C518]/20 bg-[#F5C518]/5 text-white'
-                                  : isInProgress
-                                    ? 'border border-teal-400/20 bg-teal-400/5 text-white'
-                                    : 'border border-white/8 bg-white/[0.02] text-white/70 hover:bg-white/[0.05]'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                {isComplete && <CheckCircle2 size={14} className="text-[#F5C518] shrink-0" />}
-                                <div className="min-w-0">
-                                  <p className="text-[11px] font-mono text-white/40">{unit} {week.number}</p>
-                                  <p className="font-medium truncate">{week.title}</p>
-                                </div>
-                              </div>
-                              <span className="text-[11px] text-white/30 shrink-0">{week.durationLabel}</span>
-                            </a>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Modules roadmap — pictorial flow of the modules in this course */}
-            {weekGroups.filter(g => !!g.module).length > 0 && (
-              <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 md:p-8">
-                <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
-                  <div>
-                    <p className="text-xs font-mono uppercase tracking-[0.18em] text-white/30 mb-1">Modules roadmap</p>
-                    <h3 className="font-display text-2xl font-extrabold text-white">Your journey through {weekGroups.filter(g => !!g.module).length} module{weekGroups.filter(g => !!g.module).length !== 1 ? 's' : ''}</h3>
-                  </div>
-                  {continueWeek && (
-                    <a href={`/course/${course.slug}/week/${continueWeek.slug}`} className="text-sm text-[#F5C518] hover:text-[#FFE070] transition-colors">
-                      Jump back in →
-                    </a>
-                  )}
-                </div>
-
-                {/* Pictorial: numbered nodes connected by a vertical "track" on the left */}
-                <div className="relative pl-2">
-                  {/* The connecting track */}
-                  <div className="absolute top-6 bottom-6 left-[31px] w-[2px] bg-gradient-to-b from-[#F5C518]/40 via-white/10 to-white/5" />
-
-                  <div className="space-y-5">
-                    {weekGroups.filter(g => !!g.module).map((group, gi) => {
-                      const moduleWeeks = group.weeks
-                      const completedCount = moduleWeeks.filter(w => w.progress.status === 'COMPLETE').length
-                      const inProgressCount = moduleWeeks.filter(w => w.progress.status === 'IN_PROGRESS').length
-                      const totalMin = moduleWeeks.reduce((s, w) => s + w.estimatedCompletionMinutes, 0)
-                      const allDone = completedCount === moduleWeeks.length && moduleWeeks.length > 0
-                      const started = completedCount > 0 || inProgressCount > 0
-                      const firstUnfinished = moduleWeeks.find(w => w.progress.status !== 'COMPLETE')
-                      const ctaWeek = firstUnfinished ?? moduleWeeks[0]
-                      return (
-                        <motion.div
-                          key={group.module!.id}
-                          initial={{ opacity: 0, x: -8 }}
-                          whileInView={{ opacity: 1, x: 0 }}
-                          viewport={{ once: true }}
-                          transition={{ delay: gi * 0.08 }}
-                          className="relative flex items-stretch gap-5"
-                        >
-                          {/* Numbered node */}
-                          <div className="relative flex-shrink-0">
-                            <div className={`relative z-10 w-16 h-16 rounded-full flex items-center justify-center font-display text-xl font-extrabold border-4 ${
-                              allDone
-                                ? 'bg-[#F5C518] text-[#0A0A0A] border-[#F5C518]/30'
-                                : started
-                                  ? 'bg-teal-400 text-[#0A0A0A] border-teal-400/30'
-                                  : 'bg-[#0F0F11] text-white/60 border-white/15'
-                            }`}>
-                              {allDone ? <CheckCircle2 size={26} /> : gi + 1}
-                            </div>
-                          </div>
-
-                          {/* Module card */}
-                          <a
-                            href={ctaWeek ? `/course/${course.slug}/week/${ctaWeek.slug}` : undefined}
-                            className={`group flex-1 rounded-2xl border p-5 transition-colors ${
-                              allDone
-                                ? 'border-[#F5C518]/20 bg-[#F5C518]/[0.04] hover:border-[#F5C518]/40'
-                                : started
-                                  ? 'border-teal-400/20 bg-teal-400/[0.04] hover:border-teal-400/40'
-                                  : 'border-white/10 bg-black/20 hover:border-white/25'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-3 mb-2">
-                              <div className="min-w-0">
-                                <p className={`text-[10px] font-mono uppercase tracking-[0.18em] mb-1 ${
-                                  allDone ? 'text-[#F5C518]' : started ? 'text-teal-400' : 'text-white/40'
-                                }`}>
-                                  Module {gi + 1}
-                                </p>
-                                <h4 className="text-base font-semibold text-white leading-snug">{group.module!.title}</h4>
-                              </div>
-                              {(allDone || started) && (
-                                <span className={`text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${
-                                  allDone ? 'text-[#F5C518]' : 'text-teal-400'
-                                }`}>
-                                  {allDone ? 'Complete' : 'In progress'}
-                                </span>
-                              )}
-                            </div>
-                            {group.module!.description && (
-                              <p className="text-xs text-white/45 leading-relaxed mb-3 line-clamp-2">
-                                {group.module!.description}
-                              </p>
-                            )}
-                            {/* Progress bar */}
-                            <div className="mb-3">
-                              <div className="h-1 rounded-full bg-white/8 overflow-hidden">
-                                <div
-                                  className={`h-full transition-all ${allDone ? 'bg-[#F5C518]' : 'bg-teal-400'}`}
-                                  style={{ width: `${moduleWeeks.length === 0 ? 0 : (completedCount / moduleWeeks.length) * 100}%` }}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between gap-3 text-xs text-white/45">
-                              <div className="flex items-center gap-3">
-                                <span className="inline-flex items-center gap-1"><BookOpen size={11} />{moduleWeeks.length} {unit.toLowerCase()}{moduleWeeks.length !== 1 ? 's' : ''}</span>
-                                <span className="inline-flex items-center gap-1"><Clock3 size={11} />{totalMin >= 60 ? `${Math.round(totalMin / 60)}h` : `${totalMin}m`}</span>
-                                <span>{completedCount}/{moduleWeeks.length} done</span>
-                              </div>
-                              {ctaWeek && (
-                                <span className="inline-flex items-center gap-1 text-white/60 group-hover:text-white transition-colors">
-                                  {allDone ? 'Review' : started ? 'Continue' : 'Start'} <ArrowRight size={11} />
-                                </span>
-                              )}
-                            </div>
-                          </a>
-                        </motion.div>
-                      )
-                    })}
-                  </div>
+                  ))}
                 </div>
               </div>
             )}
-          </section>
+          </aside>
+
         </div>
       </main>
     </div>
   )
 }
+
+
+
+
+
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {error: string | null, stack: string | null}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props)
+    this.state = { error: null, stack: null }
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error: error.message || String(error), stack: error.stack || '' }
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen bg-black text-red-500 p-8 font-mono">
+          <h1 className="text-3xl font-bold mb-4">CRASH!</h1>
+          <p className="text-xl mb-4">{this.state.error}</p>
+          <pre className="bg-white/10 p-4 rounded text-sm overflow-auto whitespace-pre-wrap">{this.state.stack}</pre>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+export default function CoursePage() {
+  return <ErrorBoundary><CoursePageInner /></ErrorBoundary>
+}
+
