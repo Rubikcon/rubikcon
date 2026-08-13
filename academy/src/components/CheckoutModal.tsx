@@ -25,7 +25,7 @@ export default function CheckoutModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleCheckout = async (currency: 'NGN' | 'USD') => {
+  const handleCheckout = async (currency: string) => {
     setLoading(true)
     setError(null)
     try {
@@ -33,7 +33,7 @@ export default function CheckoutModal({
         '/academy/payments/initialize',
         {
           method: 'POST',
-          body: { courseId, currency },
+          body: JSON.stringify({ courseId, currency }),
         }
       )
       
