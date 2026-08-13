@@ -10,6 +10,7 @@ import { apiRequest } from '../lib/api'
 import { getStoredAuth } from '../lib/auth'
 import { coursePriceInfo } from '../lib/pricing'
 import type { CourseSummary } from '../types/academy'
+import CheckoutModal from '../components/CheckoutModal'
 
 const DEFAULT_COURSE_SLUG = 'blockchain-social-impact'
 
@@ -55,6 +56,7 @@ function CoursePageInner() {
   const [error, setError] = useState<string | null>(null)
   const [enrolling, setEnrolling] = useState(false)
   const [enrollError, setEnrollError] = useState<string | null>(null)
+  const [showCheckout, setShowCheckout] = useState(false)
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({})
   const auth = getStoredAuth()
 
@@ -78,6 +80,12 @@ function CoursePageInner() {
 
   async function handleEnroll() {
     if (!auth) { window.location.href = `/login?redirect=/course/${slug}`; return }
+    
+    if (course?.isPaid) {
+      setShowCheckout(true)
+      return
+    }
+
     setEnrolling(true)
     setEnrollError(null)
     try {
@@ -219,9 +227,6 @@ function CoursePageInner() {
                       Save {price.discountPercent}%
                     </span>
                   )}
-                  <span className="w-full text-xs text-white/35">
-                    Online payment (card via Paystack &amp; crypto) is launching soon — enrol now to reserve your seat and our team will follow up on payment.
-                  </span>
                 </div>
               ) : (
                 <p className="mb-6 text-xs text-white/40 max-w-xl leading-relaxed">
@@ -325,6 +330,22 @@ function CoursePageInner() {
               </div>
             </div>
           </div>
+          {showCheckout && course && (
+            <CheckoutModal
+              courseId={course.id}
+              courseTitle={course.title}
+              priceNgn={course.priceNgn}
+              priceUsd={course.priceUsd}
+              discountedPriceNgn={course.discountedPriceNgn}
+              discountedPriceUsd={course.discountedPriceUsd}
+              onClose={() => setShowCheckout(false)}
+              onSuccess={() => {
+                setShowCheckout(false)
+                // Just reload to get enrolled state since webhook processes it asynchronously
+                window.location.reload()
+              }}
+            />
+          )}
         </main>
       </div>
     )

@@ -33,6 +33,7 @@ model User {
   moduleFeedbacks          ModuleFeedback[]
   profile                  UserProfile?
   facilitatorProfile       Facilitator?
+  payments                 Payment[]
 
   @@index([email])
   @@map("users")

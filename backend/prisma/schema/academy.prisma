@@ -38,6 +38,7 @@ model Course {
   courseFacilitators CourseFacilitator[]
   approvals          CourseApproval[]
   enrollments        CourseEnrollment[]
+  payments           Payment[]
 
   @@index([createdById])
   @@index([status])
@@ -51,8 +52,9 @@ model CourseEnrollment {
   courseId   String
   enrolledAt DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  payment Payment?
 
   @@unique([userId, courseId])
   @@index([userId])
@@ -619,4 +621,58 @@ model WeekProgress {
   @@index([userId])
   @@index([weekId])
   @@map("week_progress")
+}
+
+// --- Payments ---
+
+model Payment {
+  id                String  @id @default(uuid())
+  internalReference String  @unique // Our generated ID sent to provider
+  userId            String
+  courseId          String
+  enrollmentId      String? @unique // Links to CourseEnrollment on SUCCESS
+
+  // Base Course Pricing (The source of truth)
+  basePrice    Decimal @db.Decimal(14, 2)
+  baseCurrency String // 'NGN' or 'USD'
+
+  // Payment Execution (What is actually quoted/paid)
+  payableAmount   Decimal @db.Decimal(18, 8) // Major units (accommodates crypto decimals)
+  paymentCurrency String // 'NGN', 'USD', 'USDT', 'BTC', etc.
+
+  // Provider details
+  provider          PaymentProvider
+  paymentMethod     String? // 'CARD', 'CRYPTO', etc.
+  providerReference String?         @unique // Received from provider
+  providerMetadata  Json? // Raw dump for debugging/support
+
+  status PaymentStatus @default(PENDING)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  paidAt    DateTime?
+
+  user       User              @relation(fields: [userId], references: [id])
+  course     Course            @relation(fields: [courseId], references: [id])
+  enrollment CourseEnrollment? @relation(fields: [enrollmentId], references: [id])
+
+  @@index([userId])
+  @@index([courseId])
+  @@index([internalReference])
+  @@index([providerReference])
+  @@index([status])
+  @@map("payments")
+}
+
+enum PaymentProvider {
+  PAYSTACK
+  NOWPAYMENTS
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
 }

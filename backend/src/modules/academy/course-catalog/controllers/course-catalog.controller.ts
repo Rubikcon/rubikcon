@@ -1199,6 +1199,10 @@ export class CourseCatalogController {
         const course = await prisma.course.findUnique({ where: { slug } })
         if (!course) return sendError(res, 'Course not found', 404)
         
+        if (course.isPaid) {
+          return sendError(res, 'This course requires payment. Please use the checkout flow.', 403)
+        }
+
         const existing = await prisma.courseEnrollment.findUnique({
           where: { userId_courseId: { userId, courseId: course.id } }
         })

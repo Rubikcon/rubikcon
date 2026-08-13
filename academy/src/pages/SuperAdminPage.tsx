@@ -23,6 +23,7 @@ import {
 import AcademyNavbar from "../components/AcademyNavbar";
 import { apiRequest } from "../lib/api";
 import SiteContentManager from "../components/SiteContentManager";
+import AdminPaymentsTab from "../components/AdminPaymentsTab";
 import { getStoredAuth } from "../lib/auth";
 import { compressImageToBase64 } from "../lib/imageCompress";
 import type { AdminSubmission, CourseStatus } from "../types/academy";
@@ -129,7 +130,8 @@ type Tab =
   | "learners"
   | "users"
   | "facilitators"
-  | "content";
+  | "content"
+  | "payments";
 
 // ─── Facilitator management types (matches GET /superadmin/facilitators) ──
 
@@ -1015,6 +1017,7 @@ export default function SuperAdminPage() {
     { id: "learners", label: "Learners", icon: Users },
     { id: "users", label: "Users", icon: Users },
     { id: "facilitators", label: "Facilitators", icon: UserCog },
+    { id: "payments", label: "Payments", icon: Database },
     { id: "content", label: "Site Content", icon: Database },
   ];
 
@@ -1262,7 +1265,6 @@ export default function SuperAdminPage() {
                   <button
                     onClick={() => {
                       setActiveTab("users");
-                      /* removed */
                     }}
                     className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white/70 hover:text-white hover:border-white/30 transition-colors"
                   >
@@ -2370,6 +2372,13 @@ export default function SuperAdminPage() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* 💎 PAYMENTS TAB 💎 */}
+          {activeTab === "payments" && (
+            <div className="mt-8">
+              <AdminPaymentsTab />
             </div>
           )}
 
