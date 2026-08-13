@@ -14,6 +14,7 @@ import { enrollmentRoutes } from "../modules/academy/enrollment/enrollment.route
 import { progressRoutes } from "../modules/academy/progress/progress.routes";
 import { quizzesRoutes } from "../modules/academy/quizzes/quizzes.routes";
 import { assignmentsRoutes } from "../modules/academy/assignments/assignments.routes";
+import { paymentsRoutes } from "../modules/academy/payments/payments.routes";
 import gamesRoutes from "../modules/games/games.routes";
 import gigsRoutes from "../modules/gigs/gigs.routes";
 import { userManagementRoutes } from "../modules/user-management/user-management.routes";
@@ -49,7 +50,12 @@ app.use(compression());
 // Swagger
 setupSwagger(app);
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ 
+  limit: "10mb",
+  verify: (req: any, res, buf) => {
+    req.rawBody = buf.toString();
+  }
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // API responses are personalised (optionalAuth mixes enrollment state into
@@ -115,6 +121,7 @@ app.use("/api/academy", enrollmentRoutes);
 app.use("/api/academy", progressRoutes);
 app.use("/api/academy", quizzesRoutes);
 app.use("/api/academy", assignmentsRoutes);
+app.use("/api/academy/payments", paymentsRoutes);
 app.use("/api/games", gamesRoutes);
 app.use("/api/gigs", gigsRoutes);
 app.use("/api/academy", userManagementRoutes);
