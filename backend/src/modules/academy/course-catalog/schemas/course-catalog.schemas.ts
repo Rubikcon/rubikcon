@@ -31,7 +31,7 @@ export const CreateCourseSchema = z.object({
 
 export const UpdateCourseSchema = CreateCourseSchema.partial()
 
-export const CoursePricingSchema = z.object({
+export const CoursePricingSchema = z.object({ isPaid: z.boolean().optional(),
   priceUsd: z.number().min(0).max(1_000_000).nullable().optional(),
   priceNgn: z.number().min(0).max(1_000_000_000).nullable().optional(),
   discountPercent: z.number().int().min(0).max(100).nullable().optional(),

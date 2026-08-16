@@ -37,7 +37,7 @@ export class PaystackProvider implements IPaymentProvider {
           amount: amountInSubunit,
           currency,
           email,
-          // You could optionally pass a callback_url here if not set in Paystack dashboard
+          callback_url: "http://localhost:3001/dashboard"
         }),
       })
 
