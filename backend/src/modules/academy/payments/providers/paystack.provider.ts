@@ -1,6 +1,7 @@
 import * as crypto from 'crypto'
 import { IPaymentProvider, InitializationResult } from './payment-provider.interface'
-import { AppError } from '../../../../shared/errors/AppError'
+import { AppError } from '../../../../shared/errors/AppError';
+import { config } from '../../../../config/env';
 
 export class PaystackProvider implements IPaymentProvider {
   private secretKey: string
@@ -37,7 +38,7 @@ export class PaystackProvider implements IPaymentProvider {
           amount: amountInSubunit,
           currency,
           email,
-          callback_url: "http://localhost:3001/dashboard"
+          callback_url: `${config.academyUrl}/dashboard`
         }),
       })
 
