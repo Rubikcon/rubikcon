@@ -1,12 +1,14 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  server: { port: 3001 },
+  server: {
+    port: 3001,
+  },
   build: {
-    target: 'esnext',
-    minify: 'terser',
+    target: "esnext",
+    minify: "terser",
     terserOptions: {
       compress: {
         drop_console: true,
@@ -16,23 +18,23 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'vendor': ['react', 'react-dom', 'wouter'],
-          'ui': ['framer-motion', 'lucide-react'],
+          vendor: ["react", "react-dom", "wouter"],
+          ui: ["framer-motion", "lucide-react"],
         },
-        chunkFileNames: 'js/[name]-[hash].js',
-        entryFileNames: 'js/[name]-[hash].js',
+        chunkFileNames: "js/[name]-[hash].js",
+        entryFileNames: "js/[name]-[hash].js",
         assetFileNames: (assetInfo) => {
-          const info = assetInfo.name.split('.')
-          const ext = info[info.length - 1]
+          const info = assetInfo.name.split(".");
+          const ext = info[info.length - 1];
           if (/png|jpe?g|gif|svg/.test(ext)) {
-            return `img/[name]-[hash][extname]`
+            return `img/[name]-[hash][extname]`;
           }
-          return `[name]-[hash][extname]`
+          return `[name]-[hash][extname]`;
         },
       },
     },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'wouter', 'framer-motion', 'lucide-react'],
+    include: ["react", "react-dom", "wouter", "framer-motion", "lucide-react"],
   },
-})
+});

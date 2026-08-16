@@ -303,8 +303,9 @@ export default function SuperAdminPage() {
   const [pricingForm, setPricingForm] = useState({
     priceUsd: "",
     priceNgn: "",
-    discountPercent: "",
-  });
+      discountPercent: "",
+      isPaid: false,
+    });
   const [savingPricing, setSavingPricing] = useState(false);
 
   // Users
@@ -867,6 +868,7 @@ export default function SuperAdminPage() {
         body: JSON.stringify({
           priceUsd: parseNum(pricingForm.priceUsd),
           priceNgn: parseNum(pricingForm.priceNgn),
+            isPaid: pricingForm.isPaid,
           discountPercent: pricingForm.discountPercent.trim()
             ? Math.round(Number(pricingForm.discountPercent))
             : null,
@@ -2463,7 +2465,20 @@ export default function SuperAdminPage() {
               "{pricingCourse.title}"
             </p>
             <form onSubmit={savePricing} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+                              <div>
+                  <label className="flex items-center gap-2 text-sm text-white/70 mb-4 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={pricingForm.isPaid}
+                      onChange={(e) =>
+                        setPricingForm((p) => ({ ...p, isPaid: e.target.checked }))
+                      }
+                      className="rounded border-white/20 bg-black/30 text-[#F5C518] focus:ring-[#F5C518]/40"
+                    />
+                    Require Payment (Checkout will be enabled)
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs text-white/40 mb-1">
                     Price (USD)
