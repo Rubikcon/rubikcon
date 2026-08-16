@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { X, Loader2, CreditCard, Bitcoin } from 'lucide-react'
+import DePayWidgets from '@depay/widgets'
 import { apiRequest } from '../lib/api'
 
 interface CheckoutModalProps {
@@ -26,6 +27,45 @@ export default function CheckoutModal({
   const [error, setError] = useState<string | null>(null)
 
   const handleCheckout = async (currency: string) => {
+    if (currency === 'USDT' || currency === 'CRYPTO') {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await apiRequest<{ checkoutUrl: string; internalReference: string }>(
+          '/academy/payments/initialize',
+          {
+            method: 'POST',
+            body: JSON.stringify({ courseId, currency: 'USDT' }),
+          }
+        )
+        setLoading(false)
+        
+        DePayWidgets.Payment({
+          accept: [{
+            blockchain: 'polygon',
+            amount: usdPrice,
+            token: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', // Polygon USDT
+            receiver: import.meta.env.VITE_CRYPTO_WALLET_ADDRESS || '0x0000000000000000000000000000000000000000'
+          }],
+          succeeded: async (transaction: any) => {
+            try {
+              await apiRequest('/academy/payments/verify-web3', {
+                method: 'POST',
+                body: JSON.stringify({ internalReference: res.internalReference, txHash: transaction.id })
+              })
+              window.location.href = '/dashboard'
+            } catch (err) {
+              console.error(err)
+            }
+          }
+        })
+        return
+      } catch (err: any) {
+        setError(err.message || 'Failed to initialize crypto checkout')
+        setLoading(false)
+        return
+      }
+    }
     setLoading(true)
     setError(null)
     try {
@@ -123,7 +163,7 @@ export default function CheckoutModal({
                     </div>
                     <div className="text-left">
                       <div className="font-semibold text-white">Pay with Crypto</div>
-                      <div className="text-sm text-white/50">via NOWPayments (BTC, ETH, etc)</div>
+                      <div className="text-sm text-white/50">via DePay (Web3 Wallet)</div>
                     </div>
                   </div>
                   <div className="font-bold text-white">${usdPrice.toLocaleString()}</div>

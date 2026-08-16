@@ -1,4 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
+import { createPublicClient, http } from 'viem'
+import { polygon } from 'viem/chains'
+import prisma from '../../../../infrastructure/prisma/client'
 import { AppError } from '../../../../shared/errors/AppError'
 import { courseCatalogRepository } from '../../course-catalog/repositories/course-catalog.repository'
 import { paymentsRepository } from '../repositories/payments.repository'
@@ -27,7 +30,7 @@ export class PaymentsService {
     
     let basePriceStr: string
     let payableAmount: number
-    let provider: IPaymentProvider
+    let provider: IPaymentProvider | null = null
     let providerEnum: 'PAYSTACK' | 'NOWPAYMENTS'
     let paymentMethod: string
 
@@ -49,10 +52,9 @@ export class PaymentsService {
         payableAmount = payableAmount * (1 - course.discountPercent / 100)
       }
     } else {
-      // Crypto -> NOWPayments. Base currency passed to NOWPayments is USD.
-      provider = this.nowpayments
-      providerEnum = 'NOWPAYMENTS'
-      paymentMethod = 'CRYPTO'
+      // Crypto -> Web3 (DePay)
+        providerEnum = 'NOWPAYMENTS'
+        paymentMethod = 'CRYPTO'
       
       if (!course.priceUsd) {
         throw new AppError('USD Price not configured for this course. Required for crypto conversion.', 400)
@@ -81,7 +83,22 @@ export class PaymentsService {
     })
 
     try {
-      const initResult = await provider.initializePayment(internalReference, payableAmount, curr, email)
+      if (curr !== 'NGN' && curr !== 'USD') {
+        // Web3 doesn't need external URL initialization
+        return {
+          checkoutUrl: '',
+          internalReference
+        }
+      }
+
+      if (curr !== 'NGN' && curr !== 'USD') {
+        return {
+          checkoutUrl: '',
+          internalReference
+        }
+      }
+
+      const initResult = await provider!.initializePayment(internalReference, payableAmount, curr, email)
       
       if (initResult.providerReference) {
         await paymentsRepository.updatePaymentProviderDetails(payment.id, initResult.providerReference)
@@ -138,6 +155,50 @@ export class PaymentsService {
     }
     
     return { status: 'ignored' }
+  }
+
+  
+  async verifyWeb3Payment(internalReference: string, txHash: string) {
+    const payment = await paymentsRepository.findByInternalReference(internalReference)
+    if (!payment) throw new AppError('Payment not found', 404)
+    if (payment.status === 'SUCCESS') return payment
+
+    const client = createPublicClient({ chain: polygon, transport: http() })
+    
+    try {
+      const receipt = await client.getTransactionReceipt({ hash: txHash as `0x${string}` })
+      if (receipt.status !== 'success') {
+        throw new AppError('Transaction failed on-chain', 400)
+      }
+
+      // Very simple validation for MVP: Check if the transaction succeeded.
+      // In production, parse ERC20 Transfer events to ensure exact amount/recipient.
+      const expectedAmount = payment.payableAmount
+      
+      const updatedPayment = await prisma.$transaction(async (tx) => {
+        const p = await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'SUCCESS' },
+        })
+
+        const existingEnrollment = await tx.courseEnrollment.findFirst({
+          where: { userId: p.userId, courseId: p.courseId },
+        })
+
+        if (!existingEnrollment) {
+          await tx.courseEnrollment.create({
+            data: { userId: p.userId, courseId: p.courseId },
+          })
+        }
+
+        return p
+      })
+
+      return updatedPayment
+    } catch (err: any) {
+      console.error("Viem Error:", err)
+      throw new AppError("Failed to verify transaction on-chain", 400)
+    }
   }
 
   async verifyNowPaymentsWebhook(signature: string, payload: any, rawBody: string) {

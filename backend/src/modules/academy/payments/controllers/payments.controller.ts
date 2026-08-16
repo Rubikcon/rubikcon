@@ -55,6 +55,22 @@ export class PaymentsController {
     }
   }
 
+  
+  async verifyWeb3(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { internalReference, txHash } = req.body
+      if (!internalReference || !txHash) {
+        return sendError(res, 'Missing reference or txHash', 400)
+      }
+
+      await paymentsService.verifyWeb3Payment(internalReference, txHash)
+      return sendSuccess(res, null, 'Web3 Payment Verified')
+    } catch (err: any) {
+      console.error('Web3 verify error:', err)
+      return sendError(res, err.message, 400)
+    }
+  }
+
   async nowpaymentsWebhook(req: Request, res: Response, next: NextFunction) {
     try {
       const signature = req.headers['x-nowpayments-sig'] as string
