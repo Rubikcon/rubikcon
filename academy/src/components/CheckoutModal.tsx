@@ -26,6 +26,9 @@ export default function CheckoutModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const ngnPrice = discountedPriceNgn || priceNgn
+  const usdPrice = discountedPriceUsd || priceUsd
+
   const handleCheckout = async (currency: string) => {
     if (currency === 'USDT' || currency === 'CRYPTO') {
       setLoading(true)
@@ -43,7 +46,7 @@ export default function CheckoutModal({
         DePayWidgets.Payment({
           accept: [{
             blockchain: 'polygon',
-            amount: usdPrice,
+            amount: usdPrice || 0,
             token: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', // Polygon USDT
             receiver: import.meta.env.VITE_CRYPTO_WALLET_ADDRESS || '0x0000000000000000000000000000000000000000'
           }],
@@ -85,8 +88,6 @@ export default function CheckoutModal({
     }
   }
 
-  const ngnPrice = discountedPriceNgn || priceNgn
-  const usdPrice = discountedPriceUsd || priceUsd
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
