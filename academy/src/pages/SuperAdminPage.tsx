@@ -69,6 +69,7 @@ type SuperAdminCourse = {
   submittedAt: string | null;
   createdAt: string;
   // Prisma Decimal fields arrive as strings over JSON
+  isPaid: boolean;
   priceUsd: string | number | null;
   priceNgn: string | number | null;
   discountPercent: number | null;
@@ -848,6 +849,7 @@ export default function SuperAdminPage() {
       priceNgn: course.priceNgn != null ? String(Number(course.priceNgn)) : "",
       discountPercent:
         course.discountPercent != null ? String(course.discountPercent) : "",
+      isPaid: !!course.isPaid,
     });
   }
 
