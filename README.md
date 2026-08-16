@@ -1,337 +1,276 @@
-# 🧱 Rubikcon — Web3 Multi-Product Platform
-
-A production-ready monorepo containing 4 independent frontend applications and a unified backend API.
+# Rubikcon Protocol v1.0
 
 ---
 
-## 📁 Project Structure
+## Summary
 
-```bash
+Rubikcon is a comprehensive hybrid Web2/Web3 platform integrating a Learning Management System (Academy), a decentralized talent marketplace (BlockGigs), and a session-based gaming hub. The system utilizes centralized database infrastructure combined with decentralized payment verification to enable seamless fiat and cryptocurrency course enrollments.
+
+### Key Features
+
+- Multi-tenant architecture
+- Web3 native cryptocurrency checkout (DePay, Polygon USDT)
+- Fiat payment integration (Paystack NGN/USD)
+- Secure, stateless authentication via JWT
+- Robust server-side payment verification (HMAC-SHA512 and on-chain RPC)
+
+---
+
+## System Architecture
+
+### Core Components
+
+- Academy Frontend (React/Vite)
+  - Responsibility: Provides the LMS UI, video rendering, progress tracking, and checkout initiation.
+  - Key Functions: `handleCheckout`, `DePayWidgets.Payment`
+
+- Core API Backend (Express/Node.js)
+  - Responsibility: Manages core state, validates external webhooks, and verifies on-chain transactions.
+  - Key Functions: `verifyWeb3Payment`, `verifyPaystackWebhook`
+
+- Database (PostgreSQL + Prisma)
+  - Responsibility: Persists users, courses, module structures, and transaction states.
+  - Key Functions: `paymentsRepository`, `courseEnrollment`
+
+---
+
+## Component Interaction Flow
+
+1. User -> Academy Frontend
+   - Calls `handleCheckout` with currency intent (Fiat or Crypto)
+
+2. Academy Frontend -> Backend API
+   - Calls `/initialize` to generate internal tracking reference
+
+3. Backend API -> Frontend Checkout UI
+   - Returns `internalReference`. Frontend mounts DePay widget or Paystack redirect.
+
+4. External Payment Processor -> Backend API
+   - For Fiat: Paystack fires HMAC-signed POST to `/webhook/paystack`
+   - For Crypto: Frontend captures `txHash` and POSTs to `/verify-web3`
+
+5. Final State
+   - Backend updates `Payment` record to SUCCESS and inserts `CourseEnrollment`. User gains course access.
+
+---
+
+## Example Execution
+
+### Crypto Course Enrollment
+
+1. User calls:
+
+   ```ts
+   handleCheckout("USDT");
+   ```
+
+2. Frontend processes request:
+   - Fetches internal reference from backend
+   - Instantiates `DePayWidgets.Payment`
+   - User signs transaction via Web3 provider
+
+3. Internal operations (Backend):
+   - Receives `txHash`
+   - Queries Polygon RPC via `viem`
+   - Validates receipt success status
+
+4. Result:
+   - Payment marked SUCCESS
+   - CourseEnrollment created
+
+---
+
+## State & Data Model
+
+- User Model
+  - Description: Global account identifier
+  - Fields: id, email, password, name, role
+
+- Course Model
+  - Description: Educational product definition
+  - Fields: id, title, isPaid, priceUsd, priceNgn
+
+- Payment Model
+  - Description: Transaction tracking layer
+  - Fields: id, internalReference, providerReference, amount, status
+
+---
+
+## Invariants & Security Model
+
+- Enrollments require strict verification
+- Webhook endpoints enforce signature matching
+- Price variables originate strictly from the backend database
+
+### Failure Conditions
+
+- Reverts when:
+  - Paystack HMAC-SHA512 signature is invalid or missing
+  - Web3 transaction receipt status is not 'success'
+  - Course is marked as free but payment route is invoked
+
+---
+
+## External Dependencies
+
+- Paystack API
+  - Purpose: Fiat payment processing and webhook notifications
+
+- Polygon RPC Node (via Viem)
+  - Usage: Validates on-chain transaction receipts
+
+---
+
+## Configuration
+
+- PAYSTACK_SECRET_KEY
+  - Description: API key for Paystack verification
+  - Default: sk*test*...
+
+- VITE_CRYPTO_WALLET_ADDRESS
+  - Description: Merchant wallet address receiving crypto payments
+  - Default: 0x0...
+
+---
+
+## Getting Started
+
+### Monorepo Structure & Domains
+
+```text
 rubikcon/
-├── landing/          → rubikcon.com                    (port 3000)
-├── academy/          → www.rubikconacademy.xyz        (port 3001)
-├── games/            → games.rubikcon.com              (port 3002)
-├── blockgigs/        → blockgigs.rubikcon.com          (port 3003)
-└── backend/          → api.rubikcon.com                (port 4000)
+├── landing/          -> rubikcon.com                   (port 3000)
+├── academy/          -> www.rubikconacademy.xyz        (port 3001)
+├── games/            -> games.rubikcon.com             (port 3002)
+├── blockgigs/        -> blockgigs.rubikcon.com         (port 3003)
+└── backend/          -> api.rubikcon.com               (port 4000)
 ```
 
----
-
-## ⚙️ Tech Stack
-
-| Layer    | Technology                                                     |
-| -------- | -------------------------------------------------------------- |
-| Frontend | React 18, Vite, TypeScript, TailwindCSS, Framer Motion, Wouter |
-| Backend  | Node.js, Express, TypeScript                                   |
-| Database | PostgreSQL + Prisma ORM                                        |
-| Auth     | JWT (access tokens, 7d expiry)                                 |
-| Sessions | Anonymous session support (no login required for Games)        |
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
+### Requirements
 
 - Node.js 18+
 - PostgreSQL 14+
-- npm or pnpm
 
----
+### Installation & Local Development
 
-### 1. Backend Setup
+Clone the repository and install dependencies for each module:
+
+```bash
+git clone <repo>
+cd rubikcon
+```
+
+Start the Backend API (Port 4000):
 
 ```bash
 cd backend
-
-# Install dependencies
 npm install
-
-# Copy env file and configure
-cp .env.example .env
-# Edit .env — set DATABASE_URL to your PostgreSQL connection string
-
-# Generate Prisma client
-npm run db:generate
-
-# Run migrations
-npm run db:migrate
-
-# Seed the database
-npm run db:seed
-
-# Start dev server
 npm run dev
-# → API running at http://localhost:4000
-# → Health check: http://localhost:4000/health
 ```
 
-**Seed credentials:**
-
-| Role  | Email              | Password    |
-| ----- | ------------------ | ----------- |
-| Admin | admin@rubikcon.com | admin123456 |
-| Demo  | demo@rubikcon.com  | demo12345   |
-
----
-
-### 2. Frontend Apps
-
-Each app is independent. Run them in separate terminals:
+Start the Landing Page (Port 3000):
 
 ```bash
-# Landing Page (port 3000)
-cd landing && npm install && npm run dev
-
-# Academy (port 3001)
-cd academy && npm install && npm run dev
-
-# Games (port 3002)
-cd games && npm install && npm run dev
-
-# BlockGigs (port 3003)
-cd blockgigs && npm install && npm run dev
+cd landing
+npm install
+npm run dev
 ```
 
----
-
-## 🌐 Apps Overview
-
-### 🏠 Landing Page (`/landing`) — Port 3000
-
-The main marketing site for Rubikcon.
-
-**Pages:**
-
-- `/` — Full homepage (Hero, Products, Features, Testimonials, CTA, Footer)
-- `/login` — JWT login form
-- `/signup` — Account creation form
-
-**Features:**
-
-- Parallax hero with animated mesh background
-- Product showcase cards (Academy, Games, BlockGigs)
-- Mobile-responsive nav with dropdown
-- Auth forms connect to backend API
-
----
-
-### 🎓 Academy (`/academy`) — Port 3001
-
-Full learning management system.
-
-**Pages:**
-
-- `/` — Course landing with enroll CTA
-- `/course` — Module browser with progress tracking
-- `/lesson/:id` — Full lesson experience
-
-**Features:**
-
-- 4 modules, 10+ lessons (static data — wire to backend to persist)
-- Expandable module sidebar
-- Embedded YouTube video player
-- Mark as Complete with progress bar
-- Next/Previous lesson navigation
-- Lesson content renderer (markdown-like)
-
----
-
-### 🎮 Games (`/games`) — Port 3002
-
-Session-based gaming platform. **No login required.**
-
-**Pages:**
-
-- `/` — Game lobby with leaderboard
-- `/play/:id` — Active play screen
-
-**Games implemented:**
-
-- **Hash Runner** — Type block numbers to score combos (30s timer)
-- **Block Blast** — Tap colored tiles before they vanish (45s timer)
-- All other games: Hash Runner engine (extend to add new games)
-
-**Features:**
-
-- Anonymous session via `localStorage` (UUID-based)
-- Personal high score tracking per game
-- Live leaderboard sidebar
-- Score saved to session, upgradeable to on-chain with account
-
----
-
-### 💼 BlockGigs (`/blockgigs`) — Port 3003
-
-Decentralized talent marketplace.
-
-**Pages:**
-
-- `/` — Gig + Freelancer marketplace with filters
-- `/gig/:id` — Full gig detail with application form
-- `/freelancer/:id` — Freelancer profile with reviews
-
-**Features:**
-
-- Filter by category, currency, difficulty
-- Featured gig highlighting
-- Apply with proposal form (requires auth on backend)
-- Freelancer profiles with ratings, reviews, posted gigs
-
----
-
-## 🔌 Backend API Reference
-
-Base URL: `http://localhost:4000`
-
-### Auth
+Start the Academy (Port 3001):
 
 ```bash
-POST   /auth/signup          Register new user
-POST   /auth/login           Login, receive JWT
-GET    /auth/me              Get current user (requires token)
+cd academy
+npm install
+npm run dev
 ```
 
-### Academy
+Start Games (Port 3002):
 
 ```bash
-GET    /academy/course           List all courses
-GET    /academy/course/:slug     Single course with modules + lessons
-GET    /academy/lesson/:id       Single lesson
-POST   /academy/progress         Mark lesson complete (auth required)
-GET    /academy/progress         Get my progress (auth required)
+cd games
+npm install
+npm run dev
 ```
 
-### Games
+Start BlockGigs (Port 3003):
 
 ```bash
-POST   /games/session/start       Start a new session (anon or auth)
-GET    /games/session/:id         Get session + scores
-POST   /games/score               Submit a score
-GET    /games/leaderboard         Global top 50 scores
-GET    /games/leaderboard/:gameId Top scores for one game
+cd blockgigs
+npm install
+npm run dev
 ```
 
-### Gigs
+### Environment Setup
+
+Create a `.env` file in the `backend/` directory:
+
+```text
+DATABASE_URL=<postgres_url>
+JWT_SECRET=<secret>
+PAYSTACK_SECRET_KEY=<key>
+```
+
+Create a `.env` file in the `academy/` directory:
+
+```text
+VITE_CRYPTO_WALLET_ADDRESS=<address>
+VITE_API_URL=http://localhost:4000
+```
+
+## Build
 
 ```bash
-GET    /gigs                      List gigs (paginated, filterable)
-GET    /gigs/:id                  Single gig detail
-POST   /gigs                      Post a gig (auth required)
-POST   /gigs/apply                Apply to a gig (auth required)
-GET    /gigs/:id/applications     View applications (poster only)
-```
-
-### Auth Header
-
-```
-Authorization: Bearer <jwt_token>
-```
-
-### Response Format
-
-```json
-{
-  "success": true,
-  "message": "Success",
-  "data": { ... },
-  "timestamp": "2025-04-09T12:00:00.000Z"
-}
+npm run build
 ```
 
 ---
 
-## 🗄️ Database Schema
+## Test
 
 ```bash
-User         → id, email, password, name, role
-Session      → id, userId (nullable), expiresAt
-Course       → id, title, slug, published
-Module       → id, courseId, title, position
-Lesson       → id, moduleId, title, content, videoUrl, duration, position
-Progress     → id, userId, lessonId, completed  [unique: userId+lessonId]
-Score        → id, sessionId, userId (nullable), gameId, score
-Gig          → id, posterId, title, budget, currency, skills[], status
-Application  → id, gigId, userId, proposal, rate, status
+npm test
 ```
 
 ---
 
-## 🔐 Security Notes
-
-- Passwords hashed with bcrypt (12 rounds)
-- JWT signed with HS256, 7-day expiry
-- Input validation with Zod on all endpoints
-- CORS restricted to configured origins
-- Prisma error boundary middleware
-- Anonymous game sessions never expose user data
-
----
-
-## 🚢 Deployment
-
-### Frontend (Vercel)
-
-Each app deploys independently to Vercel. Set environment build commands:
+## Coverage
 
 ```bash
-Build: npm run build
-Output: dist
+npm run coverage
 ```
 
-Update `APPS` URLs in each frontend from `localhost` to production domains.
+---
 
-### Backend (Railway / Render)
+## Deployment (Optional)
 
 ```bash
-# Set these environment variables in your deployment:
-DATABASE_URL=postgresql://...
-JWT_SECRET=your-production-secret-min-32-chars
-ALLOWED_ORIGINS=https://rubikcon.com,https://www.rubikconacademy.xyz,...
-PORT=4000
-NODE_ENV=production
+vercel deploy
 ```
 
-### Database
+---
 
-Use Railway PostgreSQL, Supabase, or Neon.tech for managed PostgreSQL.
+## Notes & Variants
+
+- For NGN/USD checkout, use Paystack integration.
+- For Crypto checkout, use DePay widget integration.
 
 ---
 
-## 📜 Scripts Reference
+## Roadmap (Optional)
 
-| App     | Command               | Description            |
-| ------- | --------------------- | ---------------------- |
-| all     | `npm install`         | Install dependencies   |
-| all     | `npm run dev`         | Start dev server       |
-| all     | `npm run build`       | Production build       |
-| backend | `npm run db:generate` | Generate Prisma client |
-| backend | `npm run db:migrate`  | Run DB migrations      |
-| backend | `npm run db:seed`     | Seed demo data         |
-| backend | `npm run db:studio`   | Open Prisma Studio     |
-
----
-
-## 🛠 Extending the Platform
-
-### Add a new game to Games app
-
-1. Create a new game component in `games/src/pages/PlayPage.tsx`
-2. Add its entry to `games/src/data/gamesData.ts`
-3. Add a case in `renderGame()` inside `PlayPage`
-
-### Add a new course to Academy
-
-1. Add modules/lessons to `academy/src/data/courseData.ts`  
-   OR seed via `backend/prisma/seed.ts` and wire the API
-
-### Add a new API module to Backend
-
-1. Create `backend/src/modules/<name>/<name>.routes.ts`
-2. Add `prisma.model` to `schema.prisma`
-3. Run `npm run db:migrate`
-4. Mount the router in `backend/src/index.ts`
+- [ ] Set Paystack keys to Live Mode
+- [ ] Register production webhook URL in Paystack dashboard
+- [ ] Configure VITE_CRYPTO_WALLET_ADDRESS in Vercel
+- [ ] Implement automated refund mechanism for edge-case failures
+- [ ] Implement email receipt dispatcher
+- [ ] Harden Authentication: Migrate to a 3rd-party provider (e.g., Clerk, Supabase Auth) or implement native email verification and password reset flows.
+- [ ] Complete Facilitator Dashboard: Implement full CRUD interfaces for managing modules, lessons, and assignments.
+- [ ] Build SuperAdmin User Management: Create UI to manage users, manual enrollments, and platform analytics.
+- [ ] Complete Facilitator Application Flow: Build the backend approval/rejection pipeline for pending facilitators.
+- [ ] Integrate Games & BlockGigs: Connect the remaining placeholder frontend apps to their respective backend API modules.
 
 ---
 
-Built with ❤️ for the Web3 frontier - by [Natzsmart](https://www.github.com/Natzsmart)
+## License
+
+MIT

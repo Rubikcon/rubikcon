@@ -1,49 +1,170 @@
-# Rubikcon Backend
+# Rubikcon Backend API v1.0
 
-The core backend service for the Rubikcon platform, handling Authentication, Course Catalog, Progress tracking, Gamification, and User Management.
+---
 
-## Tech Stack
+## Summary
 
-- **Runtime**: Node.js
-- **Framework**: Express.js
-- **Language**: TypeScript
-- **Database**: PostgreSQL (via Prisma ORM)
-- **Validation**: Zod
-- **Documentation**: Swagger / OpenAPI
+The central authoritative state machine and API for the Rubikcon ecosystem. Built with Express and Prisma, it handles cross-application authentication, database mutations, and strict payment verifications.
 
-## Architecture
+### Key Features
 
-This repository adheres strictly to a canonical layered architecture:
+- Stateless JWT Authentication
+- Paystack Webhook Validator
+- Web3 On-Chain Receipt Validator (Viem)
+- Relational schema management via Prisma
 
-- `src/modules/*/*.routes.ts`: Express route definitions
-- `src/modules/*/*.controller.ts`: Request validation and HTTP responses
-- `src/modules/*/*.service.ts`: Core business logic
-- `src/modules/*/*.repository.ts`: Data access layer
+---
 
-For detailed architectural guidelines, see `docs/architecture.md`.
+## System Architecture
+
+### Core Components
+
+- PaymentsController
+  - Responsibility: Exposes webhook and verification endpoints.
+  - Key Functions: `verifyWeb3`, `paystackWebhook`
+
+- PaymentsService
+  - Responsibility: Contains business logic for signature verification and database transaction handling.
+  - Key Functions: `verifyWeb3Payment`, `verifyPaystackWebhook`
+
+- PaymentsRepository
+  - Responsibility: Abstracts Prisma operations.
+  - Key Functions: `updatePaymentStatus`
+
+---
+
+## Component Interaction Flow
+
+1. User -> /api/academy/payments/verify-web3
+   - Calls endpoint with `txHash`
+
+2. PaymentsController -> PaymentsService
+   - Internal routing
+
+3. PaymentsService -> Polygon RPC
+   - Executes `getTransactionReceipt` via Viem
+
+4. PaymentsService -> Prisma
+   - Executes `$transaction` to update payment and insert enrollment
+
+5. Final State
+   - Return 200 OK
+
+---
+
+## Example Execution
+
+### Webhook Validation
+
+1. Paystack calls:
+
+   ```http
+   POST /api/academy/payments/webhook/paystack
+   ```
+
+2. Backend processes request:
+   - Extracts `x-paystack-signature`
+
+3. Internal operations:
+   - Computes HMAC-SHA512 of raw body using `PAYSTACK_SECRET_KEY`
+   - Compares computed hash to signature
+   - Validates subunit amount and currency match
+
+4. Result:
+   - `CourseEnrollment` created safely
+
+---
+
+## State & Data Model
+
+- Payment
+  - Description: Immutable ledger of initialization and finalization states
+  - Fields: internalReference, status, amount
+
+- CourseEnrollment
+  - Description: Access control mapping
+  - Fields: userId, courseId
+
+---
+
+## Invariants & Security Model
+
+- Webhooks lacking valid HMAC signatures must fail immediately
+- Double-processing of webhooks is prevented by checking existing SUCCESS states
+
+### Failure Conditions
+
+- Reverts when:
+  - Signature hash mismatch
+  - Amount or currency payload mismatch
+  - On-chain txHash resolves to failed or reverted
+
+---
+
+## External Dependencies
+
+- Prisma ORM
+  - Purpose: Database operations
+
+- Viem
+  - Usage: Web3 RPC interactions
+
+---
+
+## Configuration
+
+- PAYSTACK_SECRET_KEY
+  - Description: Signing key for webhooks
+  - Default: sk*test*...
+
+---
 
 ## Getting Started
 
-### Prerequisites
+### Requirements
 
-- Node.js >= 18
-- Docker (for local database)
+- Node.js 18+
+- PostgreSQL 14+
 
-### Setup
+### Installation
 
-1. Clone the repository
-2. Run `npm install`
-3. Copy `.env.example` to `.env` and configure your local environment variables
-4. Start the database: `docker-compose up -d`
-5. Run migrations: `npx prisma migrate dev`
-6. Seed the database: `npm run seed`
+```bash
+cd backend
+npm install
+```
 
-### Running the App
+### Environment Setup
 
-- **Development**: `npm run dev`
-- **Production**: `npm start`
+Create `.env` file:
 
-## Documentation
+```bash
+DATABASE_URL=postgresql://...
+PAYSTACK_SECRET_KEY=sk_test_...
+```
 
-- **API Documentation**: Available at `/api-docs` when the server is running.
-- **Internal Docs**: See the `docs/` folder for information on architecture, authentication, the Academy module, and contributing guidelines.
+---
+
+## Build
+
+```bash
+npx prisma generate
+npm run build
+```
+
+---
+
+## Roadmap (Optional)
+
+- [ ] Set Paystack keys to Live Mode
+- [ ] Register production webhook URL in Paystack dashboard
+- [ ] Implement automated refund mechanism for edge-case failures
+- [ ] Implement email receipt dispatcher
+- [ ] Harden Authentication: Add email verification, password reset endpoints, or migrate to JWKS validation for 3rd-party auth.
+- [ ] Complete Facilitator API: Add full endpoints for course/module/lesson creation and assignment grading.
+- [ ] Complete SuperAdmin API: Add endpoints for analytics and role management.
+
+---
+
+## License
+
+MIT
