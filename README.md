@@ -156,7 +156,7 @@ rubikcon/
 Clone the repository and install dependencies for each module:
 
 ```bash
-git clone <repo>
+git clone https://github.com/Rubikcon/rubikcon.git
 cd rubikcon
 ```
 
