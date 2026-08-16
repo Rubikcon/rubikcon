@@ -1,6 +1,7 @@
 import * as crypto from 'crypto'
 import { IPaymentProvider, InitializationResult } from './payment-provider.interface'
 import { AppError } from '../../../../shared/errors/AppError'
+import { config } from '../../../../config/env'
 
 export class NowPaymentsProvider implements IPaymentProvider {
   private apiKey: string
@@ -21,7 +22,7 @@ export class NowPaymentsProvider implements IPaymentProvider {
     email: string
   ): Promise<InitializationResult> {
     try {
-      const response = await fetch('https://api.nowpayments.io/v1/invoice', {
+      const response = await fetch((process.env.NOWPAYMENTS_API_URL || "https://api.nowpayments.io/v1") + "/invoice", {
         method: 'POST',
         headers: {
           'x-api-key': this.apiKey,
@@ -31,7 +32,8 @@ export class NowPaymentsProvider implements IPaymentProvider {
           price_amount: amount,
           price_currency: currency.toLowerCase(), // NOWPayments often expects lowercase 'usd'
           order_id: internalReference,
-          order_description: 'Course Enrollment',
+          order_description: "Course Enrollment",
+          success_url: `${config.academyUrl}/dashboard`,
         }),
       })
 
