@@ -114,48 +114,186 @@ export class PaymentsService {
     }
   }
 
-  async verifyPaystackWebhook(signature: string, payload: any, rawBody: string) {
-    if (!this.paystack.verifyWebhookSignature(rawBody, signature)) {
-      throw new AppError('Invalid signature', 401)
-    }
+  // async verifyPaystackWebhook(signature: string, payload: any, rawBody: string) {
+  //   if (!this.paystack.verifyWebhookSignature(rawBody, signature)) {
+  //     throw new AppError('Invalid signature', 401)
+  //   }
 
-    const event = payload.event
-    const data = payload.data
+  //   const event = payload.event
+  //   const data = payload.data
 
-    if (event === 'charge.success') {
-      const internalReference = data.reference
-      const providerReference = data.id.toString()
+  //   if (event === 'charge.success') {
+  //     const internalReference = data.reference
+  //     const providerReference = data.id.toString()
 
-      const payment = await paymentsRepository.findByInternalReference(internalReference)
-      if (!payment) return { status: 'ignored', reason: 'payment not found' }
-      if (payment.status === 'SUCCESS') return { status: 'success', reason: 'already processed' }
+  //     const payment = await paymentsRepository.findByInternalReference(internalReference)
+  //     if (!payment) return { status: 'ignored', reason: 'payment not found' }
+  //     if (payment.status === 'SUCCESS') return { status: 'success', reason: 'already processed' }
 
-      // Validate amount (Paystack sends subunit)
-      const expectedSubunit = Math.round(Number(payment.payableAmount) * 100)
-      if (data.amount !== expectedSubunit) {
-        await paymentsRepository.markPaymentFailed(payment.id, { reason: 'Amount mismatch', payload: data })
-        return { status: 'failed', reason: 'amount mismatch' }
-      }
+  //     // Validate amount (Paystack sends subunit)
+  //     const expectedSubunit = Math.round(Number(payment.payableAmount) * 100)
+  //     if (data.amount !== expectedSubunit) {
+  //       await paymentsRepository.markPaymentFailed(payment.id, { reason: 'Amount mismatch', payload: data })
+  //       return { status: 'failed', reason: 'amount mismatch' }
+  //     }
       
-      if (data.currency !== payment.paymentCurrency) {
-        await paymentsRepository.markPaymentFailed(payment.id, { reason: 'Currency mismatch', payload: data })
-        return { status: 'failed', reason: 'currency mismatch' }
-      }
+  //     if (data.currency !== payment.paymentCurrency) {
+  //       await paymentsRepository.markPaymentFailed(payment.id, { reason: 'Currency mismatch', payload: data })
+  //       return { status: 'failed', reason: 'currency mismatch' }
+  //     }
 
-      // Mark success & Enroll safely via transaction
-      await paymentsRepository.updatePaymentProviderDetails(payment.id, providerReference)
-      await paymentsRepository.handleSuccessfulPayment(
-        payment.id, 
-        payment.userId, 
-        payment.courseId, 
-        data
-      )
+  //     // Mark success & Enroll safely via transaction
+  //     await paymentsRepository.updatePaymentProviderDetails(payment.id, providerReference)
+  //     await paymentsRepository.handleSuccessfulPayment(
+  //       payment.id, 
+  //       payment.userId, 
+  //       payment.courseId, 
+  //       data
+  //     )
       
-      return { status: 'success' }
-    }
+  //     return { status: 'success' }
+  //   }
     
-    return { status: 'ignored' }
+  //   return { status: 'ignored' }
+  // }
+
+  async verifyPaystackWebhook(signature: string, payload: any, rawBody: string) {
+  console.log('========== PAYSTACK WEBHOOK START ==========')
+
+  console.log('Event:', payload?.event)
+  console.log('Reference:', payload?.data?.reference)
+  console.log('Amount:', payload?.data?.amount)
+  console.log('Currency:', payload?.data?.currency)
+  console.log('Status:', payload?.data?.status)
+
+  const signatureValid =
+    this.paystack.verifyWebhookSignature(rawBody, signature)
+
+  console.log('Signature valid:', signatureValid)
+
+  if (!signatureValid) {
+    console.log('❌ INVALID PAYSTACK SIGNATURE')
+    throw new AppError('Invalid signature', 401)
   }
+
+  const event = payload.event
+  const data = payload.data
+
+  if (event === 'charge.success') {
+
+    const internalReference = data.reference
+    const providerReference = data.id.toString()
+
+    console.log('Looking for internal reference:', internalReference)
+
+    const payment =
+      await paymentsRepository.findByInternalReference(internalReference)
+
+    console.log(
+      'Payment found:',
+      payment
+        ? {
+            id: payment.id,
+            status: payment.status,
+            userId: payment.userId,
+            courseId: payment.courseId,
+            payableAmount: payment.payableAmount,
+            paymentCurrency: payment.paymentCurrency
+          }
+        : null
+    )
+
+    if (!payment) {
+      console.log('❌ PAYMENT NOT FOUND')
+      return {
+        status: 'ignored',
+        reason: 'payment not found'
+      }
+    }
+
+    if (payment.status === 'SUCCESS') {
+      console.log('⚠️ PAYMENT ALREADY SUCCESS')
+      return {
+        status: 'success',
+        reason: 'already processed'
+      }
+    }
+
+    const expectedSubunit =
+      Math.round(Number(payment.payableAmount) * 100)
+
+    console.log('Expected amount:', expectedSubunit)
+    console.log('Paystack amount:', data.amount)
+
+    if (data.amount !== expectedSubunit) {
+      console.log('❌ AMOUNT MISMATCH')
+
+      await paymentsRepository.markPaymentFailed(
+        payment.id,
+        {
+          reason: 'Amount mismatch',
+          payload: data
+        }
+      )
+
+      return {
+        status: 'failed',
+        reason: 'amount mismatch'
+      }
+    }
+
+    console.log('Expected currency:', payment.paymentCurrency)
+    console.log('Paystack currency:', data.currency)
+
+    if (data.currency !== payment.paymentCurrency) {
+      console.log('❌ CURRENCY MISMATCH')
+
+      await paymentsRepository.markPaymentFailed(
+        payment.id,
+        {
+          reason: 'Currency mismatch',
+          payload: data
+        }
+      )
+
+      return {
+        status: 'failed',
+        reason: 'currency mismatch'
+      }
+    }
+
+    console.log('✅ PAYMENT VALIDATION PASSED')
+    console.log('Updating provider reference...')
+
+    await paymentsRepository.updatePaymentProviderDetails(
+      payment.id,
+      providerReference
+    )
+
+    console.log('Calling handleSuccessfulPayment...')
+
+    await paymentsRepository.handleSuccessfulPayment(
+      payment.id,
+      payment.userId,
+      payment.courseId,
+      data
+    )
+
+    console.log('✅ PAYMENT + ENROLLMENT PROCESSED')
+    console.log('========== PAYSTACK WEBHOOK END ==========')
+
+    return {
+      status: 'success'
+    }
+  }
+
+  console.log('⚠️ Ignored Paystack event:', event)
+  console.log('========== PAYSTACK WEBHOOK END ==========')
+
+  return {
+    status: 'ignored'
+  }
+}
 
   
   async verifyWeb3Payment(internalReference: string, txHash: string) {
